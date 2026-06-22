@@ -1,0 +1,104 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-schibsted), system-ui, sans-serif;
+  background: #f3efe4;
+  color: #16190f;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: #15c07c;
+  color: #08231a;
+}
+
+input::placeholder {
+  color: #9a9a8c;
+}
+
+a {
+  color: inherit;
+}
+
+/* Smooth in-page anchor navigation. */
+html {
+  scroll-behavior: smooth;
+}
+
+/* --- Interactive hover states (originally `style-hover` in the design) --- */
+.btn-primary {
+  background: #15c07c;
+  transition: background 0.15s ease;
+}
+.btn-primary:hover {
+  background: #1ace87;
+}
+
+.btn-dark {
+  background: #16190f;
+  transition: background 0.15s ease;
+}
+.btn-dark:hover {
+  background: #000;
+}
+
+.btn-outline {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  transition: border-color 0.15s ease;
+}
+.btn-outline:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.nav-link {
+  transition: color 0.15s ease;
+}
+.nav-link:hover {
+  color: #15a06a;
+}
+
+.footer-link {
+  transition: color 0.15s ease;
+}
+.footer-link:hover {
+  color: #efede2;
+}
+
+/* --- Responsive: collapse the multi-column grids on smaller screens --- */
+@media (max-width: 920px) {
+  .hero-grid,
+  .offer-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .grid-3,
+  .grid-4,
+  .footer-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .trust-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  .offer-summary {
+    position: static !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .nav-links {
+    display: none !important;
+  }
+  .grid-3,
+  .grid-4,
+  .footer-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
