@@ -21,6 +21,7 @@ export default function Home() {
         }}
       >
         <div
+          className="section-inner"
           style={{
             maxWidth: 1200,
             margin: "0 auto",
@@ -73,7 +74,7 @@ export default function Home() {
             </a>
             <a
               href="#demo"
-              className="btn-primary"
+              className="btn-primary nav-cta"
               style={{
                 color: "#08231A",
                 fontWeight: 700,
@@ -149,6 +150,7 @@ export default function Home() {
               Konkurrenten svarer ikke kl.&nbsp;02:00. Det gjør du.
             </h1>
             <p
+              className="hero-sub"
               style={{
                 fontSize: 19,
                 lineHeight: 1.5,
@@ -320,6 +322,7 @@ export default function Home() {
 
         {/* Trust logos */}
         <div
+          className="section-inner"
           style={{
             maxWidth: 1200,
             margin: "64px auto 0",
@@ -345,8 +348,8 @@ export default function Home() {
       </section>
 
       {/* LIVE VOICE DEMO */}
-      <section id="demo" style={{ background: "#F3EFE4", padding: "96px 0" }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
+      <section id="demo" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
           <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto 40px" }}>
             <div style={{ ...eyebrowGreen, textAlign: "center" }}>Live demo</div>
             <h2
@@ -392,8 +395,9 @@ export default function Home() {
       </section>
 
       {/* PROBLEM */}
-      <section style={{ background: "#F3EFE4", padding: "96px 0" }}>
+      <section className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
         <div
+          className="section-inner"
           style={{ maxWidth: 1100, margin: "0 auto", padding: "0 32px", textAlign: "center" }}
         >
           <div
@@ -463,8 +467,8 @@ export default function Home() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section id="slik" style={{ background: "#F3EFE4", padding: "96px 0" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 32px" }}>
+      <section id="slik" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 32px" }}>
           <div style={eyebrowGreen}>Slik funker det</div>
           <h2
             style={{
@@ -513,8 +517,8 @@ export default function Home() {
       </section>
 
       {/* FEATURES */}
-      <section id="funksjoner" style={{ background: "#EDE8DB", padding: "96px 0" }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
+      <section id="funksjoner" className="section-pad" style={{ background: "#EDE8DB", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
           <div style={eyebrowGreen}>Funksjoner</div>
           <h2
             style={{
@@ -585,8 +589,8 @@ export default function Home() {
       </section>
 
       {/* INDUSTRIES */}
-      <section id="bransjer" style={{ background: "#F3EFE4", padding: "96px 0" }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
+      <section id="bransjer" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
           <div style={eyebrowGreen}>Bransjer</div>
           <h2
             style={{
@@ -640,8 +644,8 @@ export default function Home() {
       </section>
 
       {/* GUARANTEE */}
-      <section style={{ background: "#0B2118", color: "#EFEDE2", padding: "96px 0" }}>
-        <div style={{ maxWidth: 880, margin: "0 auto", padding: "0 32px", textAlign: "center" }}>
+      <section className="section-pad" style={{ background: "#0B2118", color: "#EFEDE2", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 880, margin: "0 auto", padding: "0 32px", textAlign: "center" }}>
           <div
             style={{
               width: 64,
@@ -703,8 +707,8 @@ export default function Home() {
       </section>
 
       {/* PRICING */}
-      <section id="priser" style={{ background: "#F3EFE4", padding: "96px 0" }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
+      <section id="priser" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
           <div style={{ textAlign: "center", maxWidth: 680, margin: "0 auto" }}>
             <div style={{ ...eyebrowGreen, textAlign: "center" }}>Transparente priser</div>
             <h2
@@ -845,8 +849,8 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" style={{ background: "#EDE8DB", padding: "96px 0" }}>
-        <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 32px" }}>
+      <section id="faq" className="section-pad" style={{ background: "#EDE8DB", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 820, margin: "0 auto", padding: "0 32px" }}>
           <div style={{ ...eyebrowGreen, textAlign: "center" }}>Vanlige spørsmål</div>
           <h2
             style={{
@@ -891,6 +895,7 @@ export default function Home() {
 
       {/* FINAL CTA */}
       <section
+        className="section-pad"
         style={{
           background: "#0B2118",
           backgroundImage:
@@ -899,7 +904,7 @@ export default function Home() {
           padding: "104px 0",
         }}
       >
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 32px", textAlign: "center" }}>
+        <div className="section-inner" style={{ maxWidth: 760, margin: "0 auto", padding: "0 32px", textAlign: "center" }}>
           <h2
             style={{
               fontSize: "clamp(32px,4.2vw,56px)",
@@ -972,7 +977,7 @@ export default function Home() {
       {/* FOOTER */}
       <footer style={{ background: "#08160F", color: "#9FB3A7", padding: "56px 0 40px" }}>
         <div
-          className="footer-grid"
+          className="footer-grid section-inner"
           style={{
             maxWidth: 1180,
             margin: "0 auto",
@@ -1019,6 +1024,7 @@ export default function Home() {
           </div>
         </div>
         <div
+          className="section-inner"
           style={{
             maxWidth: 1180,
             margin: "40px auto 0",

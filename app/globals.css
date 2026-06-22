@@ -79,6 +79,9 @@ html {
   .offer-grid {
     grid-template-columns: 1fr !important;
   }
+  .hero-grid {
+    gap: 40px !important;
+  }
   .grid-3,
   .grid-4,
   .footer-grid {
@@ -96,9 +99,30 @@ html {
   .nav-links {
     display: none !important;
   }
+  .nav-cta {
+    display: none !important;
+  }
   .grid-3,
   .grid-4,
   .footer-grid {
     grid-template-columns: 1fr !important;
+  }
+  .trust-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .section-pad {
+    padding-top: 56px !important;
+    padding-bottom: 56px !important;
+  }
+  .section-inner {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+  .hero-grid {
+    padding: 44px 18px 0 !important;
+    gap: 28px !important;
+  }
+  .hero-sub {
+    font-size: 16px !important;
   }
 }
