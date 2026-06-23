@@ -9,6 +9,17 @@ export default function BookingForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showTimeInput, setShowTimeInput] = useState(false);
+
+  const handleCompanyChange = (value: string) => {
+    setCompany(value);
+    if (value.trim()) setShowTimeInput(true);
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+    if (value.trim()) setShowTimeInput(true);
+  };
 
   const getMinDateTime = () => {
     const now = new Date();
@@ -70,7 +81,7 @@ export default function BookingForm() {
         type="text"
         placeholder="Bedriftsnavn"
         value={company}
-        onChange={(e) => setCompany(e.target.value)}
+        onChange={(e) => handleCompanyChange(e.target.value)}
         style={{
           width: "100%",
           padding: "14px 16px",
@@ -87,7 +98,7 @@ export default function BookingForm() {
         type="tel"
         placeholder="+47 000 00 000"
         value={phone}
-        onChange={(e) => setPhone(e.target.value)}
+        onChange={(e) => handlePhoneChange(e.target.value)}
         style={{
           width: "100%",
           padding: "14px 16px",
@@ -99,23 +110,27 @@ export default function BookingForm() {
           margin: "6px 0 14px",
         }}
       />
-      <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Tidspunkt for demo</label>
-      <input
-        type="datetime-local"
-        value={dateTime}
-        onChange={(e) => setDateTime(e.target.value)}
-        min={getMinDateTime()}
-        style={{
-          width: "100%",
-          padding: "14px 16px",
-          borderRadius: 11,
-          border: "1px solid #E2DCCB",
-          background: "#FFFFFF",
-          fontSize: 15,
-          fontFamily: "inherit",
-          margin: "6px 0 18px",
-        }}
-      />
+      {showTimeInput && (
+        <>
+          <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Tidspunkt for demo</label>
+          <input
+            type="datetime-local"
+            value={dateTime}
+            onChange={(e) => setDateTime(e.target.value)}
+            min={getMinDateTime()}
+            style={{
+              width: "100%",
+              padding: "14px 16px",
+              borderRadius: 11,
+              border: "1px solid #E2DCCB",
+              background: "#FFFFFF",
+              fontSize: 15,
+              fontFamily: "inherit",
+              margin: "6px 0 18px",
+            }}
+          />
+        </>
+      )}
       {error && <div style={{ fontSize: 13, color: "#C2562C", marginBottom: 12 }}>{error}</div>}
       {success && (
         <div style={{ fontSize: 13, color: "#15A06A", marginBottom: 12 }}>
