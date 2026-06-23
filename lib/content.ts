@@ -68,7 +68,6 @@ export const industries: Industry[] = [
   { title: "Helse & klinikk", desc: "Timebestilling, reseptfornyelse og pasienthenvendelser." },
   { title: "E-handel & nettbutikk", desc: "Ordrestatus, retur og produktspørsmål — automatisk." },
   { title: "Telekom & bredbånd", desc: "Support for mobil, bredbånd, TV og fasttelefon døgnet rundt." },
-  { title: "Offentlig sektor", desc: "Hjelp innbyggere med søknader, tjenester og informasjon." },
   { title: "Reiseliv & hotell", desc: "Rombestilling, endringer og gjestehenvendelser automatisk." },
 ];
 
