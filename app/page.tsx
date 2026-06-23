@@ -84,7 +84,7 @@ export default function Home() {
                 textDecoration: "none",
               }}
             >
-              Bygg agenten din gratis
+              Snakk med AI-agenten
             </a>
           </div>
         </div>
@@ -176,10 +176,10 @@ export default function Home() {
                   boxShadow: "0 10px 30px rgba(21,192,124,0.3)",
                 }}
               >
-                Bygg agenten din gratis →
+                Snakk med AI-agenten →
               </a>
               <a
-                href="#demo"
+                href="#book"
                 className="btn-outline"
                 style={{
                   background: "transparent",
@@ -191,7 +191,7 @@ export default function Home() {
                   textDecoration: "none",
                 }}
               >
-                Book 20-min demo
+                Book et møte →
               </a>
             </div>
             <div
@@ -701,150 +701,8 @@ export default function Home() {
               boxShadow: "0 10px 30px rgba(21,192,124,0.3)",
             }}
           >
-            Bygg agenten din gratis →
+            Snakk med AI-agenten →
           </a>
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section id="priser" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
-        <div className="section-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
-          <div style={{ textAlign: "center", maxWidth: 680, margin: "0 auto" }}>
-            <div style={{ ...eyebrowGreen, textAlign: "center" }}>Transparente priser</div>
-            <h2
-              style={{
-                fontSize: "clamp(30px,3.8vw,50px)",
-                lineHeight: 1.06,
-                letterSpacing: "-0.03em",
-                fontWeight: 800,
-                margin: "14px 0 0",
-                textWrap: "balance",
-              }}
-            >
-              Alt inkludert. Du betaler kun for taleminutter.
-            </h2>
-            <p
-              style={{
-                fontSize: 17,
-                color: "#4A4D40",
-                margin: "16px auto 0",
-                maxWidth: "50ch",
-                lineHeight: 1.5,
-              }}
-            >
-              Chat er alltid gratis. Dedikert nummer inkludert. Selvbetjent plattform inkludert.
-              Ingen skjulte kostnader.
-            </p>
-          </div>
-          <div
-            className="grid-4"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4,1fr)",
-              gap: 16,
-              marginTop: 48,
-              alignItems: "start",
-            }}
-          >
-            {/* Starter */}
-            <div style={priceCard}>
-              <div style={{ fontSize: 17, fontWeight: 700 }}>Starter</div>
-              <div style={{ fontSize: 13.5, color: "#5C5F52", marginTop: 2 }}>
-                100 min ≈ 50 samtaler
-              </div>
-              <div style={priceRow}>
-                <span style={priceBig}>990 kr</span>
-                <span style={{ fontSize: 13, color: "#5C5F52" }}>/mnd</span>
-              </div>
-              <a href="#demo" className="btn-dark" style={priceCtaDark}>
-                Kom i gang
-              </a>
-            </div>
-            {/* Growth */}
-            <div style={priceCard}>
-              <div style={{ fontSize: 17, fontWeight: 700 }}>Growth</div>
-              <div style={{ fontSize: 13.5, color: "#5C5F52", marginTop: 2 }}>
-                500 min ≈ 250 samtaler
-              </div>
-              <div style={priceRow}>
-                <span style={priceBig}>2 490 kr</span>
-                <span style={{ fontSize: 13, color: "#5C5F52" }}>/mnd</span>
-              </div>
-              <a href="#demo" className="btn-dark" style={priceCtaDark}>
-                Kom i gang
-              </a>
-            </div>
-            {/* Pro (highlighted) */}
-            <div
-              style={{
-                background: "#0B2118",
-                color: "#EFEDE2",
-                borderRadius: 16,
-                padding: 26,
-                position: "relative",
-                boxShadow: "0 20px 50px rgba(11,33,24,0.3)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: -12,
-                  left: 26,
-                  background: "#3FE0A0",
-                  color: "#08231A",
-                  fontFamily: mono,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  letterSpacing: "0.05em",
-                }}
-              >
-                MEST VALGT
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 700 }}>Pro</div>
-              <div style={{ fontSize: 13.5, color: "#AFC0B5", marginTop: 2 }}>
-                1 500 min ≈ 750 samtaler
-              </div>
-              <div style={priceRow}>
-                <span style={{ ...priceBig, color: "#fff" }}>6 990 kr</span>
-                <span style={{ fontSize: 13, color: "#AFC0B5" }}>/mnd</span>
-              </div>
-              <a
-                href="#demo"
-                className="btn-primary"
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  color: "#08231A",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  padding: 13,
-                  borderRadius: 11,
-                  textDecoration: "none",
-                }}
-              >
-                Bygg agenten din gratis
-              </a>
-            </div>
-            {/* Enterprise */}
-            <div style={priceCard}>
-              <div style={{ fontSize: 17, fontWeight: 700 }}>Enterprise</div>
-              <div style={{ fontSize: 13.5, color: "#5C5F52", marginTop: 2 }}>
-                22 500+ min · Egen SLA
-              </div>
-              <div style={priceRow}>
-                <span style={{ ...priceBig, fontSize: 30 }}>Tilpasset</span>
-              </div>
-              <a href="#demo" className="btn-dark" style={priceCtaDark}>
-                Kontakt oss
-              </a>
-            </div>
-          </div>
-          <p style={{ textAlign: "center", fontSize: 14, color: "#5C5F52", marginTop: 24 }}>
-            Alle planer: 0,50 kr/min · Ubegrenset chat (fair use) · Dedikert nummer · Ingen
-            binding · 60 dagers oppsigelse
-          </p>
         </div>
       </section>
 
@@ -950,10 +808,10 @@ export default function Home() {
                 boxShadow: "0 12px 34px rgba(21,192,124,0.34)",
               }}
             >
-              Bygg agenten din gratis →
+              Snakk med AI-agenten →
             </a>
             <a
-              href="#demo"
+              href="#book"
               className="btn-outline"
               style={{
                 background: "transparent",
@@ -965,7 +823,7 @@ export default function Home() {
                 textDecoration: "none",
               }}
             >
-              Book 20-min demo
+              Book et møte →
             </a>
           </div>
           <div style={{ fontSize: 14, color: "#8DA298", marginTop: 18 }}>
