@@ -61,6 +61,7 @@ export interface Industry {
 }
 
 export const industries: Industry[] = [
+  { title: "Service & vedlikehold", desc: "Timebestilling, serviceanmodninger og vedlikehold håndteres automatisk." },
   { title: "Bank & finans", desc: "Saldo, transaksjoner og lånespørsmål automatisk — døgnet rundt." },
   { title: "Forsikring", desc: "Effektiviser skademelding, polisespørsmål og kundeoppfølging." },
   { title: "Energi & strøm", desc: "Måleravlesning, fakturaspørsmål og strømbrudd håndteres automatisk." },
