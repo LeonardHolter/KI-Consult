@@ -134,7 +134,7 @@ export default function BookingForm() {
       {error && <div style={{ fontSize: 13, color: "#C2562C", marginBottom: 12 }}>{error}</div>}
       {success && (
         <div style={{ fontSize: 13, color: "#15A06A", marginBottom: 12 }}>
-          Takk! Vi kontakter deg på {phone}.
+          Takk! Vi kontakter deg så fort som mulig.
         </div>
       )}
       <button
