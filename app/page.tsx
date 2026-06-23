@@ -254,7 +254,7 @@ export default function Home() {
               Få en gratis live-demo
             </h3>
             <p style={{ fontSize: 15, color: "#5C5F52", margin: "0 0 18px", lineHeight: 1.45 }}>
-              20 minutter — vi viser plattformen live med din egen case.
+              20 minutter - vi viser plattformen live med din egen case.
             </p>
             <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Bedrift</label>
             <input
@@ -362,7 +362,7 @@ export default function Home() {
                 textWrap: "balance",
               }}
             >
-              Snakk med en norsk AI-agent — akkurat nå.
+              Snakk med en norsk AI-agent - akkurat nå.
             </h2>
             <p
               style={{
@@ -374,7 +374,7 @@ export default function Home() {
               }}
             >
               Gi agenten din egen instruksjon, trykk på knappen og snakk med den i
-              sanntid. Naturlig norsk stemme — rett i nettleseren.
+              sanntid. Naturlig norsk stemme - rett i nettleseren.
             </p>
           </div>
 
@@ -684,7 +684,7 @@ export default function Home() {
             }}
           >
             Prøv KI Consult i {gDays} dager. Hvis agenten ikke gir deg verdi, sier du ifra og får
-            hver krone tilbake — ingen spørsmål. Det er enklere å si ja enn å si nei.
+            hver krone tilbake - ingen spørsmål. Det er enklere å si ja enn å si nei.
           </p>
           <a
             href="#demo"
@@ -851,7 +851,7 @@ export default function Home() {
             </div>
             <p style={{ fontSize: 14.5, lineHeight: 1.55, margin: "14px 0 0", maxWidth: "34ch" }}>
               Norskutviklede AI-agenter for telefon, web og chat. Vi hjelper bedrifter med å
-              aldri miste en kunde — døgnet rundt.
+              aldri miste en kunde - døgnet rundt.
             </p>
           </div>
           <div>

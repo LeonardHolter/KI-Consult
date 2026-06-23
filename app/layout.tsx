@@ -17,7 +17,7 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KI Consult — Norskutviklet AI-kundeservice",
+  title: "KI Consult - Norskutviklet AI-kundeservice",
   description:
     "KI-agenten som tar telefonen, chatten og webhenvendelsene dine automatisk. Naturlig norsk stemme, BankID & Vipps, hostet i Norge.",
 };

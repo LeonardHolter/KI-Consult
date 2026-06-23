@@ -1,5 +1,5 @@
 // Mints a short-lived WebRTC conversation token for the ElevenLabs
-// Conversational AI agent. The secret API key stays on the server — the
+// Conversational AI agent. The secret API key stays on the server - the
 // browser only ever receives the single-use token.
 
 export const dynamic = "force-dynamic";

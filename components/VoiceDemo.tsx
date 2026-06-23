@@ -6,46 +6,18 @@ import { ConversationProvider, useConversation } from "@elevenlabs/react";
 
 const mono = "var(--font-space-mono), monospace";
 
-const DEFAULT_PROMPT = `Du er en vennlig norsk kundeservice-agent for et fiktivt strømselskap som heter "Fjordkraft Demo".
-Du svarer kort, naturlig og høflig på norsk (bokmål). Du hjelper kunder med spørsmål om strømpris, faktura, måleravlesning og flytting.
-Hvis du ikke vet svaret, sier du at du setter kunden over til en menneskelig rådgiver. Hold svarene korte — dette er en talesamtale.`;
+const PROMPT = `Du er resepsjonist for et tannlegesenter i Oslo som heter "Oslo Tannlegesenter".
+Du snakker naturlig norsk og hjelper pasienter med å bestille, flytte eller avlyse timer hos tannlegen.
+Du spør om navn, hva pasienten trenger hjelp med (undersøkelse, fyll, rens, akutt), og ønsket tidspunkt.
+Du kan gi generell info om åpningstider (mandag–fredag 08–17) og priser (undersøkelse 650 kr).
+Hold svarene korte og hyggelige - dette er en talesamtale.`;
 
-interface Preset {
-  label: string;
-  prompt: string;
-  firstMessage: string;
-}
-
-const PRESETS: Preset[] = [
-  {
-    label: "Strømselskap",
-    prompt: DEFAULT_PROMPT,
-    firstMessage:
-      "Hei, du snakker med Fjordkraft Demo. Hva kan jeg hjelpe deg med i dag?",
-  },
-  {
-    label: "Frisørsalong (booking)",
-    prompt: `Du er resepsjonist for en frisørsalong i Oslo som heter "Klipp & Stil".
-Du snakker naturlig norsk og hjelper kunder med å bestille, flytte eller avlyse timer.
-Du spør om navn, ønsket tjeneste (klipp, farge, styling) og foretrukket tidspunkt. Hold svarene korte og hyggelige — dette er en talesamtale.`,
-    firstMessage:
-      "Hei og velkommen til Klipp og Stil! Vil du bestille en time i dag?",
-  },
-  {
-    label: "Nettbutikk (support)",
-    prompt: `Du er en kundestøtte-agent for en norsk nettbutikk som selger sportsutstyr.
-Du svarer på spørsmål om ordrestatus, retur, frakt og produkter — alltid på naturlig norsk.
-Be om ordrenummer når det trengs. Hold svarene korte og løsningsorienterte — dette er en talesamtale.`,
-    firstMessage:
-      "Hei! Du har kommet til kundeservice. Gjelder det en ordre, en retur, eller noe annet?",
-  },
-];
+const FIRST_MESSAGE =
+  "Hei, du har ringt Oslo Tannlegesenter. Hva kan jeg hjelpe deg med i dag?";
 
 type UiState = "idle" | "connecting" | "active" | "error";
 
 function VoiceDemoInner() {
-  const [prompt, setPrompt] = useState(PRESETS[0].prompt);
-  const [firstMessage, setFirstMessage] = useState(PRESETS[0].firstMessage);
   const [uiState, setUiState] = useState<UiState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
@@ -58,7 +30,6 @@ function VoiceDemoInner() {
       setUiState("error");
     },
     onMessage: (event) => {
-      // The React SDK surfaces transcript text on the latest message.
       const text = (event as { message?: string })?.message;
       if (typeof text === "string" && text.trim()) setLastMessage(text);
     },
@@ -71,7 +42,6 @@ function VoiceDemoInner() {
     setLastMessage(null);
     setUiState("connecting");
     try {
-      // Ask for the microphone up front for a clean permission prompt.
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const res = await fetch("/api/elevenlabs/token");
@@ -91,8 +61,8 @@ function VoiceDemoInner() {
         connectionType: "webrtc",
         overrides: {
           agent: {
-            prompt: { prompt },
-            firstMessage,
+            prompt: { prompt: PROMPT },
+            firstMessage: FIRST_MESSAGE,
             language: "no",
           },
         },
@@ -107,46 +77,37 @@ function VoiceDemoInner() {
       setErrorMsg(message);
       setUiState("error");
     }
-  }, [prompt, firstMessage, startSession]);
+  }, [startSession]);
 
   const stop = useCallback(() => {
     endSession();
     setUiState("idle");
   }, [endSession]);
 
-  const applyPreset = (preset: Preset) => {
-    if (uiState === "active" || uiState === "connecting") return;
-    setPrompt(preset.prompt);
-    setFirstMessage(preset.firstMessage);
-  };
-
-  const isBusy = uiState === "active" || uiState === "connecting";
   const statusLabel =
     uiState === "connecting" || status === "connecting"
       ? "Kobler til…"
       : uiState === "active"
         ? isSpeaking
           ? "Agenten snakker…"
-          : "Lytter — si noe"
+          : "Lytter - si noe"
         : "Klar";
 
   return (
     <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 24,
-        alignItems: "stretch",
-      }}
+      style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "stretch" }}
       className="voicedemo-grid"
     >
-      {/* Prompt editor */}
+      {/* Info panel */}
       <div
         style={{
           background: "rgba(255,255,255,0.03)",
           border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 18,
-          padding: 24,
+          padding: 28,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
         }}
       >
         <div
@@ -157,100 +118,41 @@ function VoiceDemoInner() {
             textTransform: "uppercase",
             color: "#3FE0A0",
             fontWeight: 700,
-            marginBottom: 12,
+            marginBottom: 16,
           }}
         >
-          Tilpass agenten
+          🦷 Demo - Tannlegesenter
         </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-          {PRESETS.map((p) => {
-            const active = p.prompt === prompt;
-            return (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => applyPreset(p)}
-                disabled={isBusy}
-                style={{
-                  fontFamily: mono,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  padding: "7px 12px",
-                  borderRadius: 8,
-                  cursor: isBusy ? "default" : "pointer",
-                  border: active
-                    ? "1px solid #3FE0A0"
-                    : "1px solid rgba(255,255,255,0.18)",
-                  background: active ? "rgba(63,224,160,0.14)" : "transparent",
-                  color: active ? "#3FE0A0" : "#AFC0B5",
-                  opacity: isBusy && !active ? 0.5 : 1,
-                }}
-              >
-                {p.label}
-              </button>
-            );
-          })}
+        <h3
+          style={{
+            fontSize: 22,
+            fontWeight: 800,
+            color: "#EFEDE2",
+            letterSpacing: "-0.02em",
+            margin: "0 0 12px",
+          }}
+        >
+          Oslo Tannlegesenter
+        </h3>
+        <p style={{ fontSize: 15, lineHeight: 1.6, color: "#AFC0B5", margin: "0 0 22px" }}>
+          Snakk med resepsjonisten og bestill time, spør om priser, eller få hjelp med andre
+          henvendelser.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {[
+            "Bestille eller endre time",
+            "Spørsmål om priser og behandlinger",
+            "Akutte henvendelser",
+          ].map((item) => (
+            <div
+              key={item}
+              style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#AFC0B5" }}
+            >
+              <span style={{ color: "#3FE0A0", fontSize: 12 }}>✓</span>
+              {item}
+            </div>
+          ))}
         </div>
-
-        <label
-          style={{
-            display: "block",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#AFC0B5",
-            marginBottom: 6,
-          }}
-        >
-          Systemprompt (instruksjon til agenten)
-        </label>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          disabled={isBusy}
-          rows={7}
-          style={{
-            width: "100%",
-            resize: "vertical",
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.16)",
-            background: "#0A1C14",
-            color: "#EFEDE2",
-            fontSize: 14,
-            lineHeight: 1.5,
-            fontFamily: "inherit",
-            marginBottom: 14,
-          }}
-        />
-
-        <label
-          style={{
-            display: "block",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#AFC0B5",
-            marginBottom: 6,
-          }}
-        >
-          Åpningsreplikk
-        </label>
-        <input
-          type="text"
-          value={firstMessage}
-          onChange={(e) => setFirstMessage(e.target.value)}
-          disabled={isBusy}
-          style={{
-            width: "100%",
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.16)",
-            background: "#0A1C14",
-            color: "#EFEDE2",
-            fontSize: 14,
-            fontFamily: "inherit",
-          }}
-        />
       </div>
 
       {/* Call panel */}
@@ -289,7 +191,7 @@ function VoiceDemoInner() {
             animation: isSpeaking ? "voicedemo-pulse 1.1s ease-in-out infinite" : undefined,
           }}
         >
-          <span style={{ fontSize: 44 }}>{uiState === "active" ? "🎙️" : "💬"}</span>
+          <span style={{ fontSize: 44 }}>{uiState === "active" ? "🎙️" : "🦷"}</span>
         </div>
 
         <div
@@ -321,29 +223,16 @@ function VoiceDemoInner() {
             : lastMessage
               ? `"${lastMessage}"`
               : uiState === "active"
-                ? "Snakk i mikrofonen — agenten svarer på norsk."
-                : "Rediger prompten, trykk «Snakk med agenten» og tillat mikrofonen."}
+                ? "Snakk i mikrofonen - agenten svarer på norsk."
+                : "Trykk på knappen og tillat mikrofonen for å starte."}
         </p>
 
         {uiState === "active" || uiState === "connecting" ? (
-          <button
-            type="button"
-            onClick={stop}
-            style={{
-              ...btnBase,
-              background: "#C2562C",
-              color: "#fff",
-            }}
-          >
+          <button type="button" onClick={stop} style={{ ...btnBase, background: "#C2562C", color: "#fff" }}>
             Avslutt samtale
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={start}
-            className="btn-primary"
-            style={{ ...btnBase, color: "#08231A" }}
-          >
+          <button type="button" onClick={start} className="btn-primary" style={{ ...btnBase, color: "#08231A" }}>
             Snakk med agenten →
           </button>
         )}
