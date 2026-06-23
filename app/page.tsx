@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import VoiceDemo from "@/components/VoiceDemo";
 import TrustLogos from "@/components/TrustLogos";
+import BookingForm from "@/components/BookingForm";
 import { gDays, steps, features, industries, faqs } from "@/lib/content";
 
 const mono = "var(--font-space-mono), monospace";
@@ -244,67 +245,7 @@ export default function Home() {
             <p style={{ fontSize: 15, color: "#5C5F52", margin: "0 0 18px", lineHeight: 1.45 }}>
               20 minutter - vi viser plattformen live med din egen case.
             </p>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Bedrift</label>
-            <input
-              type="text"
-              placeholder="Bedriftsnavn"
-              style={{
-                width: "100%",
-                padding: "14px 16px",
-                borderRadius: 11,
-                border: "1px solid #E2DCCB",
-                background: "#FFFFFF",
-                fontSize: 15,
-                fontFamily: "inherit",
-                margin: "6px 0 14px",
-              }}
-            />
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Telefon</label>
-            <input
-              type="tel"
-              placeholder="+47 000 00 000"
-              style={{
-                width: "100%",
-                padding: "14px 16px",
-                borderRadius: 11,
-                border: "1px solid #E2DCCB",
-                background: "#FFFFFF",
-                fontSize: 15,
-                fontFamily: "inherit",
-                margin: "6px 0 18px",
-              }}
-            />
-            <a
-              href="#"
-              className="btn-primary"
-              style={{
-                display: "block",
-                textAlign: "center",
-                color: "#08231A",
-                fontWeight: 700,
-                fontSize: 16,
-                padding: 16,
-                borderRadius: 12,
-                textDecoration: "none",
-              }}
-            >
-              Book demoen min →
-            </a>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 14,
-                marginTop: 16,
-                fontSize: 13,
-                color: "#5C5F52",
-              }}
-            >
-              <span style={{ color: "#15A06A" }}>✓</span>GDPR{" "}
-              <span style={{ color: "#15A06A" }}>✓</span>Hostet i Norge{" "}
-              <span style={{ color: "#15A06A" }}>✓</span>BankID{" "}
-              <span style={{ color: "#15A06A" }}>✓</span>Ingen lock-in
-            </div>
+            <BookingForm />
           </div>
         </div>
 
