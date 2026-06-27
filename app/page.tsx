@@ -4,12 +4,86 @@ import LogoMarquee from "@/components/LogoMarquee";
 import BookingForm from "@/components/BookingForm";
 import IntegrationsOrbit from "@/components/IntegrationsOrbit";
 import { gDays, steps, features, industries, faqs, pricingPlans } from "@/lib/content";
+import { siteConfig } from "@/lib/site";
+
+/** Parse "2 500 kr" -> 2500 for schema Offer prices. */
+function priceValue(s?: string): number | null {
+  if (!s) return null;
+  const digits = s.replace(/[^\d]/g, "");
+  return digits ? Number(digits) : null;
+}
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: siteConfig.name,
+    url: siteConfig.url,
+    logo: `${siteConfig.url}/icon.png`,
+    email: siteConfig.email,
+    telephone: siteConfig.phone,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: siteConfig.locality,
+      addressCountry: siteConfig.country,
+    },
+    areaServed: { "@type": "Country", name: "Norge" },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: siteConfig.name,
+    url: siteConfig.url,
+    inLanguage: "nb-NO",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    serviceType: "AI-kundeservice",
+    name: "AI-kundeservice for telefon, chat og web",
+    description: siteConfig.description,
+    provider: { "@type": "Organization", name: siteConfig.name, url: siteConfig.url },
+    areaServed: { "@type": "Country", name: "Norge" },
+    offers: pricingPlans
+      .map((plan) => {
+        const price = priceValue(plan.monthly);
+        if (price == null) return null;
+        return {
+          "@type": "Offer",
+          name: plan.name,
+          price,
+          priceCurrency: "NOK",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price,
+            priceCurrency: "NOK",
+            unitText: "MND",
+          },
+          url: `${siteConfig.url}/#priser`,
+        };
+      })
+      .filter(Boolean),
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  },
+];
 
 const mono = "var(--font-space-mono), monospace";
 
 export default function Home() {
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       {/* NAV */}
       <header
         style={{
