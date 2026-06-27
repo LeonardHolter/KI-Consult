@@ -70,7 +70,7 @@ export default function LogoMarquee() {
 
       <style>{`
         .logo-marquee-track {
-          animation: logo-marquee 22s linear infinite;
+          animation: logo-marquee 45s linear infinite;
         }
         /* Travel left → right: start shifted one copy left, slide back to 0. */
         @keyframes logo-marquee {
