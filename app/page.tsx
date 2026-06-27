@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
 import VoiceDemo from "@/components/VoiceDemo";
-import TrustLogos from "@/components/TrustLogos";
+import LogoMarquee from "@/components/LogoMarquee";
 import BookingForm from "@/components/BookingForm";
-import { gDays, steps, features, industries, faqs } from "@/lib/content";
+import IntegrationsOrbit from "@/components/IntegrationsOrbit";
+import { gDays, steps, features, industries, faqs, pricingPlans } from "@/lib/content";
 
 const mono = "var(--font-space-mono), monospace";
 
@@ -136,7 +137,7 @@ export default function Home() {
                 textWrap: "balance",
               }}
             >
-              Konkurrenten svarer ikke kl.&nbsp;02:00. Det gjør du.
+              Konkurrenten svarer ikke 24/7. Det gjør du.
             </h1>
             <p
               className="hero-sub"
@@ -270,9 +271,9 @@ export default function Home() {
               marginBottom: 22,
             }}
           >
-            Bygget for norske bedrifter i regulerte bransjer
+            Selskaper som bruker KI Consult
           </div>
-          <TrustLogos />
+          <LogoMarquee />
         </div>
       </section>
 
@@ -517,8 +518,117 @@ export default function Home() {
         </div>
       </section>
 
+      {/* INTEGRATIONS */}
+      <section className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+        <div
+          className="integ-grid"
+          style={{
+            maxWidth: 1180,
+            margin: "0 auto",
+            padding: "0 32px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 56,
+            alignItems: "center",
+          }}
+        >
+          {/* Left: copy */}
+          <div>
+            <div style={eyebrowGreen}>Integrasjoner</div>
+            <h2
+              style={{
+                fontSize: "clamp(30px,3.8vw,50px)",
+                lineHeight: 1.06,
+                letterSpacing: "-0.03em",
+                fontWeight: 800,
+                margin: "14px 0 0",
+                maxWidth: "16ch",
+                textWrap: "balance",
+              }}
+            >
+              Kobles rett på systemene dere bruker.
+            </h2>
+            <p
+              style={{
+                fontSize: 17,
+                color: "#4A4D40",
+                margin: "18px 0 0",
+                maxWidth: "46ch",
+                lineHeight: 1.55,
+              }}
+            >
+              Dere trenger ikke bytte ut programvare for å komme i gang. Agenten jobber
+              direkte i verktøyene dere allerede har - henter data og utfører oppgaver
+              automatisk.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, margin: "30px 0 32px" }}>
+              {[
+                "Full støtte for autentisering med BankID",
+                "Snakker med alle deres fagsystemer",
+                "Ingen utskifting av eksisterende systemer",
+              ].map((item) => (
+                <div key={item} style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      width: 30,
+                      height: 30,
+                      borderRadius: 9,
+                      background: "rgba(21,160,106,0.12)",
+                      color: "#15A06A",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 15,
+                      fontWeight: 800,
+                    }}
+                  >
+                    ✓
+                  </span>
+                  <span style={{ fontSize: 16.5, fontWeight: 700, color: "#16190F" }}>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <a
+                href="#book"
+                className="btn-primary"
+                style={{
+                  color: "#08231A",
+                  fontWeight: 700,
+                  fontSize: 16,
+                  padding: "15px 26px",
+                  borderRadius: 12,
+                  textDecoration: "none",
+                }}
+              >
+                Få en demo →
+              </a>
+              <a
+                href="#demo"
+                style={{
+                  background: "transparent",
+                  color: "#16190F",
+                  fontWeight: 600,
+                  fontSize: 16,
+                  padding: "15px 24px",
+                  borderRadius: 12,
+                  textDecoration: "none",
+                  border: "1px solid #C9C3B2",
+                }}
+              >
+                Snakk med agenten
+              </a>
+            </div>
+          </div>
+
+          {/* Right: orbit */}
+          <IntegrationsOrbit />
+        </div>
+      </section>
+
       {/* INDUSTRIES */}
-      <section id="bransjer" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+      <section id="bransjer" className="section-pad" style={{ background: "#EDE8DB", padding: "96px 0" }}>
         <div className="section-inner" style={{ maxWidth: 1180, margin: "0 auto", padding: "0 32px" }}>
           <div style={eyebrowGreen}>Bransjer</div>
           <h2
@@ -568,6 +678,158 @@ export default function Home() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="priser" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 32px" }}>
+          <div style={{ textAlign: "center", maxWidth: 680, margin: "0 auto" }}>
+            <div style={{ ...eyebrowGreen, textAlign: "center" }}>Priser</div>
+            <h2
+              style={{
+                fontSize: "clamp(30px,3.8vw,50px)",
+                lineHeight: 1.06,
+                letterSpacing: "-0.03em",
+                fontWeight: 800,
+                margin: "14px 0 0",
+                textWrap: "balance",
+              }}
+            >
+              Tydelig pris. Ingen skjulte kostnader.
+            </h2>
+            <p
+              style={{
+                fontSize: 17,
+                color: "#4A4D40",
+                margin: "16px auto 0",
+                maxWidth: "52ch",
+                lineHeight: 1.5,
+              }}
+            >
+              Chat er alltid gratis - du betaler kun for taleminutter. Overforbruk
+              faktureres til 5 kr/min. Ingen binding, {gDays} dagers pengene-tilbake.
+            </p>
+          </div>
+
+          <div
+            className="grid-4"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4,1fr)",
+              gap: 18,
+              marginTop: 48,
+              alignItems: "start",
+            }}
+          >
+            {pricingPlans.map((plan) => {
+              const featured = plan.featured;
+              return (
+                <div
+                  key={plan.name}
+                  style={{
+                    background: featured ? "#0B2118" : "#FBFAF4",
+                    color: featured ? "#EFEDE2" : "#16190F",
+                    border: featured ? "1px solid #15C07C" : "1px solid #E2DCCB",
+                    borderRadius: 18,
+                    padding: 28,
+                    display: "flex",
+                    flexDirection: "column",
+                    boxShadow: featured ? "0 24px 60px rgba(11,33,24,0.30)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 26 }}>
+                    <h3 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", margin: 0 }}>
+                      {plan.name}
+                    </h3>
+                    {plan.badge && (
+                      <span
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 10.5,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          fontWeight: 700,
+                          color: "#08231A",
+                          background: "#3FE0A0",
+                          padding: "5px 9px",
+                          borderRadius: 999,
+                        }}
+                      >
+                        {plan.badge}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 13,
+                      color: featured ? "#9FD9C2" : "#15A06A",
+                      fontWeight: 600,
+                      margin: "6px 0 18px",
+                    }}
+                  >
+                    {plan.minutes}
+                  </div>
+
+                  {plan.monthly ? (
+                    <>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                        {plan.monthlyPrefix && (
+                          <span style={{ fontSize: 16, fontWeight: 600, color: featured ? "#9FB3A7" : "#5C5F52" }}>
+                            {plan.monthlyPrefix}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 36, fontWeight: 800, letterSpacing: "-0.03em" }}>
+                          {plan.monthly}
+                        </span>
+                        <span style={{ fontSize: 15, color: featured ? "#9FB3A7" : "#5C5F52" }}>/mnd</span>
+                      </div>
+                      <div style={{ fontSize: 14, color: featured ? "#9FB3A7" : "#5C5F52", margin: "6px 0 20px" }}>
+                        + {plan.setup} oppsett (engangs)
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 18, fontWeight: 700, color: featured ? "#9FD9C2" : "#15A06A", margin: "6px 0 20px" }}>
+                      Kontakt oss for pris
+                    </div>
+                  )}
+
+                  <a
+                    href="#book"
+                    className={featured ? "btn-primary" : undefined}
+                    style={{
+                      display: "block",
+                      textAlign: "center",
+                      fontWeight: 700,
+                      fontSize: 15,
+                      padding: 14,
+                      borderRadius: 12,
+                      textDecoration: "none",
+                      marginBottom: 22,
+                      color: featured ? "#08231A" : "#F3EFE4",
+                      background: featured ? undefined : "#0B2118",
+                      border: featured ? "none" : "1px solid #0B2118",
+                    }}
+                  >
+                    {plan.cta} →
+                  </a>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+                    {plan.features.map((feat) => (
+                      <div
+                        key={feat}
+                        style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: 14.5, lineHeight: 1.4 }}
+                      >
+                        <span style={{ color: "#3FE0A0", fontSize: 13, marginTop: 1 }}>✓</span>
+                        <span style={{ color: featured ? "#C9D6CE" : "#4A4D40" }}>{feat}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -701,7 +963,7 @@ export default function Home() {
               textWrap: "balance",
             }}
           >
-            Konkurrenten svarer ikke kl. 02:00. Det gjør du.
+            Konkurrenten svarer ikke 24/7. Det gjør du.
           </h2>
           <p
             style={{
@@ -852,37 +1114,6 @@ const eyebrowGreen: CSSProperties = {
   textTransform: "uppercase",
   color: "#15A06A",
   fontWeight: 700,
-};
-
-const priceCard: CSSProperties = {
-  background: "#FBFAF4",
-  border: "1px solid #E2DCCB",
-  borderRadius: 16,
-  padding: 26,
-};
-
-const priceRow: CSSProperties = {
-  display: "flex",
-  alignItems: "baseline",
-  gap: 5,
-  margin: "16px 0",
-};
-
-const priceBig: CSSProperties = {
-  fontSize: 38,
-  fontWeight: 800,
-  letterSpacing: "-0.03em",
-};
-
-const priceCtaDark: CSSProperties = {
-  display: "block",
-  textAlign: "center",
-  color: "#F3EFE4",
-  fontWeight: 700,
-  fontSize: 15,
-  padding: 13,
-  borderRadius: 11,
-  textDecoration: "none",
 };
 
 const footerHeading: CSSProperties = {

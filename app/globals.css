@@ -76,11 +76,15 @@ html {
 /* --- Responsive: collapse the multi-column grids on smaller screens --- */
 @media (max-width: 920px) {
   .hero-grid,
-  .offer-grid {
+  .offer-grid,
+  .integ-grid {
     grid-template-columns: 1fr !important;
   }
   .hero-grid {
     gap: 40px !important;
+  }
+  .integ-grid {
+    gap: 44px !important;
   }
   .grid-3,
   .grid-4,

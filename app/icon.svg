@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect x="26" y="26" width="460" height="460" rx="120" fill="#0B2118"/>
+  <text x="256" y="262" text-anchor="middle" dominant-baseline="central"
+        font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="250"
+        fill="#EFEDE2">KI</text>
+  <circle cx="256" cy="426" r="26" fill="#3FE0A0"/>
+</svg>

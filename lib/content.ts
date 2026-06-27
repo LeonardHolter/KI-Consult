@@ -71,6 +71,64 @@ export const industries: Industry[] = [
   { title: "Reiseliv & hotell", desc: "Rombestilling, endringer og gjestehenvendelser automatisk." },
 ];
 
+export interface PricingPlan {
+  name: string;
+  minutes: string;
+  setup: string;
+  monthly?: string;
+  monthlyPrefix?: string;
+  /** Highlight as the recommended plan. */
+  featured?: boolean;
+  badge?: string;
+  cta: string;
+  features: string[];
+}
+
+const baseFeatures = [
+  "Chat — fri bruk (fair use)",
+  "Norsk telefonnummer",
+  "Tale-widget på web",
+  "Human handoff dashboard",
+  "Selvbetjeningsplattform",
+];
+
+/** Customer-facing pricing. Overage billed at 5 kr/min on all plans. */
+export const pricingPlans: PricingPlan[] = [
+  {
+    name: "Starter",
+    minutes: "500 taleminutter/mnd",
+    setup: "3 500 kr",
+    monthly: "2 500 kr",
+    cta: "Kom i gang",
+    features: baseFeatures,
+  },
+  {
+    name: "Vekst",
+    minutes: "1 500 taleminutter/mnd",
+    setup: "6 500 kr",
+    monthly: "7 500 kr",
+    featured: true,
+    badge: "Mest populær",
+    cta: "Velg Vekst",
+    features: baseFeatures,
+  },
+  {
+    name: "Pro",
+    minutes: "2 500 taleminutter/mnd",
+    setup: "11 500 kr",
+    monthly: "12 500 kr",
+    cta: "Velg Pro",
+    features: baseFeatures,
+  },
+  {
+    name: "Enterprise",
+    minutes: "6 000+ taleminutter/mnd",
+    setup: "Custom",
+    cta: "Kontakt oss",
+    features: baseFeatures,
+  },
+];
+
 export interface Faq {
   q: string;
   a: string;
@@ -82,5 +140,4 @@ export const faqs: Faq[] = [
   { q: "Hvor lang tid tar oppsettet?", a: "Live på 7 dager fra signert avtale. Enkle FAQ-agenter kan settes opp gratis og raskere." },
   { q: "Hva om agenten ikke kan svare?", a: "Da overleveres samtalen sømløst til en av dine ansatte - med full kontekst, så kunden slipper å gjenta seg." },
   { q: "Er det bindingstid?", a: "Nei. Ingen binding, 60 dagers oppsigelse, og 30 dagers pengene-tilbake hvis du ikke finner verdi." },
-  { q: "Hva koster det egentlig?", a: "Fra 990 kr/mnd. Chat er alltid gratis - du betaler kun for taleminutter. Ingen skjulte kostnader." },
 ];
