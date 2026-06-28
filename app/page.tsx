@@ -882,68 +882,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* GUARANTEE */}
-      <section className="section-pad" style={{ background: "#0B2118", color: "#EFEDE2", padding: "96px 0" }}>
-        <div className="section-inner" style={{ maxWidth: 880, margin: "0 auto", padding: "0 32px", textAlign: "center" }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              background: "rgba(63,224,160,0.14)",
-              color: "#3FE0A0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 30,
-              margin: "0 auto",
-            }}
-          >
-            🛡
-          </div>
-          <h2
-            style={{
-              fontSize: "clamp(28px,3.6vw,46px)",
-              lineHeight: 1.1,
-              letterSpacing: "-0.03em",
-              fontWeight: 800,
-              margin: "24px 0 0",
-              textWrap: "balance",
-            }}
-          >
-            {gDays} dagers pengene-tilbake-garanti. Null risiko.
-          </h2>
-          <p
-            style={{
-              fontSize: 19,
-              lineHeight: 1.55,
-              color: "#B4C5BB",
-              margin: "20px auto 0",
-              maxWidth: "54ch",
-            }}
-          >
-            Prøv KI Consult i {gDays} dager. Hvis agenten ikke gir deg verdi, sier du ifra og får
-            hver krone tilbake - ingen spørsmål. Det er enklere å si ja enn å si nei.
-          </p>
-          <a
-            href="#demo"
-            className="btn-primary"
-            style={{
-              display: "inline-block",
-              marginTop: 32,
-              color: "#08231A",
-              fontWeight: 700,
-              fontSize: 17,
-              padding: "17px 30px",
-              borderRadius: 13,
-              textDecoration: "none",
-              boxShadow: "0 10px 30px rgba(21,192,124,0.3)",
-            }}
-          >
-            Snakk med AI-agenten →
-          </a>
-        </div>
-      </section>
 
       {/* FAQ */}
       <section id="faq" className="section-pad" style={{ background: "#EDE8DB", padding: "96px 0" }}>
