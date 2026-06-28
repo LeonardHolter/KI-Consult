@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import VoiceDemo from "@/components/VoiceDemo";
-import LogoMarquee from "@/components/LogoMarquee";
 import BookingForm from "@/components/BookingForm";
 import IntegrationsOrbit from "@/components/IntegrationsOrbit";
 import { gDays, steps, features, industries, faqs, pricingPlans } from "@/lib/content";
@@ -324,31 +323,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Trust logos */}
-        <div
-          className="section-inner"
-          style={{
-            maxWidth: 1200,
-            margin: "64px auto 0",
-            padding: "30px 32px 40px",
-            borderTop: "1px solid rgba(255,255,255,0.09)",
-          }}
-        >
-          <div
-            style={{
-              textAlign: "center",
-              fontFamily: mono,
-              fontSize: 12,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
-              color: "#7C8E83",
-              marginBottom: 22,
-            }}
-          >
-            Selskaper som bruker KI Consult
-          </div>
-          <LogoMarquee />
-        </div>
       </section>
 
       {/* LIVE VOICE DEMO */}
