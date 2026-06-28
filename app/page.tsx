@@ -199,24 +199,6 @@ export default function Home() {
               />
               Norskutviklet AI-kundeservice
             </div>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 9,
-                marginTop: 18,
-                padding: "8px 14px",
-                borderRadius: 999,
-                background: "rgba(63,224,160,0.12)",
-                border: "1px solid rgba(63,224,160,0.32)",
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#D8E4DC",
-              }}
-            >
-              <span aria-hidden>🔥</span>
-              Vi tar inn kun <strong style={{ color: "#3FE0A0", fontWeight: 700 }}>fem nye verksteder</strong> i juli
-            </div>
             <h1
               style={{
                 fontSize: "clamp(40px,5.4vw,72px)",
