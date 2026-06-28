@@ -167,7 +167,7 @@ export default function Home() {
           style={{
             maxWidth: 1200,
             margin: "0 auto",
-            padding: "74px 32px 0",
+            padding: "74px 32px 72px",
             display: "grid",
             gridTemplateColumns: "1.15fr 0.85fr",
             gap: 56,
@@ -198,6 +198,24 @@ export default function Home() {
                 }}
               />
               Norskutviklet AI-kundeservice
+            </div>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 9,
+                marginTop: 18,
+                padding: "8px 14px",
+                borderRadius: 999,
+                background: "rgba(63,224,160,0.12)",
+                border: "1px solid rgba(63,224,160,0.32)",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#D8E4DC",
+              }}
+            >
+              <span aria-hidden>🔥</span>
+              Vi tar inn kun <strong style={{ color: "#3FE0A0", fontWeight: 700 }}>fem nye verksteder</strong> i juli
             </div>
             <h1
               style={{
@@ -272,7 +290,7 @@ export default function Home() {
               <span style={{ opacity: 0.4 }}>·</span> Ingen binding
               <span style={{ opacity: 0.4 }}>·</span>{" "}
               <strong style={{ color: "#D8E4DC", fontWeight: 600 }}>
-                {gDays} dagers pengene-tilbake-garanti
+                {gDays} dagers medlemskaps garanti
               </strong>
             </div>
           </div>
