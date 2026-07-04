@@ -21,12 +21,22 @@ const structuredData = [
     logo: `${siteConfig.url}/icon.png`,
     email: siteConfig.email,
     telephone: siteConfig.phone,
+    description: siteConfig.description,
     address: {
       "@type": "PostalAddress",
       addressLocality: siteConfig.locality,
       addressCountry: siteConfig.country,
     },
     areaServed: { "@type": "Country", name: "Norge" },
+    knowsAbout: [
+      "KI-resepsjonist",
+      "AI-resepsjonist",
+      "virtuell resepsjonist",
+      "AI-kundeservice",
+      "AI-telefoni",
+      "AI-sentralbord",
+      "norsk taleteknologi",
+    ],
   },
   {
     "@context": "https://schema.org",
@@ -38,8 +48,14 @@ const structuredData = [
   {
     "@context": "https://schema.org",
     "@type": "Service",
-    serviceType: "AI-kundeservice",
-    name: "AI-kundeservice for telefon, chat og web",
+    serviceType: "KI-resepsjonist og AI-kundeservice",
+    name: "KI-resepsjonist for telefon, chat og web",
+    alternateName: [
+      "AI-resepsjonist",
+      "Virtuell resepsjonist",
+      "AI-sentralbord",
+      "AI-kundeservice",
+    ],
     description: siteConfig.description,
     provider: { "@type": "Organization", name: siteConfig.name, url: siteConfig.url },
     areaServed: { "@type": "Country", name: "Norge" },
@@ -197,7 +213,7 @@ export default function Home() {
                   boxShadow: "0 0 0 4px rgba(63,224,160,0.18)",
                 }}
               />
-              Norskutviklet AI-kundeservice
+              Norskutviklet KI-resepsjonist
             </div>
             <h1
               style={{
@@ -222,7 +238,7 @@ export default function Home() {
                 maxWidth: "48ch",
               }}
             >
-              KI-agenten som tar telefonen, chatten og webhenvendelsene dine automatisk.
+              KI-resepsjonisten som tar telefonen, chatten og webhenvendelsene dine automatisk.
               30 dagers pengene-tilbake-garanti. Null risiko.
             </p>
             <div style={{ display: "flex", gap: 14, marginTop: 32, flexWrap: "wrap" }}>
@@ -882,6 +898,48 @@ export default function Home() {
         </div>
       </section>
 
+
+      {/* WHAT IS A KI-RESEPSJONIST (SEO / answer-engine content) */}
+      <section id="ki-resepsjonist" className="section-pad" style={{ background: "#F3EFE4", padding: "96px 0" }}>
+        <div className="section-inner" style={{ maxWidth: 820, margin: "0 auto", padding: "0 32px" }}>
+          <div style={{ ...eyebrowGreen }}>KI-resepsjonist forklart</div>
+          <h2
+            style={{
+              fontSize: "clamp(28px,3.6vw,44px)",
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
+              fontWeight: 800,
+              margin: "14px 0 20px",
+              textWrap: "balance",
+            }}
+          >
+            Hva er en KI-resepsjonist?
+          </h2>
+          <p style={{ fontSize: 17, lineHeight: 1.65, color: "#4A4D40", margin: "0 0 18px" }}>
+            En KI-resepsjonist (også kalt AI-resepsjonist eller virtuell resepsjonist) er en
+            digital medarbeider som bruker kunstig intelligens til å svare på telefon, chat og
+            webhenvendelser - på naturlig norsk, døgnet rundt. Den tar imot samtaler, booker og
+            endrer timer, svarer på vanlige spørsmål og setter over til en ansatt når det
+            faktisk trengs et menneske.
+          </p>
+          <p style={{ fontSize: 17, lineHeight: 1.65, color: "#4A4D40", margin: "0 0 18px" }}>
+            I motsetning til et tradisjonelt sentralbord eller en telefonsvarer, forstår
+            KI-resepsjonisten hva kunden faktisk spør om og løser saken der og da. KI Consult
+            sin KI-resepsjonist er norskutviklet, svarer med naturlig norsk stemme på under
+            300 millisekunder, støtter BankID- og Vipps-identifisering, og all data hostes i
+            Norge i tråd med GDPR.
+          </p>
+          <p style={{ fontSize: 17, lineHeight: 1.65, color: "#4A4D40", margin: 0 }}>
+            Typiske brukere er tannleger, klinikker, verksteder, eiendomsmeglere og andre
+            bedrifter som taper kunder på ubesvarte anrop. Oppsettet tar 7 dager, krever ingen
+            utvikler, og agenten kan{" "}
+            <a href="#demo" style={{ color: "#15A06A", fontWeight: 600 }}>
+              prøves gratis i nettleseren
+            </a>{" "}
+            før du bestemmer deg.
+          </p>
+        </div>
+      </section>
 
       {/* FAQ */}
       <section id="faq" className="section-pad" style={{ background: "#EDE8DB", padding: "96px 0" }}>

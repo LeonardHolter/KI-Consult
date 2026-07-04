@@ -135,6 +135,8 @@ export interface Faq {
 }
 
 export const faqs: Faq[] = [
+  { q: "Hva er en KI-resepsjonist?", a: "En KI-resepsjonist er en digital medarbeider drevet av kunstig intelligens som svarer på telefon, chat og webhenvendelser - akkurat som en menneskelig resepsjonist, men tilgjengelig 24/7. Den booker timer, svarer på spørsmål og setter over til en ansatt når det trengs." },
+  { q: "Kan en KI-resepsjonist erstatte sentralbordet vårt?", a: "For de fleste bedrifter, ja. KI-resepsjonisten tar imot alle innkommende samtaler, ruter dem riktig, svarer på vanlige spørsmål og booker avtaler automatisk. Ansatte kobles kun inn når samtalen faktisk krever et menneske." },
   { q: "Snakker agenten ordentlig norsk?", a: "Ja. Den er bygget for norsk - både bokmål og dialekter - med naturlig stemme som svarer på under 300 ms. Ikke en oversatt utenlandsk modell." },
   { q: "Hvor lagres dataene?", a: "Alt hostes i Norge og er fullt GDPR-kompatibelt. Du eier dine data, og vi deler dem aldri." },
   { q: "Hvor lang tid tar oppsettet?", a: "Live på 7 dager fra signert avtale. Enkle FAQ-agenter kan settes opp gratis og raskere." },
