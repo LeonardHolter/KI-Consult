@@ -2,7 +2,9 @@
 // here only — metadata, sitemap, robots and JSON-LD all read from this.
 export const siteConfig = {
   name: "KI Consult",
-  url: "https://kiconsult.no",
+  // www is the canonical serving host — the apex domain 308-redirects to it,
+  // and Google indexes the site under www.
+  url: "https://www.kiconsult.no",
   title: "KI-resepsjonist på norsk – AI-kundeservice for telefon, chat & web | KI Consult",
   description:
     "Norskutviklet KI-resepsjonist som svarer telefonen, chatten og webhenvendelsene dine 24/7. Naturlig norsk stemme, BankID & Vipps, GDPR og hostet i Norge. Prøv gratis demo.",
