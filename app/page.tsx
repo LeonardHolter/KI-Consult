@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import VoiceDemo from "@/components/VoiceDemo";
 import BookingForm from "@/components/BookingForm";
 import IntegrationsOrbit from "@/components/IntegrationsOrbit";
@@ -149,6 +150,9 @@ export default function Home() {
             <a href="#priser" className="nav-link" style={{ textDecoration: "none" }}>
               Priser
             </a>
+            <Link href="/blog" className="nav-link" style={{ textDecoration: "none" }}>
+              Blogg
+            </Link>
           </nav>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <a
@@ -1103,8 +1107,8 @@ export default function Home() {
             <div style={footerCol}>
               <a href="#priser" className="footer-link" style={footerLink}>Priser</a>
               <a href="#bransjer" className="footer-link" style={footerLink}>Bransjer</a>
+              <Link href="/blog" className="footer-link" style={footerLink}>Blogg</Link>
               <a href="#faq" className="footer-link" style={footerLink}>FAQ</a>
-              <a href="#" className="footer-link" style={footerLink}>Bli partner</a>
             </div>
           </div>
           <div>

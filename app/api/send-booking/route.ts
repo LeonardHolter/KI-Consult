@@ -2,10 +2,31 @@ import { Resend } from "resend";
 
 export const dynamic = "force-dynamic";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 export async function POST(request: Request) {
   try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      // Instantiere Resend på toppnivå kaster ved manglende nøkkel og bryter
+      // `next build`. Sjekk her, og degrader pent (som elevenlabs-ruten).
+      return Response.json(
+        {
+          error: "not_configured",
+          message:
+            "Sett RESEND_API_KEY i .env.local for å aktivere booking-bekreftelser.",
+        },
+        { status: 503 }
+      );
+    }
+
     const { company, phone, dateTime } = await request.json();
 
     if (!company || !phone || !dateTime) {
@@ -26,12 +47,13 @@ export async function POST(request: Request) {
 
     const emailHtml = `
       <h2>Ny demobooking fra KI Consult</h2>
-      <p><strong>Bedrift:</strong> ${company}</p>
-      <p><strong>Telefon:</strong> ${phone}</p>
+      <p><strong>Bedrift:</strong> ${escapeHtml(company)}</p>
+      <p><strong>Telefon:</strong> ${escapeHtml(phone)}</p>
       <p><strong>Ønsket tidspunkt:</strong> ${formattedDate}</p>
       <p>Vennligst kontakt bedriften for å bekrefte demoen.</p>
     `;
 
+    const resend = new Resend(apiKey);
     await resend.emails.send({
       from: "KI Consult <noreply@resend.dev>",
       to: "leonard@holterholdings.com",
