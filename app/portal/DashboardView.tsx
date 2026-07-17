@@ -104,16 +104,17 @@ export default function PortalDashboard({
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
   useEffect(() => {
+    if (!clientId) return;
     if (document.getElementById("bot-embed")) return;
     const s = document.createElement("script");
     s.id = "bot-embed";
-    s.src = `${BOT_ORIGIN}/embed.js`;
+    s.src = `${BOT_ORIGIN}/embed.js?client=${clientId}`;
     s.async = true;
     document.body.appendChild(s);
     return () => {
       // The widget mounts outside React, so unmounting the page has to take the
       // bubble down too — otherwise it follows the user onto other pages.
-      document.getElementById("handzon-chat-root")?.remove();
+      document.getElementById("ki-chat-root")?.remove();
       s.remove();
       // embed.js guards its IIFE with this flag so a static <script> tag on a
       // real website never double-inits. We remove and re-insert the tag on
@@ -121,9 +122,9 @@ export default function PortalDashboard({
       // re-executed script sees it already set, returns immediately, and
       // never rebuilds the DOM we just tore down — no bubble on the next
       // visit to this page within the same tab (e.g. log out, log back in).
-      delete (window as unknown as Record<string, unknown>).__handzonChatLoaded;
+      delete (window as unknown as Record<string, unknown>).__kiChatLoaded;
     };
-  }, []);
+  }, [clientId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -320,6 +321,11 @@ export default function PortalDashboard({
         {overviewHref && (
           <Link href={`/portal/voice-demo${clientId ? `?client=${clientId}` : ""}`} className="ctp-back">
             Juster agenten
+          </Link>
+        )}
+        {overviewHref && clientId && (
+          <Link href={`/portal/chat-bot?client=${clientId}`} className="ctp-back">
+            Juster chatbot
           </Link>
         )}
         <span className="ctp-live">

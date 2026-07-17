@@ -1,34 +1,32 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { after } from "next/server";
-import fs from "fs";
-import path from "path";
 import { bookSlot, loadSlots } from "@/lib/slots";
-import { loadSettings } from "@/lib/settings";
-import { DEFAULT_CHAT_PROMPT } from "@/lib/chat-prompt";
 import { clientIp, corsHeaders, rateLimit } from "@/lib/api-guard";
 import { osloParts } from "@/lib/google-calendar";
 import { logTurn } from "@/lib/portal-log";
+import { getChatBotSettingsPublic } from "@/lib/chatBot/data";
+import type { ChatBotSettings } from "@/lib/chatBot/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Preflight for cross-origin embeds (handzon.no via <script> snippet).
+function clientIdFrom(req: Request): string | null {
+  return new URL(req.url).searchParams.get("client");
+}
+
+// Preflight for cross-origin embeds (<script> snippet on the client's site).
+// Client identity travels as a query param (not the body) specifically so
+// it's available here too — a CORS preflight has no body to read.
 export async function OPTIONS(req: Request) {
+  const clientId = clientIdFrom(req);
+  const settings = clientId ? await getChatBotSettingsPublic(clientId) : null;
   return new Response(null, {
     status: 204,
-    headers: corsHeaders(req.headers.get("origin")),
+    headers: corsHeaders(req.headers.get("origin"), settings?.allowedOrigins ?? []),
   });
 }
 
-const knowledgeBase = fs.readFileSync(
-  path.join(process.cwd(), "lib", "knowledge-base.md"),
-  "utf-8"
-);
-
-// The chatbot prompt is editable from the dashboard; fall back to the default.
-async function buildSystemPrompt(): Promise<string> {
-  const settings = await loadSettings();
-  const base = settings.chatPrompt?.trim() || DEFAULT_CHAT_PROMPT;
+function buildSystemPrompt(settings: ChatBotSettings): string {
   const now = new Date();
   const todayISO = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Oslo",
@@ -49,20 +47,20 @@ async function buildSystemPrompt(): Promise<string> {
     minute: "2-digit",
     hour12: false,
   }).format(now);
-  return `${base}
+  return `${settings.instructions}
 
 DAGENS DATO OG KLOKKESLETT (Europe/Oslo): ${todayLabel} (${todayISO}), klokken er nå ${nowTime}. Bruk ALLTID denne linjen — ikke egen hukommelse eller gjetning — når du regner ut hva «i dag», «i morgen», «på fredag» osv. betyr, også når du kaller book_demo_slot. Stemmer ikke en dato du har i minnet med denne linjen: stol på denne linjen.
 
 KUNNSKAPSBASE (referanse for priser og tjenestedetaljer):
 
-${knowledgeBase}`;
+${settings.knowledgeBase}`;
 }
 
 const TOOLS: Anthropic.Tool[] = [
   {
     name: "get_available_demo_slots",
     description:
-      "Henter ledige timer fra kalenderen hos Handz On. Bruk alltid dette verktøyet før du foreslår tidspunkter til kunden. Bruk near_time når et ønsket tidspunkt ikke er tilgjengelig, for å få de nærmeste alternativene øverst i listen.",
+      "Henter ledige timer fra kalenderen. Bruk alltid dette verktøyet før du foreslår tidspunkter til kunden. Bruk near_time når et ønsket tidspunkt ikke er tilgjengelig, for å få de nærmeste alternativene øverst i listen.",
     strict: true,
     input_schema: {
       type: "object",
@@ -126,11 +124,11 @@ function toMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-async function execTool(name: string, input: unknown): Promise<string> {
+async function execTool(clientId: string, name: string, input: unknown): Promise<string> {
   if (name === "get_available_demo_slots") {
     const { date, near_time } = (input ?? {}) as { date?: string | null; near_time?: string | null };
     const now = osloParts(new Date().toISOString());
-    let filtered = (await loadSlots())
+    let filtered = (await loadSlots(clientId))
       .filter((s) => !s.full)
       .filter((s) => s.date !== now.date || s.time > now.time);
     if (date) filtered = filtered.filter((s) => s.date === date);
@@ -179,7 +177,7 @@ async function execTool(name: string, input: unknown): Promise<string> {
       .replace(/^(\d):/, "0$1:")
       .slice(0, 5);
     const slot_id = `${date.trim()}-${normalizedTime.replace(":", "")}`;
-    const result = await bookSlot(slot_id, customer_name, customer_phone, service);
+    const result = await bookSlot(clientId, slot_id, customer_name, customer_phone, service);
     return JSON.stringify(
       result.ok
         ? { success: true, slot: result.slot }
@@ -192,7 +190,17 @@ async function execTool(name: string, input: unknown): Promise<string> {
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export async function POST(req: Request) {
-  const cors = corsHeaders(req.headers.get("origin"));
+  const clientId = clientIdFrom(req);
+  if (!clientId) {
+    return new Response("Mangler ?client=.", { status: 400 });
+  }
+
+  const settings = await getChatBotSettingsPublic(clientId);
+  if (!settings) {
+    return new Response("Ukjent klient.", { status: 404 });
+  }
+
+  const cors = corsHeaders(req.headers.get("origin"), settings.allowedOrigins);
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response("Chatboten er ikke konfigurert (mangler API-nøkkel).", {
@@ -262,7 +270,7 @@ export async function POST(req: Request) {
 
   const client = new Anthropic();
   const encoder = new TextEncoder();
-  const systemPrompt = await buildSystemPrompt();
+  const systemPrompt = buildSystemPrompt(settings);
 
   const readable = new ReadableStream({
     async start(controller) {
@@ -314,7 +322,7 @@ export async function POST(req: Request) {
             if (block.type === "tool_use") {
               let value: string;
               try {
-                value = await execTool(block.name, block.input);
+                value = await execTool(clientId, block.name, block.input);
               } catch (err) {
                 console.error(
                   `Chat tool "${block.name}" feilet:`,
@@ -351,9 +359,7 @@ export async function POST(req: Request) {
         console.error("Chat stream error:", err);
         try {
           controller.enqueue(
-            encoder.encode(
-              "Beklager, tjenesten er utilgjengelig akkurat nå. Prøv igjen senere, eller kontakt oss på https://handzon.no/kontakt."
-            )
+            encoder.encode("Beklager, tjenesten er utilgjengelig akkurat nå. Prøv igjen senere.")
           );
           controller.close();
         } catch {
@@ -372,6 +378,7 @@ export async function POST(req: Request) {
         if (conversationId && assistantText.trim()) {
           after(
             logTurn({
+              clientId,
               conversationId,
               userMessage: lastUserMessage,
               assistantMessage: assistantText,

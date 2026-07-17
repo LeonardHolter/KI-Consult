@@ -46,7 +46,10 @@ export default async function PortalPage({
   // ever see their own dashboard. The /api/bot proxy and RLS both enforce the
   // same boundary independently, but there's no reason to even look here.
   if (profile.role === "client") {
-    return <DashboardView />;
+    // client_id is always set for the "client" role (DB constraint), but
+    // pass it explicitly rather than relying on DashboardView inferring it —
+    // the embed script and voice-agent button both need the id directly.
+    return <DashboardView clientId={profile.client_id ?? undefined} />;
   }
 
   const clients = await getClients();

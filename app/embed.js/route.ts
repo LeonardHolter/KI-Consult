@@ -1,29 +1,50 @@
-/* Handz On chat widget — embeddable loader.
- * Usage on any website (e.g. handzon.no):
- *   <script src="https://<host>/embed.js" async></script>
- * Renders a floating chat bubble in an isolated Shadow DOM and talks to the
- * Handz On chat API on the same host this script is served from.
- */
+// Per-client chat widget loader. Was a static public/embed.js hardcoded to
+// Handz On; now a dynamic route that reads ?client=<uuid>, loads that
+// client's branding from chat_bot_settings, and templates it into the same
+// widget script (Shadow DOM bubble, markdown rendering, streaming fetch to
+// /api/chat) that used to be hardcoded.
+//
+// Usage on any client's website:
+//   <script src="https://www.kiconsult.no/embed.js?client=<uuid>" async></script>
+
+import { getChatBotSettingsPublic } from "@/lib/chatBot/data";
+
+export const dynamic = "force-dynamic";
+
+function buildScript(clientId: string, s: {
+  botName: string;
+  companyName: string;
+  welcomeMessage: string;
+  primaryColor: string;
+  accentColor: string;
+  logoUrl: string | null;
+}): string {
+  const CLIENT_ID = JSON.stringify(clientId);
+  const NAVY = JSON.stringify(s.primaryColor);
+  const ACCENT = JSON.stringify(s.accentColor);
+  const WELCOME = JSON.stringify(s.welcomeMessage);
+  const COMPANY = JSON.stringify(s.companyName || s.botName);
+  const LOGO_HTML = s.logoUrl
+    ? JSON.stringify(`<span class="logo"><img src="${s.logoUrl}" alt=""></span>`)
+    : "\"\"";
+
+  return `/* Chat widget — embeddable loader for client ${clientId}. */
 (function () {
   "use strict";
-  if (window.__handzonChatLoaded) return;
-  window.__handzonChatLoaded = true;
+  if (window.__kiChatLoaded) return;
+  window.__kiChatLoaded = true;
 
-  // Resolve the API base from this script's own URL (works with async loading).
   var scriptEl =
     document.currentScript ||
     Array.prototype.slice
       .call(document.getElementsByTagName("script"))
       .filter(function (s) {
-        return /embed\.js(\?|$)/.test(s.src || "");
+        return /embed\\.js(\\?|$)/.test(s.src || "");
       })
       .pop();
   var API_BASE = scriptEl ? new URL(scriptEl.src).origin : "";
+  var CLIENT_ID = ${CLIENT_ID};
 
-  // Groups this session's turns together in the client portal. crypto.randomUUID
-  // needs a secure context and isn't in older browsers, and this script runs on
-  // sites we don't control — so fall back to a v4 built from getRandomValues,
-  // then to Math.random as a last resort (an id only needs to be unique here).
   var CONVERSATION_ID = (function () {
     try {
       if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -49,12 +70,12 @@
     });
   })();
 
-  var NAVY = "#1e3b67";
-  var ACCENT = "#1bade4";
-  var WELCOME =
-    "Hei! 👋 Jeg er Hanz. Spør meg gjerne om tjenester, priser, avdelinger, åpningstider eller booking!";
+  var NAVY = ${NAVY};
+  var ACCENT = ${ACCENT};
+  var WELCOME = ${WELCOME};
+  var COMPANY = ${COMPANY};
+  var LOGO_HTML = ${LOGO_HTML};
 
-  // ---- Markdown (escape first, then bold/italic/links/lists) ----
   function esc(s) {
     return s
       .replace(/&/g, "&amp;")
@@ -63,15 +84,14 @@
   }
   function inline(s) {
     s = esc(s);
-    s = s.replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/\\*\\*([^*]+?)\\*\\*/g, "<strong>$1</strong>");
     s = s.replace(
-      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      /\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g,
       '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
     );
     s = s.replace(
-      /(^|[\s(])(https?:\/\/[^\s)]+)/g,
+      /(^|[\\s(])(https?:\\/\\/[^\\s)]+)/g,
       function (_m, pre, url) {
-        // Don't swallow trailing sentence punctuation into the link.
         var tm = /[.,;:!?]+$/.exec(url);
         var trail = tm ? tm[0] : "";
         if (trail) url = url.slice(0, -trail.length);
@@ -86,12 +106,12 @@
         );
       }
     );
-    s = s.replace(/(^|[^*])\*([^*\n]+?)\*/g, "$1<em>$2</em>");
-    s = s.replace(/(^|\s)_([^_\n]+?)_/g, "$1<em>$2</em>");
+    s = s.replace(/(^|[^*])\\*([^*\\n]+?)\\*/g, "$1<em>$2</em>");
+    s = s.replace(/(^|\\s)_([^_\\n]+?)_/g, "$1<em>$2</em>");
     return s;
   }
   function markdown(text) {
-    var lines = text.split("\n");
+    var lines = text.split("\\n");
     var html = "";
     var list = [];
     function flush() {
@@ -107,7 +127,7 @@
       list = [];
     }
     lines.forEach(function (line) {
-      var b = /^\s*[-*•]\s+(.*)$/.exec(line);
+      var b = /^\\s*[-*•]\\s+(.*)$/.exec(line);
       if (b) {
         list.push(b[1]);
       } else {
@@ -120,9 +140,8 @@
     return html;
   }
 
-  // ---- Build DOM in a shadow root ----
   var host = document.createElement("div");
-  host.id = "handzon-chat-root";
+  host.id = "ki-chat-root";
   host.style.position = "fixed";
   host.style.zIndex = "2147483000";
   host.style.right = "0";
@@ -191,10 +210,8 @@
   panel.className = "panel";
   panel.style.display = "none";
   panel.innerHTML =
-    '<div class="hd"><span class="logo"><img src="' +
-    API_BASE +
-    '/media/logo.webp" alt=""></span>' +
-    '<div><div class="t">Kundeservice</div><div class="s">Handz On Auto Care</div></div>' +
+    '<div class="hd">' + LOGO_HTML +
+    '<div><div class="t">Kundeservice</div><div class="s">' + esc(COMPANY) + '</div></div>' +
     '<button class="x" aria-label="Lukk">' +
     SVG.close +
     "</button></div>" +
@@ -216,7 +233,7 @@
   var sendBtn = panel.querySelector(".send");
   var closeBtn = panel.querySelector(".x");
 
-  var messages = []; // {role, content}
+  var messages = [];
   var busy = false;
   var welcomed = false;
 
@@ -260,7 +277,7 @@
     busy = true;
     sendBtn.disabled = true;
 
-    fetch(API_BASE + "/api/chat", {
+    fetch(API_BASE + "/api/chat?client=" + encodeURIComponent(CLIENT_ID), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -288,9 +305,7 @@
         return pump();
       })
       .catch(function () {
-        botEl.innerHTML = markdown(
-          "Beklager, noe gikk galt. Prøv igjen, eller kontakt oss på https://handzon.no/kontakt."
-        );
+        botEl.innerHTML = markdown("Beklager, noe gikk galt. Prøv igjen om litt.");
       })
       .then(function () {
         busy = false;
@@ -304,3 +319,30 @@
     if (e.key === "Enter") send();
   });
 })();
+`;
+}
+
+export async function GET(req: Request) {
+  const clientId = new URL(req.url).searchParams.get("client");
+  if (!clientId) {
+    return new Response("// missing ?client=<id>", {
+      status: 400,
+      headers: { "Content-Type": "application/javascript; charset=utf-8" },
+    });
+  }
+
+  const settings = await getChatBotSettingsPublic(clientId);
+  if (!settings) {
+    return new Response("// unknown client", {
+      status: 404,
+      headers: { "Content-Type": "application/javascript; charset=utf-8" },
+    });
+  }
+
+  return new Response(buildScript(clientId, settings), {
+    headers: {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}

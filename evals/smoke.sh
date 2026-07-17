@@ -50,27 +50,41 @@ else
 fi
 
 echo
-echo "-- Handz On chat bot (migrated from handzon-clone) --"
+echo "-- multi-tenant chat bot (migrated from handzon-clone, per-client via ?client=<uuid>) --"
+HANDZON_ID="ad19951e-00e1-4293-8975-6c6bb1dbdad7"
+
 status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/embed.js")
-check "GET /embed.js serves" "200" "$status"
+check "GET /embed.js without ?client= -> 400" "400" "$status"
+
+status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/embed.js?client=00000000-0000-0000-0000-000000000000")
+check "GET /embed.js?client=<unknown> -> 404" "404" "$status"
+
+status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/embed.js?client=$HANDZON_ID")
+check "GET /embed.js?client=<handzon> -> 200" "200" "$status"
 
 status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/media/logo.webp")
 check "GET /media/logo.webp serves" "200" "$status"
 
-body=$(curl -s "$BASE/api/calendar-view")
+status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/calendar-view")
+check "GET /api/calendar-view without ?client= -> 400" "400" "$status"
+
+body=$(curl -s "$BASE/api/calendar-view?client=$HANDZON_ID")
 if echo "$body" | grep -q '"slots"'; then
-  echo "  ok   - GET /api/calendar-view returns real slot data"
+  echo "  ok   - GET /api/calendar-view?client=<handzon> returns real slot data"
   PASS=$((PASS + 1))
 else
-  echo "  FAIL - GET /api/calendar-view did not return slots: $body"
+  echo "  FAIL - GET /api/calendar-view?client=<handzon> did not return slots: $body"
   FAIL=$((FAIL + 1))
 fi
 
-origin=$(curl -s -X OPTIONS "$BASE/api/chat" -H "Origin: https://handzon.no" -D - -o /dev/null | grep -i "access-control-allow-origin" | tr -d '\r')
-check "OPTIONS /api/chat allows https://handzon.no" "access-control-allow-origin: https://handzon.no" "$(echo "$origin" | tr 'A-Z' 'a-z')"
+status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/chat" -H "Content-Type: application/json" -d '{"messages":[]}')
+check "POST /api/chat without ?client= -> 400" "400" "$status"
 
-origin=$(curl -s -X OPTIONS "$BASE/api/chat" -H "Origin: https://evil-example.com" -D - -o /dev/null | grep -ci "access-control-allow-origin")
-check "OPTIONS /api/chat blocks an untrusted origin" "0" "$origin"
+origin=$(curl -s -X OPTIONS "$BASE/api/chat?client=$HANDZON_ID" -H "Origin: https://handzon.no" -D - -o /dev/null | grep -i "access-control-allow-origin" | tr -d '\r')
+check "OPTIONS /api/chat?client=<handzon> allows https://handzon.no" "access-control-allow-origin: https://handzon.no" "$(echo "$origin" | tr 'A-Z' 'a-z')"
+
+origin=$(curl -s -X OPTIONS "$BASE/api/chat?client=$HANDZON_ID" -H "Origin: https://evil-example.com" -D - -o /dev/null | grep -ci "access-control-allow-origin")
+check "OPTIONS /api/chat?client=<handzon> blocks an untrusted origin" "0" "$origin"
 
 echo
 echo "-- admin/portal routes reject unauthenticated requests (403, not 500) --"
@@ -85,6 +99,9 @@ check "GET /api/portal/voice-demo/settings?client=... -> 403" "403" "$status"
 
 status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/portal/voice-demo/test-session" -H "Content-Type: application/json" -d '{"instructions":"x"}')
 check "POST /api/portal/voice-demo/test-session -> 403" "403" "$status"
+
+status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/portal/chat-bot/settings?client=$HANDZON_ID")
+check "GET /api/portal/chat-bot/settings?client=... -> 403" "403" "$status"
 
 echo
 echo "$PASS passed, $FAIL failed"

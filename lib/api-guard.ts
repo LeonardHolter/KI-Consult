@@ -1,23 +1,12 @@
 // CORS allow-listing + a best-effort in-memory rate limiter for the public
-// chat endpoint (so it's safe to embed on handzon.no via a <script> snippet).
+// chat endpoint (so it's safe to embed on any client's site via a <script>
+// snippet). Allowed origins are per-client (chat_bot_settings.allowed_origins)
+// rather than a single hardcoded/global list, now that the bot is multi-tenant.
 
-const DEFAULT_ORIGINS = [
-  "https://handzon.no",
-  "https://www.handzon.no",
-];
-
-function allowedOrigins(): string[] {
-  const extra = (process.env.CHAT_ALLOWED_ORIGINS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return [...DEFAULT_ORIGINS, ...extra];
-}
-
-/** True for handzon.no origins, any localhost (dev/test), or configured extras. */
-export function isAllowedOrigin(origin: string | null): boolean {
+/** True for one of the client's configured origins, or any localhost (dev/test). */
+export function isAllowedOrigin(origin: string | null, clientAllowedOrigins: string[]): boolean {
   if (!origin) return false;
-  if (allowedOrigins().includes(origin)) return true;
+  if (clientAllowedOrigins.includes(origin)) return true;
   try {
     const host = new URL(origin).hostname;
     if (host === "localhost" || host === "127.0.0.1") return true;
@@ -27,12 +16,12 @@ export function isAllowedOrigin(origin: string | null): boolean {
   return false;
 }
 
-export function corsHeaders(origin: string | null): Record<string, string> {
+export function corsHeaders(origin: string | null, clientAllowedOrigins: string[]): Record<string, string> {
   // Reflect the origin only when allow-listed; otherwise no CORS grant.
   const h: Record<string, string> = {
     Vary: "Origin",
   };
-  if (isAllowedOrigin(origin)) {
+  if (isAllowedOrigin(origin, clientAllowedOrigins)) {
     h["Access-Control-Allow-Origin"] = origin as string;
     h["Access-Control-Allow-Methods"] = "POST, OPTIONS";
     h["Access-Control-Allow-Headers"] = "Content-Type";

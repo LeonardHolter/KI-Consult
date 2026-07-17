@@ -24,8 +24,6 @@ export type Settings = {
   lastSlotServiceKeyword: string;
   /** How many business days ahead to offer. */
   daysAhead: number;
-  /** Website chatbot system prompt (falls back to DEFAULT_CHAT_PROMPT). */
-  chatPrompt?: string;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,21 +39,24 @@ export const DEFAULT_SETTINGS: Settings = {
   daysAhead: 3,
 };
 
-const BLOB_PATH = "handzon/settings.json";
-const FILE = path.join(process.cwd(), "data", "settings.json");
+// Booking-calendar config lives per client (Blob key keyed by client UUID) —
+// distinct from the client's chat prompt/branding, which lives in Postgres
+// (chat_bot_settings) since it needs admin RLS + version history.
+const blobPath = (clientId: string) => `${clientId}/settings.json`;
+const filePath = (clientId: string) => path.join(process.cwd(), "data", clientId, "settings.json");
 
 const blobConfigured = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
-export async function loadSettings(): Promise<Settings> {
+export async function loadSettings(clientId: string): Promise<Settings> {
   try {
     if (blobConfigured()) {
-      const result = await get(BLOB_PATH, { access: "private" });
+      const result = await get(blobPath(clientId), { access: "private" });
       if (result && result.statusCode === 200 && result.stream) {
         const text = await new Response(result.stream).text();
         return { ...DEFAULT_SETTINGS, ...JSON.parse(text) };
       }
-    } else if (fs.existsSync(FILE)) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(FILE, "utf-8")) };
+    } else if (fs.existsSync(filePath(clientId))) {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(filePath(clientId), "utf-8")) };
     }
   } catch {
     /* fall through to defaults */
@@ -63,18 +64,18 @@ export async function loadSettings(): Promise<Settings> {
   return { ...DEFAULT_SETTINGS };
 }
 
-export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
-  const merged = { ...(await loadSettings()), ...patch };
+export async function saveSettings(clientId: string, patch: Partial<Settings>): Promise<Settings> {
+  const merged = { ...(await loadSettings(clientId)), ...patch };
   if (blobConfigured()) {
-    await put(BLOB_PATH, JSON.stringify(merged, null, 2), {
+    await put(blobPath(clientId), JSON.stringify(merged, null, 2), {
       access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
     });
   } else {
-    fs.mkdirSync(path.dirname(FILE), { recursive: true });
-    fs.writeFileSync(FILE, JSON.stringify(merged, null, 2));
+    fs.mkdirSync(path.dirname(filePath(clientId)), { recursive: true });
+    fs.writeFileSync(filePath(clientId), JSON.stringify(merged, null, 2));
   }
   return merged;
 }

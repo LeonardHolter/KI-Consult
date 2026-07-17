@@ -45,7 +45,7 @@ function isAllowed(path: string): boolean {
   });
 }
 
-type Target = { baseUrl: string; adminSecret: string | null };
+type Target = { baseUrl: string; adminSecret: string | null; clientId: string };
 
 /** Resolves the caller's bot target, or null if they may not reach one. */
 async function resolveTarget(req: NextRequest): Promise<Target | null> {
@@ -84,7 +84,11 @@ async function resolveTarget(req: NextRequest): Promise<Target | null> {
     | null;
   if (!rows?.length) return null;
 
-  return { baseUrl: rows[0].bot_base_url.replace(/\/$/, ""), adminSecret: rows[0].admin_secret };
+  return {
+    baseUrl: rows[0].bot_base_url.replace(/\/$/, ""),
+    adminSecret: rows[0].admin_secret,
+    clientId,
+  };
 }
 
 async function handle(req: NextRequest, path: string[]) {
@@ -98,11 +102,16 @@ async function handle(req: NextRequest, path: string[]) {
     return NextResponse.json({ error: "Ingen tilgang." }, { status: 401 });
   }
 
-  // Forward the caller's query string, minus our own routing param.
+  // Forward the caller's query string, with "client" replaced by the
+  // *resolved* clientId (not whatever the caller sent) — the downstream
+  // routes (e.g. /api/calendar-view) are multi-tenant and need to know which
+  // client's data to load, and re-setting rather than trusting the caller's
+  // own value is what stops an admin's "client" query param confusion from
+  // ever leaking into the forwarded request undissected.
   const qs = new URLSearchParams(req.nextUrl.searchParams);
-  qs.delete("client");
+  qs.set("client", target.clientId);
   // The allowlist is written without the /api prefix, so add it back here.
-  const url = `${target.baseUrl}/api/${joined}${qs.size ? `?${qs}` : ""}`;
+  const url = `${target.baseUrl}/api/${joined}?${qs}`;
 
   const headers: Record<string, string> = {};
   const contentType = req.headers.get("content-type");

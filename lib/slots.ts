@@ -231,7 +231,7 @@ async function calendarBook(
   const bookedAt = new Date().toISOString();
   const event = await insertEvent(settings.calendarId!, {
     summary: `${service} – ${customerName}`,
-    description: `Booket av Handz On AI-agent.\nKunde: ${customerName}\nTelefon: ${customerPhone}\nTjeneste: ${service}`,
+    description: `Booket av AI-chatbot.\nKunde: ${customerName}\nTelefon: ${customerPhone}\nTjeneste: ${service}`,
     start: { dateTime: `${slot.date}T${slot.time}:00`, timeZone: "Europe/Oslo" },
     end: { dateTime: `${slot.date}T${slot.endTime}:00`, timeZone: "Europe/Oslo" },
     extendedProperties: {
@@ -259,45 +259,45 @@ async function calendarBook(
 /* ------------------------------------------------------------------ */
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const BOOKINGS_FILE = path.join(DATA_DIR, "demo-bookings.json");
-const BOOKINGS_BLOB_PATH = "handzon/demo-bookings.json";
+const bookingsFile = (clientId: string) => path.join(DATA_DIR, clientId, "demo-bookings.json");
+const bookingsBlobPath = (clientId: string) => `${clientId}/demo-bookings.json`;
 
 const blobConfigured = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
 type DemoBooking = Booking & { slotId: string; date: string; time: string };
 
-async function demoReadBookings(): Promise<DemoBooking[]> {
+async function demoReadBookings(clientId: string): Promise<DemoBooking[]> {
   try {
     if (blobConfigured()) {
-      const result = await get(BOOKINGS_BLOB_PATH, { access: "private" });
+      const result = await get(bookingsBlobPath(clientId), { access: "private" });
       if (!result || result.statusCode !== 200 || !result.stream) return [];
       return JSON.parse(await new Response(result.stream).text()) as DemoBooking[];
     }
-    if (!fs.existsSync(BOOKINGS_FILE)) return [];
-    return JSON.parse(fs.readFileSync(BOOKINGS_FILE, "utf-8"));
+    if (!fs.existsSync(bookingsFile(clientId))) return [];
+    return JSON.parse(fs.readFileSync(bookingsFile(clientId), "utf-8"));
   } catch {
     return [];
   }
 }
 
-async function demoWriteBookings(bookings: DemoBooking[]) {
+async function demoWriteBookings(clientId: string, bookings: DemoBooking[]) {
   if (blobConfigured()) {
-    await put(BOOKINGS_BLOB_PATH, JSON.stringify(bookings, null, 2), {
+    await put(bookingsBlobPath(clientId), JSON.stringify(bookings, null, 2), {
       access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
     });
   } else {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(BOOKINGS_FILE, JSON.stringify(bookings, null, 2));
+    fs.mkdirSync(path.dirname(bookingsFile(clientId)), { recursive: true });
+    fs.writeFileSync(bookingsFile(clientId), JSON.stringify(bookings, null, 2));
   }
 }
 
-async function demoSlotViews(settings: Settings): Promise<SlotView[]> {
+async function demoSlotViews(clientId: string, settings: Settings): Promise<SlotView[]> {
   const dates = upcomingDates(settings.daysAhead);
   const templates = slotTemplates(settings);
-  const allBookings = await demoReadBookings();
+  const allBookings = await demoReadBookings(clientId);
   const views: SlotView[] = [];
   for (const date of dates) {
     for (const tmpl of templates) {
@@ -310,13 +310,14 @@ async function demoSlotViews(settings: Settings): Promise<SlotView[]> {
 }
 
 async function demoBook(
+  clientId: string,
   settings: Settings,
   slotId: string,
   customerName: string,
   customerPhone: string,
   service: string
 ): Promise<{ ok: true; slot: SlotView } | { ok: false; error: string }> {
-  const views = await demoSlotViews(settings);
+  const views = await demoSlotViews(clientId, settings);
   const slot = views.find((s) => s.id === slotId);
   if (!slot) return { ok: false, error: "Fant ikke denne timen." };
   if (slot.full) {
@@ -333,9 +334,9 @@ async function demoBook(
   }
 
   const bookedAt = new Date().toISOString();
-  const all = await demoReadBookings();
+  const all = await demoReadBookings(clientId);
   all.push({ slotId, date: slot.date, time: slot.time, customerName, customerPhone, service, bookedAt });
-  await demoWriteBookings(all);
+  await demoWriteBookings(clientId, all);
 
   const bookings = [...slot.bookings, { customerName, customerPhone, service, bookedAt }];
   return {
@@ -353,24 +354,25 @@ async function demoBook(
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
-export async function loadSlots(): Promise<SlotView[]> {
-  const settings = await loadSettings();
+export async function loadSlots(clientId: string): Promise<SlotView[]> {
+  const settings = await loadSettings(clientId);
   return calendarConnected(settings)
     ? calendarSlotViews(settings)
-    : demoSlotViews(settings);
+    : demoSlotViews(clientId, settings);
 }
 
 export async function bookSlot(
+  clientId: string,
   slotId: string,
   customerName: string,
   customerPhone: string,
   service?: string
 ): Promise<{ ok: true; slot: SlotView } | { ok: false; error: string }> {
-  const settings = await loadSettings();
+  const settings = await loadSettings(clientId);
   const svc = service?.trim() || "Demo / rådgivning";
   return calendarConnected(settings)
     ? calendarBook(settings, slotId, customerName, customerPhone, svc)
-    : demoBook(settings, slotId, customerName, customerPhone, svc);
+    : demoBook(clientId, settings, slotId, customerName, customerPhone, svc);
 }
 
 /* ------------------------------------------------------------------ */
@@ -421,8 +423,8 @@ async function calendarEvents(settings: Settings, dates: string[]): Promise<CalE
   return out;
 }
 
-export async function loadCalendarView(): Promise<CalendarView> {
-  const settings = await loadSettings();
+export async function loadCalendarView(clientId: string): Promise<CalendarView> {
+  const settings = await loadSettings(clientId);
   if (calendarConnected(settings)) {
     const dates = upcomingDates(settings.daysAhead);
     const [slots, events] = await Promise.all([
@@ -437,7 +439,7 @@ export async function loadCalendarView(): Promise<CalendarView> {
       calendarName: settings.calendarName,
     };
   }
-  const slots = await demoSlotViews(settings);
+  const slots = await demoSlotViews(clientId, settings);
   const events: CalEvent[] = slots.flatMap((s) =>
     s.bookings.map((b, i) => ({
       id: `${s.id}-${i}`,
