@@ -1,29 +1,46 @@
 import { redirect } from "next/navigation";
-import { getProfile } from "@/lib/portal/data";
-import { getVoiceDemoPromptHistory, getVoiceDemoSettingsAdmin } from "@/lib/voiceDemo/data";
+import { getClients, getProfile } from "@/lib/portal/data";
+import {
+  DEFAULT_SETTINGS,
+  getVoiceAgentPromptHistory,
+  getVoiceAgentSettingsForClient,
+  getVoiceDemoPromptHistory,
+  getVoiceDemoSettingsAdmin,
+} from "@/lib/voiceDemo/data";
 import { DEFAULT_VOICE_DEMO_PROMPT } from "@/lib/voiceDemo/defaultPrompt";
 import VoiceDemoTuner from "./VoiceDemoTuner";
 
 export const dynamic = "force-dynamic";
 
-/** Admin-only: tune the public marketing site's realtime demo live. */
-export default async function VoiceDemoPage() {
+/**
+ * Admin-only: tune a realtime voice agent live.
+ * No ?client= — the public marketing site's tannlege demo.
+ * ?client=<id> — that client's dashboard voice agent (e.g. Handz On).
+ */
+export default async function VoiceDemoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ client?: string }>;
+}) {
   const profile = await getProfile();
   if (!profile || profile.role !== "admin") redirect("/portal");
 
-  const [settings, history] = await Promise.all([
-    getVoiceDemoSettingsAdmin(),
-    getVoiceDemoPromptHistory(),
-  ]);
+  const { client: clientId } = await searchParams;
+
+  let clientName: string | undefined;
+  if (clientId) {
+    const clients = await getClients();
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) redirect("/portal");
+    clientName = client.name;
+  }
+
+  const [settings, history] = clientId
+    ? await Promise.all([getVoiceAgentSettingsForClient(clientId), getVoiceAgentPromptHistory(clientId)])
+    : await Promise.all([getVoiceDemoSettingsAdmin(), getVoiceDemoPromptHistory()]);
 
   const initialSettings = settings ?? {
-    model: "gpt-realtime",
-    voice: "marin",
-    speed: 1.0,
-    turnDetection: { type: "semantic_vad" as const, eagerness: "medium" as const, interrupt_response: true },
-    noiseReduction: "near_field" as const,
-    transcriptionModel: "gpt-4o-transcribe",
-    transcriptionLanguage: "no",
+    ...DEFAULT_SETTINGS,
     instructions: DEFAULT_VOICE_DEMO_PROMPT,
     updatedAt: null,
   };
@@ -33,6 +50,8 @@ export default async function VoiceDemoPage() {
       initialSettings={initialSettings}
       initialHistory={history}
       migrationApplied={settings !== null}
+      clientId={clientId}
+      clientName={clientName}
     />
   );
 }

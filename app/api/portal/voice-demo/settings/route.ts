@@ -1,7 +1,11 @@
 import { getProfile } from "@/lib/portal/data";
 import {
+  DEFAULT_SETTINGS,
+  getVoiceAgentPromptHistory,
+  getVoiceAgentSettingsForClient,
   getVoiceDemoPromptHistory,
   getVoiceDemoSettingsAdmin,
+  saveVoiceAgentSettings,
   saveVoiceDemoSettings,
 } from "@/lib/voiceDemo/data";
 import { DEFAULT_VOICE_DEMO_PROMPT } from "@/lib/voiceDemo/defaultPrompt";
@@ -13,30 +17,30 @@ async function requireAdmin() {
   return profile?.role === "admin";
 }
 
-export async function GET() {
+// With no ?client= param this tunes the marketing site's tannlege demo
+// (fixed row id "default"); with one, it tunes that client's dashboard
+// voice agent instead. Both are admin-only.
+
+export async function GET(req: Request) {
   if (!(await requireAdmin())) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const [settings, history] = await Promise.all([
-    getVoiceDemoSettingsAdmin(),
-    getVoiceDemoPromptHistory(),
-  ]);
+  const clientId = new URL(req.url).searchParams.get("client");
+
+  const [settings, history] = clientId
+    ? await Promise.all([getVoiceAgentSettingsForClient(clientId), getVoiceAgentPromptHistory(clientId)])
+    : await Promise.all([getVoiceDemoSettingsAdmin(), getVoiceDemoPromptHistory()]);
 
   return Response.json({
     settings: settings ?? {
-      model: "gpt-realtime",
-      voice: "marin",
-      speed: 1.0,
-      turnDetection: { type: "semantic_vad", eagerness: "medium", interrupt_response: true },
-      noiseReduction: "near_field",
-      transcriptionModel: "gpt-4o-transcribe",
-      transcriptionLanguage: "no",
+      ...DEFAULT_SETTINGS,
       instructions: DEFAULT_VOICE_DEMO_PROMPT,
       updatedAt: null,
     },
     history,
-    // True when we fell back to defaults because the migration hasn't run yet.
+    // True when we fell back to defaults — either the migration hasn't run
+    // yet, or (client case) this client hasn't been customized yet.
     migrationApplied: settings !== null,
   });
 }
@@ -51,7 +55,7 @@ export async function PUT(req: Request) {
     return Response.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const result = await saveVoiceDemoSettings({
+  const update = {
     model: body.model,
     voice: body.voice,
     speed: body.speed,
@@ -60,7 +64,12 @@ export async function PUT(req: Request) {
     transcriptionModel: body.transcriptionModel,
     transcriptionLanguage: body.transcriptionLanguage,
     instructions: body.instructions,
-  });
+  };
+
+  const result =
+    typeof body.clientId === "string"
+      ? await saveVoiceAgentSettings(body.clientId, update)
+      : await saveVoiceDemoSettings(update);
 
   if (result.error) return Response.json({ error: result.error }, { status: 500 });
   return Response.json({ ok: true });

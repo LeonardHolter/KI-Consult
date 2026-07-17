@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
+import VoiceAgentCard from "@/components/VoiceAgentCard";
 
 /**
  * The client-facing view of their bot: the live booking calendar plus the chat
@@ -315,6 +316,11 @@ export default function PortalDashboard({
         <Link href={samtalerHref} className="ctp-back">
           Samtaler ›
         </Link>
+        {overviewHref && (
+          <Link href={`/portal/voice-demo${clientId ? `?client=${clientId}` : ""}`} className="ctp-back">
+            Juster agenten
+          </Link>
+        )}
         <span className="ctp-live">
           <span className="ctp-dot" /> LIVE
           {lastSync && <em>oppdatert {lastSync.toLocaleTimeString("no-NO")}</em>}
@@ -332,6 +338,9 @@ export default function PortalDashboard({
           Kalenderen speiler Google Calendar i sanntid. Chat med boten nede til
           høyre — det er nøyaktig samme bot som kundene dine snakker med.
         </p>
+
+        <VoiceAgentCard clientId={clientId} />
+        <div style={{ height: 20 }} />
 
         <div className="ctp-card">
           <div className="ctp-card-head">

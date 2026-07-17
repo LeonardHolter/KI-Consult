@@ -33,10 +33,15 @@ export default function VoiceDemoTuner({
   initialSettings,
   initialHistory,
   migrationApplied,
+  clientId,
+  clientName,
 }: {
   initialSettings: FullSettings & { updatedAt: string | null };
   initialHistory: PromptSnapshot[];
   migrationApplied: boolean;
+  /** Set only when tuning a client's dashboard agent rather than the marketing demo. */
+  clientId?: string;
+  clientName?: string;
 }) {
   const [settings, setSettings] = useState<FullSettings>(initialSettings);
   const [savedInstructions, setSavedInstructions] = useState(initialSettings.instructions);
@@ -76,7 +81,7 @@ export default function VoiceDemoTuner({
       const res = await fetch("/api/portal/voice-demo/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(clientId ? { ...settings, clientId } : settings),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Lagring feilet");
@@ -84,7 +89,7 @@ export default function VoiceDemoTuner({
         setHistory((prev) => [{ instructions: savedInstructions, savedAt: new Date().toISOString() }, ...prev].slice(0, 20));
       }
       setSavedInstructions(settings.instructions);
-      setSaveMsg("Lagret — live på nettsiden nå.");
+      setSaveMsg(clientId ? "Lagret — live på dashbordet nå." : "Lagret — live på nettsiden nå.");
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : "Noe gikk galt.");
     } finally {
@@ -166,7 +171,12 @@ export default function VoiceDemoTuner({
         <span className="vdt-brand">
           KI&nbsp;Consult<span>.no</span>
         </span>
-        <Link href="/portal" className="vdt-back">‹ Dashboard</Link>
+        <Link
+          href={clientId ? `/portal?client=${clientId}` : "/portal"}
+          className="vdt-back"
+        >
+          ‹ Dashboard
+        </Link>
         <span style={{ marginLeft: "auto" }} />
         <form action={signOut}>
           <button className="vdt-back" style={{ fontFamily: "inherit", cursor: "pointer" }}>Logg ut</button>
@@ -174,16 +184,20 @@ export default function VoiceDemoTuner({
       </div>
 
       <div className="vdt-main">
-        <h1 className="vdt-title">Realtime-demo — tuning</h1>
+        <h1 className="vdt-title">
+          {clientId ? `${clientName} — agent-tuning` : "Realtime-demo — tuning"}
+        </h1>
         <p className="vdt-sub">
-          Samme kontroller som i handzon-voice-lab, koblet direkte til Oslo Tannlegesenter-demoen på
-          forsiden. Lagrede endringer er live på nettsiden umiddelbart.
+          {clientId
+            ? "Samme kontroller som i handzon-voice-lab. Lagrede endringer gjelder umiddelbart for «Snakk med agenten»-knappen på dashbordet."
+            : "Samme kontroller som i handzon-voice-lab, koblet direkte til Oslo Tannlegesenter-demoen på forsiden. Lagrede endringer er live på nettsiden umiddelbart."}
         </p>
 
         {!migrationApplied && (
           <div className="vdt-warn">
-            Databasetabellen for disse innstillingene finnes ikke ennå — du ser standardverdier, og
-            «Lagre» vil feile til migrasjonen er kjørt (supabase/004_voice_demo_settings.sql).
+            {clientId
+              ? "Denne klienten har ikke egne agent-innstillinger ennå — du ser standardverdier. «Lagre» oppretter dem."
+              : "Databasetabellen for disse innstillingene finnes ikke ennå — du ser standardverdier, og «Lagre» vil feile til migrasjonen er kjørt (supabase/004_voice_demo_settings.sql)."}
           </div>
         )}
 
