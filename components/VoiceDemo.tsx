@@ -1,76 +1,93 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { ConversationProvider, useConversation } from "@elevenlabs/react";
+
+// WebRTC client for the OpenAI Realtime API — same connection architecture as
+// the handzon-voice-lab tuning lab: mint ephemeral secret server-side, then
+// RTCPeerConnection with mic track + "oai-events" data channel, SDP exchange
+// with /v1/realtime/calls. https://developers.openai.com/api/docs/guides/realtime
 
 const mono = "var(--font-space-mono), monospace";
 
-const PROMPT = `# PERSONA
-Du er Ida, en hyggelig digital resepsjonist hos Oslo Tannlegesenter. Du snakker i en live telefonsamtale. Svarene dine må være ekstremt korte, muntlige og naturlige.
-
-# GLOBALE REGLER FOR TALE
-- Svar alltid superkort (maks 10–15 ord per svar).
-- Still kun ÉTT spørsmål av gangen. Vent på svar før du går videre.
-- Bruk muntlige ord som: "Den er god", "Flott", "Skal vi se...", "Da har jeg notert det".
-
-# SCENARIO-MANUS (Følg disse nøyaktig)
-
-## 1. ÅPNING (Når samtalen starter)
-Si nøyaktig: "Hei og velkommen til Oslo Tannlegesenter! Du snakker med Ida. Hva kan jeg hjelpe deg med i dag?"
-
-## 2. BESTILLE TIME (Ta ett steg av gangen!)
-- Steg 1 (Navn): "Det ordner vi. Hva er navnet ditt?"
-- Steg 2 (Behov): "Flott, [Navn]. Gjelder det en undersøkelse, rens, fylling, eller er det akutt?"
-- Steg 3 (Tid): "Den er god. Hvilken dag og tid passer best for deg? Vi har åpent 08 til 17."
-- Steg 4 (Bekreftelse): "Da er du satt opp til [Behov] på [Dato/Tid]. Velkommen til oss, ha en fin dag!"
-
-## 3. FLYTTE ELLER AVLYSE TIME
-- Hvis kunden vil flytte: "Det fikser vi. Hva er navnet ditt, og når har du timen din nå?" -> (Vent på svar) -> "Når ønsker du å flytte den til?" -> (Vent på svar) -> "Da er den flyttet. Ha en fin dag!"
-- Hvis kunden vil avlyse: "Det er i orden. Hva er navnet ditt?" -> (Vent på svar) -> "Da er timen din avlyst. Ha en fin dag videre!"
-
-## 4. SPØRSMÅL OM ÅPNINGSTIDER ELLER PRIS (Svar kun hvis kunden spør)
-- Åpningstider: "Vi har åpent mandag til fredag fra klokken 8 til 17. I helgene har vi stengt."
-- Pris: "En vanlig undersøkelse koster 650 kroner. Andre priser får du av tannlegen under timen."
-
-# HVIS DU IKKE FORSTÅR
-Si: "Beklager, det fikk jeg ikke helt med meg. Kan du gjenta det? eller vil du at jeg sender deg over til en ekte assistent som kan hjelpe deg?"`;
-
-const FIRST_MESSAGE =
-  "Hei og velkommen til Oslo Tannlegesenter! Du snakker med Ida. Hva kan jeg hjelpe deg med i dag?";
-
 type UiState = "idle" | "connecting" | "active" | "error";
+type AgentState = "idle" | "listening" | "speaking";
 
-function VoiceDemoInner() {
+export default function VoiceDemo() {
   const [uiState, setUiState] = useState<UiState>("idle");
+  const [agentState, setAgentState] = useState<AgentState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
 
-  const conversation = useConversation({
-    onConnect: () => setUiState("active"),
-    onDisconnect: () => setUiState("idle"),
-    onError: (message) => {
-      setErrorMsg(typeof message === "string" ? message : "Noe gikk galt.");
-      setUiState("error");
-    },
-    onMessage: (event) => {
-      const text = (event as { message?: string })?.message;
-      if (typeof text === "string" && text.trim()) setLastMessage(text);
-    },
-  });
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const dcRef = useRef<RTCDataChannel | null>(null);
+  const micRef = useRef<MediaStream | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const assistantTextRef = useRef<string>("");
 
-  const { status, isSpeaking, startSession, endSession } = conversation;
+  const cleanup = useCallback(() => {
+    dcRef.current?.close();
+    pcRef.current?.close();
+    micRef.current?.getTracks().forEach((t) => t.stop());
+    dcRef.current = null;
+    pcRef.current = null;
+    micRef.current = null;
+    if (audioRef.current) audioRef.current.srcObject = null;
+  }, []);
+
+  useEffect(() => () => cleanup(), [cleanup]);
+
+  const handleServerEvent = useCallback((ev: Record<string, unknown>) => {
+    switch (ev.type) {
+      case "input_audio_buffer.speech_started":
+        setAgentState("listening");
+        break;
+      case "response.output_audio_transcript.delta": {
+        assistantTextRef.current += String(ev.delta ?? "");
+        setLastMessage(assistantTextRef.current);
+        break;
+      }
+      case "response.output_audio_transcript.done": {
+        assistantTextRef.current = String(ev.transcript ?? assistantTextRef.current);
+        setLastMessage(assistantTextRef.current);
+        break;
+      }
+      case "response.output_item.added":
+        assistantTextRef.current = "";
+        break;
+      case "output_audio_buffer.started":
+        setAgentState("speaking");
+        break;
+      case "output_audio_buffer.stopped":
+      case "output_audio_buffer.cleared":
+        setAgentState("idle");
+        break;
+      case "error":
+        setErrorMsg(
+          typeof (ev.error as { message?: string })?.message === "string"
+            ? (ev.error as { message: string }).message
+            : "Noe gikk galt.",
+        );
+        setUiState("error");
+        break;
+    }
+  }, []);
 
   const start = useCallback(async () => {
     setErrorMsg(null);
     setLastMessage(null);
+    assistantTextRef.current = "";
     setUiState("connecting");
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+    setAgentState("idle");
 
-      const res = await fetch("/api/elevenlabs/token");
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
+    try {
+      const res = await fetch("/api/voice/session", { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as {
+        clientSecret?: string;
+        model?: string;
+        message?: string;
+      };
+      if (!res.ok || !body.clientSecret) {
         throw new Error(
           body.message ??
             (res.status === 503
@@ -78,19 +95,65 @@ function VoiceDemoInner() {
               : "Klarte ikke å koble til agenten."),
         );
       }
-      const { token } = (await res.json()) as { token: string };
 
-      startSession({
-        conversationToken: token,
-        connectionType: "webrtc",
-        overrides: {
-          agent: {
-            prompt: { prompt: PROMPT },
-            firstMessage: FIRST_MESSAGE,
-            language: "no",
-          },
-        },
+      // Explicit echo cancellation matters: without it, the mic can pick up
+      // the agent's own trailing audio and false-trigger VAD, clipping the
+      // agent's last word as an automatic barge-in interrupt.
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
+      micRef.current = mic;
+
+      const pc = new RTCPeerConnection();
+      pcRef.current = pc;
+
+      let audioEl = audioRef.current;
+      if (!audioEl) {
+        audioEl = new Audio();
+        audioEl.autoplay = true;
+        audioRef.current = audioEl;
+      }
+      pc.ontrack = (e) => {
+        audioEl.srcObject = e.streams[0];
+      };
+      pc.addTrack(mic.getTracks()[0], mic);
+
+      const dc = pc.createDataChannel("oai-events");
+      dcRef.current = dc;
+      dc.onmessage = (e) => {
+        try {
+          handleServerEvent(JSON.parse(e.data));
+        } catch {
+          /* ignore malformed */
+        }
+      };
+      dc.onopen = () => {
+        setUiState("active");
+        dc.send(JSON.stringify({ type: "response.create" }));
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const sdpRes = await fetch(
+        `https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(body.model ?? "gpt-realtime")}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${body.clientSecret}`,
+            "Content-Type": "application/sdp",
+          },
+          body: offer.sdp,
+        },
+      );
+      if (!sdpRes.ok) throw new Error(`Tilkobling feilet: ${await sdpRes.text()}`);
+      await pc.setRemoteDescription({ type: "answer", sdp: await sdpRes.text() });
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+          setErrorMsg("Tilkoblingen falt ut.");
+          setUiState("error");
+        }
+      };
     } catch (err) {
       const message =
         err instanceof DOMException && err.name === "NotAllowedError"
@@ -100,16 +163,19 @@ function VoiceDemoInner() {
             : "Noe gikk galt.";
       setErrorMsg(message);
       setUiState("error");
+      cleanup();
     }
-  }, [startSession]);
+  }, [cleanup, handleServerEvent]);
 
   const stop = useCallback(() => {
-    endSession();
+    cleanup();
     setUiState("idle");
-  }, [endSession]);
+    setAgentState("idle");
+  }, [cleanup]);
 
+  const isSpeaking = agentState === "speaking";
   const statusLabel =
-    uiState === "connecting" || status === "connecting"
+    uiState === "connecting"
       ? "Kobler til…"
       : uiState === "active"
         ? isSpeaking
@@ -287,11 +353,3 @@ const btnBase: CSSProperties = {
   border: "none",
   cursor: "pointer",
 };
-
-export default function VoiceDemo() {
-  return (
-    <ConversationProvider>
-      <VoiceDemoInner />
-    </ConversationProvider>
-  );
-}
