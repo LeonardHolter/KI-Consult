@@ -339,7 +339,7 @@ export default function PortalDashboard({
           høyre — det er nøyaktig samme bot som kundene dine snakker med.
         </p>
 
-        <VoiceAgentCard clientId={clientId} />
+        <VoiceAgentCard clientId={clientId} unavailable={!overviewHref} />
         <div style={{ height: 20 }} />
 
         <div className="ctp-card">

@@ -10,7 +10,15 @@ import { useCallback, useRef, useState } from "react";
 
 type UiState = "idle" | "connecting" | "active" | "error";
 
-export default function VoiceAgentCard({ clientId }: { clientId?: string }) {
+export default function VoiceAgentCard({
+  clientId,
+  unavailable,
+}: {
+  clientId?: string;
+  /** Shows a disabled placeholder instead of a working call button — for
+   *  rolling the feature out to admin first while it's still being tuned. */
+  unavailable?: boolean;
+}) {
   const [uiState, setUiState] = useState<UiState>("idle");
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -167,6 +175,30 @@ export default function VoiceAgentCard({ clientId }: { clientId?: string }) {
           ? "Agenten snakker…"
           : "Lytter — si noe"
         : "Klar";
+
+  if (unavailable) {
+    return (
+      <div className="vac vac-disabled">
+        <style>{`
+          .vac { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 14px; padding: 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+          .vac-disabled { background: #faf8f1; }
+          .vac-orb.muted { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 24px; background: #efede2; opacity: .7; }
+          .vac-body { flex: 1; min-width: 220px; }
+          .vac-status.muted { font-family: var(--font-space-mono), monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: #9a9a8c; }
+          .vac-msg { font-size: 13.5px; color: #5c5f52; margin-top: 4px; max-width: 52ch; }
+          .vac-btn-disabled { padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 700; border: none; flex-shrink: 0; background: #efede2; color: #9a9a8c; cursor: not-allowed; }
+        `}</style>
+        <div className="vac-orb muted">📞</div>
+        <div className="vac-body">
+          <div className="vac-status muted">Ikke tilgjengelig ennå</div>
+          <div className="vac-msg">Vi finpusser stemmeagenten din — den kommer snart hit.</div>
+        </div>
+        <button type="button" className="vac-btn-disabled" disabled>
+          Snakk med agenten →
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="vac">
