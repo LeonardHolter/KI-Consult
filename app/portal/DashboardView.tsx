@@ -75,9 +75,10 @@ function fmtBookedAt(iso?: string) {
   });
 }
 
-/** Origin of the bot deployment, used to load its chat widget. */
-const BOT_ORIGIN =
-  process.env.NEXT_PUBLIC_BOT_ORIGIN ?? "https://handzon-voice-demo.vercel.app";
+/** Origin of the bot deployment, used to load its chat widget. Empty string
+ *  = same origin as this portal (the bot is now self-hosted here); override
+ *  via NEXT_PUBLIC_BOT_ORIGIN only for a client whose bot lives elsewhere. */
+const BOT_ORIGIN = process.env.NEXT_PUBLIC_BOT_ORIGIN ?? "";
 
 export default function PortalDashboard({
   clientId,

@@ -50,6 +50,29 @@ else
 fi
 
 echo
+echo "-- Handz On chat bot (migrated from handzon-clone) --"
+status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/embed.js")
+check "GET /embed.js serves" "200" "$status"
+
+status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/media/logo.webp")
+check "GET /media/logo.webp serves" "200" "$status"
+
+body=$(curl -s "$BASE/api/calendar-view")
+if echo "$body" | grep -q '"slots"'; then
+  echo "  ok   - GET /api/calendar-view returns real slot data"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL - GET /api/calendar-view did not return slots: $body"
+  FAIL=$((FAIL + 1))
+fi
+
+origin=$(curl -s -X OPTIONS "$BASE/api/chat" -H "Origin: https://handzon.no" -D - -o /dev/null | grep -i "access-control-allow-origin" | tr -d '\r')
+check "OPTIONS /api/chat allows https://handzon.no" "access-control-allow-origin: https://handzon.no" "$(echo "$origin" | tr 'A-Z' 'a-z')"
+
+origin=$(curl -s -X OPTIONS "$BASE/api/chat" -H "Origin: https://evil-example.com" -D - -o /dev/null | grep -ci "access-control-allow-origin")
+check "OPTIONS /api/chat blocks an untrusted origin" "0" "$origin"
+
+echo
 echo "-- admin/portal routes reject unauthenticated requests (403, not 500) --"
 status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/portal/voice-agent/session" -H "Content-Type: application/json" -d '{}')
 check "POST /api/portal/voice-agent/session -> 403" "403" "$status"
