@@ -155,6 +155,18 @@ export default function Home() {
             </Link>
           </nav>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <Link
+              href="/login"
+              className="nav-link"
+              style={{
+                textDecoration: "none",
+                fontSize: 15,
+                fontWeight: 500,
+                color: "#3A3D31",
+              }}
+            >
+              Logg inn
+            </Link>
             <a
               href="#demo"
               className="btn-primary nav-cta"

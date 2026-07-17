@@ -1,12 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "ki-consult",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000,
-      "autoPort": true
-    }
+    { "name": "kiconsult", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "3300"], "port": 3300 }
   ]
 }
