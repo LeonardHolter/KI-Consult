@@ -29,6 +29,8 @@ export default function VoiceAgentCard({
   const micRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const assistantTextRef = useRef<string>("");
+  const startedAtRef = useRef<number>(0);
+  const usageRef = useRef({ inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 });
 
   const cleanup = useCallback(() => {
     dcRef.current?.close();
@@ -39,6 +41,31 @@ export default function VoiceAgentCard({
     micRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
   }, []);
+
+  // Reports the finished call's duration + token usage — the only place any
+  // of this is ever learned, since the WebRTC audio is a direct browser<->
+  // OpenAI connection that never touches our backend. Best-effort: a failed
+  // report shouldn't surface to the user, they've already hung up.
+  const reportUsage = useCallback(() => {
+    if (!startedAtRef.current) return;
+    const endedAt = Date.now();
+    const startedAt = startedAtRef.current;
+    startedAtRef.current = 0;
+    fetch("/api/portal/voice-agent/usage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientId,
+        startedAt: new Date(startedAt).toISOString(),
+        endedAt: new Date(endedAt).toISOString(),
+        durationSeconds: (endedAt - startedAt) / 1000,
+        usage: usageRef.current,
+      }),
+    }).catch(() => {
+      /* best-effort — the call itself already ended fine */
+    });
+    usageRef.current = { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 };
+  }, [clientId]);
 
   const handleServerEvent = useCallback((ev: Record<string, unknown>) => {
     switch (ev.type) {
@@ -53,6 +80,16 @@ export default function VoiceAgentCard({
       case "response.output_item.added":
         assistantTextRef.current = "";
         break;
+      case "response.done": {
+        const usage = (ev.response as { usage?: Record<string, unknown> } | undefined)?.usage;
+        if (usage) {
+          usageRef.current.inputTokens += Number(usage.input_tokens ?? 0);
+          usageRef.current.outputTokens += Number(usage.output_tokens ?? 0);
+          const cached = (usage.input_token_details as { cached_tokens?: number } | undefined)?.cached_tokens;
+          usageRef.current.cacheReadInputTokens += Number(cached ?? 0);
+        }
+        break;
+      }
       case "output_audio_buffer.started":
         setAgentSpeaking(true);
         break;
@@ -123,6 +160,7 @@ export default function VoiceAgentCard({
       };
       dc.onopen = () => {
         setUiState("active");
+        startedAtRef.current = Date.now();
         dc.send(JSON.stringify({ type: "response.create" }));
       };
 
@@ -146,6 +184,7 @@ export default function VoiceAgentCard({
         if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
           setErrorMsg("Tilkoblingen falt ut.");
           setUiState("error");
+          reportUsage();
         }
       };
     } catch (err) {
@@ -159,13 +198,14 @@ export default function VoiceAgentCard({
       setUiState("error");
       cleanup();
     }
-  }, [cleanup, handleServerEvent, clientId]);
+  }, [cleanup, handleServerEvent, clientId, reportUsage]);
 
   const stop = useCallback(() => {
+    reportUsage();
     cleanup();
     setUiState("idle");
     setAgentSpeaking(false);
-  }, [cleanup]);
+  }, [cleanup, reportUsage]);
 
   const statusLabel =
     uiState === "connecting"

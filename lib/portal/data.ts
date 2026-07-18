@@ -17,7 +17,16 @@ export type Profile = {
   full_name: string | null;
 };
 
-export type Client = { id: string; slug: string; name: string };
+export type Client = {
+  id: string;
+  slug: string;
+  name: string;
+  plan: string | null;
+  monthly_price_nok: number | null;
+  status: "trial" | "active" | "paused" | "churned";
+  contact_email: string | null;
+  contact_phone: string | null;
+};
 
 export type ConversationRow = {
   id: string;
@@ -63,10 +72,27 @@ export async function getProfile(): Promise<Profile | null> {
 /** Clients the caller may see: all of them for an admin, one for a client user. */
 export async function getClients(): Promise<Client[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("clients")
-    .select("id, slug, name")
+    .select("id, slug, name, plan, monthly_price_nok, status, contact_email, contact_phone")
     .order("name");
+
+  // The billing columns (supabase/007) are additive and may not exist yet on
+  // a deployment where that migration hasn't run — fall back to the base
+  // columns rather than letting the whole admin overview (and everything
+  // else that calls this) silently render as "no clients".
+  if (error) {
+    const fallback = await supabase.from("clients").select("id, slug, name").order("name");
+    return ((fallback.data ?? []) as Pick<Client, "id" | "slug" | "name">[]).map((c) => ({
+      ...c,
+      plan: null,
+      monthly_price_nok: null,
+      status: "trial" as const,
+      contact_email: null,
+      contact_phone: null,
+    }));
+  }
+
   return (data as Client[]) ?? [];
 }
 

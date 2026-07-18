@@ -106,7 +106,10 @@ console.log("\n-- Directions (Leonard, 2026-07-13: 'kjør ned' -> 'kjør opp' to
 await test(
   "Gives directions as 'opp til plan P3', not 'ned'",
   "Hvor ligger Strømmen avdeling og hvordan kommer jeg dit?",
-  (t) => contains("opp til plan p3")(t) && !contains("kjør ned")(t),
+  // Loosened from one exact contiguous phrase: Claude sometimes bolds "P3"
+  // (**P3**), which breaks a strict "plan p3" substring match without the
+  // directions actually being wrong. Check "opp"/"p3" independently instead.
+  (t) => contains("opp")(t) && contains("p3")(t) && !contains("kjør ned")(t),
 );
 
 console.log("\n-- Booking rules --");

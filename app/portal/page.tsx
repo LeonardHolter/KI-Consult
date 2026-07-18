@@ -1,4 +1,6 @@
 import { getClients, getConversations, getProfile, getUsageStats } from "@/lib/portal/data";
+import { getClientHealth, getEventCounts24h, getVoiceUsageStats } from "@/lib/admin/data";
+import { loggingEnabled } from "@/lib/portal-log";
 import { signOut } from "@/app/login/actions";
 import DashboardView from "./DashboardView";
 import AdminOverview from "./AdminOverview";
@@ -67,7 +69,24 @@ export default async function PortalPage({
     );
   }
 
-  const conversations = await getConversations();
-  const usage = await getUsageStats();
-  return <AdminOverview clients={clients} conversations={conversations} usage={usage} />;
+  const [conversations, usage, eventCounts, voiceUsage, healthEntries] = await Promise.all([
+    getConversations(),
+    getUsageStats(),
+    getEventCounts24h(),
+    getVoiceUsageStats(),
+    Promise.all(clients.map(async (c) => [c.id, await getClientHealth(c.id)] as const)),
+  ]);
+  const health = new Map(healthEntries);
+
+  return (
+    <AdminOverview
+      clients={clients}
+      conversations={conversations}
+      usage={usage}
+      health={health}
+      eventCounts={eventCounts}
+      voiceUsage={voiceUsage}
+      loggingEnabled={loggingEnabled}
+    />
+  );
 }

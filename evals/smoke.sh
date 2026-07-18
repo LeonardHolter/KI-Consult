@@ -103,6 +103,12 @@ check "POST /api/portal/voice-demo/test-session -> 403" "403" "$status"
 status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/portal/chat-bot/settings?client=$HANDZON_ID")
 check "GET /api/portal/chat-bot/settings?client=... -> 403" "403" "$status"
 
+status=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$BASE/api/portal/clients/$HANDZON_ID" -H "Content-Type: application/json" -d '{"status":"active"}')
+check "PATCH /api/portal/clients/<id> -> 403" "403" "$status"
+
+status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/portal/voice-agent/usage" -H "Content-Type: application/json" -d '{}')
+check "POST /api/portal/voice-agent/usage -> 403" "403" "$status"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

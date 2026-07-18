@@ -1,11 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { after } from "next/server";
 import { bookSlot, loadSlots } from "@/lib/slots";
-import { clientIp, corsHeaders, rateLimit } from "@/lib/api-guard";
+import { clientIp, corsHeaders, isAllowedOrigin, rateLimit } from "@/lib/api-guard";
 import { osloParts } from "@/lib/google-calendar";
 import { logTurn } from "@/lib/portal-log";
+import { logBotEvent } from "@/lib/botEvents";
 import { getChatBotSettingsPublic } from "@/lib/chatBot/data";
 import type { ChatBotSettings } from "@/lib/chatBot/types";
+
+// The exact out-of-scope deflection phrase from the OMFANG section of the
+// prompt (see supabase/006). A reply containing this means a real customer
+// asked about something Hanz can't help with — worth surfacing to admins as
+// a signal to expand the knowledge base, distinct from a genuine error.
+const DEFLECTION_MARKER = "det kan jeg dessverre ikke hjelpe med";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,9 +27,14 @@ function clientIdFrom(req: Request): string | null {
 export async function OPTIONS(req: Request) {
   const clientId = clientIdFrom(req);
   const settings = clientId ? await getChatBotSettingsPublic(clientId) : null;
+  const origin = req.headers.get("origin");
+  const allowedOrigins = settings?.allowedOrigins ?? [];
+  if (clientId && origin && !isAllowedOrigin(origin, allowedOrigins)) {
+    after(logBotEvent({ clientId, surface: "chat", type: "cors_rejected", detail: { origin } }));
+  }
   return new Response(null, {
     status: 204,
-    headers: corsHeaders(req.headers.get("origin"), settings?.allowedOrigins ?? []),
+    headers: corsHeaders(origin, allowedOrigins),
   });
 }
 
@@ -211,6 +223,7 @@ export async function POST(req: Request) {
 
   const rl = rateLimit(clientIp(req));
   if (!rl.ok) {
+    after(logBotEvent({ clientId, surface: "chat", type: "rate_limited" }));
     return new Response("For mange forespørsler. Prøv igjen om litt.", {
       status: 429,
       headers: { ...cors, "Retry-After": String(rl.retryAfter) },
@@ -333,6 +346,14 @@ export async function POST(req: Request) {
                 value = JSON.stringify({
                   error: `Verktøyet feilet: ${err instanceof Error ? err.message : "ukjent feil"}`,
                 });
+                after(
+                  logBotEvent({
+                    clientId,
+                    surface: "chat",
+                    type: "tool_error",
+                    detail: { tool: block.name, message: err instanceof Error ? err.message : String(err) },
+                  })
+                );
               }
               // Mark the conversation as converted only on a booking the tool
               // actually confirmed — not merely on the model attempting one.
@@ -357,6 +378,14 @@ export async function POST(req: Request) {
         controller.close();
       } catch (err) {
         console.error("Chat stream error:", err);
+        after(
+          logBotEvent({
+            clientId,
+            surface: "chat",
+            type: "error",
+            detail: { message: err instanceof Error ? err.message : String(err) },
+          })
+        );
         try {
           controller.enqueue(
             encoder.encode("Beklager, tjenesten er utilgjengelig akkurat nå. Prøv igjen senere.")
@@ -366,6 +395,16 @@ export async function POST(req: Request) {
           /* already closed */
         }
       } finally {
+        if (assistantText.toLowerCase().includes(DEFLECTION_MARKER)) {
+          after(
+            logBotEvent({
+              clientId,
+              surface: "chat",
+              type: "deflection",
+              detail: { userMessage: lastUserMessage.slice(0, 300) },
+            })
+          );
+        }
         // Mirror the finished turn to the portal. Still not awaited — the
         // customer's reply is already streamed and logging must never delay
         // it — but it has to be handed to `after()` rather than left as a
