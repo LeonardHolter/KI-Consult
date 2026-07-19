@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import VoiceAgentCard from "@/components/VoiceAgentCard";
+import CalendarConnectModal from "./CalendarConnectModal";
 
 /**
  * The client-facing view of their bot: the live booking calendar plus the chat
@@ -100,6 +101,7 @@ export default function PortalDashboard({
   const [calName, setCalName] = useState<string | undefined>(undefined);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [selected, setSelected] = useState<SelectedBooking | null>(null);
+  const [calModalOpen, setCalModalOpen] = useState(false);
 
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
@@ -328,6 +330,16 @@ export default function PortalDashboard({
             Juster chatbot
           </Link>
         )}
+        {overviewHref && clientId && (
+          <button
+            type="button"
+            className="ctp-back"
+            style={{ fontFamily: "inherit", cursor: "pointer" }}
+            onClick={() => setCalModalOpen(true)}
+          >
+            Kalender
+          </button>
+        )}
         <span className="ctp-live">
           <span className="ctp-dot" /> LIVE
           {lastSync && <em>oppdatert {lastSync.toLocaleTimeString("no-NO")}</em>}
@@ -496,6 +508,10 @@ export default function PortalDashboard({
             </dl>
           </div>
         </div>
+      )}
+
+      {calModalOpen && clientId && (
+        <CalendarConnectModal clientId={clientId} onClose={() => setCalModalOpen(false)} />
       )}
     </div>
   );

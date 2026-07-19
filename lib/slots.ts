@@ -356,9 +356,15 @@ async function demoBook(
 
 export async function loadSlots(clientId: string): Promise<SlotView[]> {
   const settings = await loadSettings(clientId);
-  return calendarConnected(settings)
-    ? calendarSlotViews(settings)
-    : demoSlotViews(clientId, settings);
+  if (!calendarConnected(settings)) return demoSlotViews(clientId, settings);
+  try {
+    return await calendarSlotViews(settings);
+  } catch (err) {
+    // Same degrade-to-demo reasoning as loadCalendarView: a stored calendarId
+    // that's stopped being reachable shouldn't crash slot lookups.
+    console.error(`loadSlots: calendar unreachable for client ${clientId}:`, err);
+    return demoSlotViews(clientId, settings);
+  }
 }
 
 export async function bookSlot(
@@ -370,6 +376,12 @@ export async function bookSlot(
 ): Promise<{ ok: true; slot: SlotView } | { ok: false; error: string }> {
   const settings = await loadSettings(clientId);
   const svc = service?.trim() || "Demo / rådgivning";
+  // Deliberately NOT falling back to demo mode here like the read paths do:
+  // silently rerouting a real customer's booking into the local demo store
+  // on a calendar error would tell them "you're booked" while the business
+  // never sees it — a false confirmation is worse than a loud failure. Let
+  // it throw/reject; the chat route's existing tool-error handling already
+  // turns that into "beklager, teknisk feil" for the customer.
   return calendarConnected(settings)
     ? calendarBook(settings, slotId, customerName, customerPhone, svc)
     : demoBook(clientId, settings, slotId, customerName, customerPhone, svc);
@@ -423,22 +435,7 @@ async function calendarEvents(settings: Settings, dates: string[]): Promise<CalE
   return out;
 }
 
-export async function loadCalendarView(clientId: string): Promise<CalendarView> {
-  const settings = await loadSettings(clientId);
-  if (calendarConnected(settings)) {
-    const dates = upcomingDates(settings.daysAhead);
-    const [slots, events] = await Promise.all([
-      calendarSlotViews(settings),
-      calendarEvents(settings, dates),
-    ]);
-    return {
-      slots,
-      events,
-      connected: true,
-      location: settings.locationName,
-      calendarName: settings.calendarName,
-    };
-  }
+async function demoCalendarView(clientId: string, settings: Settings): Promise<CalendarView> {
   const slots = await demoSlotViews(clientId, settings);
   const events: CalEvent[] = slots.flatMap((s) =>
     s.bookings.map((b, i) => ({
@@ -454,4 +451,33 @@ export async function loadCalendarView(clientId: string): Promise<CalendarView> 
     }))
   );
   return { slots, events, connected: false, location: settings.locationName };
+}
+
+export async function loadCalendarView(clientId: string): Promise<CalendarView> {
+  const settings = await loadSettings(clientId);
+  if (calendarConnected(settings)) {
+    try {
+      const dates = upcomingDates(settings.daysAhead);
+      const [slots, events] = await Promise.all([
+        calendarSlotViews(settings),
+        calendarEvents(settings, dates),
+      ]);
+      return {
+        slots,
+        events,
+        connected: true,
+        location: settings.locationName,
+        calendarName: settings.calendarName,
+      };
+    } catch (err) {
+      // A calendarId is stored, but the calendar itself isn't reachable
+      // right now (unshared, deleted, service-account swapped, transient
+      // Google API error, ...). Degrade to demo mode instead of a 500 —
+      // this is exactly what happened when the service account was
+      // rotated and the old test calendar was no longer shared with it.
+      console.error(`loadCalendarView: calendar unreachable for client ${clientId}:`, err);
+      return demoCalendarView(clientId, settings);
+    }
+  }
+  return demoCalendarView(clientId, settings);
 }

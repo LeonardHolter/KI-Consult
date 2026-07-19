@@ -109,6 +109,12 @@ check "PATCH /api/portal/clients/<id> -> 403" "403" "$status"
 status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/portal/voice-agent/usage" -H "Content-Type: application/json" -d '{}')
 check "POST /api/portal/voice-agent/usage -> 403" "403" "$status"
 
+status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/portal/calendar?client=$HANDZON_ID")
+check "GET /api/portal/calendar?client=... -> 403" "403" "$status"
+
+status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/portal/calendar" -H "Content-Type: application/json" -d "{\"clientId\":\"$HANDZON_ID\",\"calendarId\":\"x\"}")
+check "POST /api/portal/calendar -> 403" "403" "$status"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
