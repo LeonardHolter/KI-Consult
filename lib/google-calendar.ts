@@ -133,6 +133,26 @@ export async function insertEvent(
   return gcal("POST", `/calendars/${encodeURIComponent(calendarId)}/events`, event);
 }
 
+export async function getEvent(calendarId: string, eventId: string): Promise<GcalEvent> {
+  return gcal(
+    "GET",
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
+  );
+}
+
+export async function deleteEvent(calendarId: string, eventId: string): Promise<void> {
+  const token = await getAccessToken();
+  const res = await fetch(
+    `${CAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+  );
+  // Google returns 204 on success and 410 if it's already gone — both mean
+  // the event is no longer on the calendar, which is the outcome we want.
+  if (!res.ok && res.status !== 410) {
+    throw new Error(`Google Calendar ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+}
+
 /** Verifies access by fetching calendar metadata. Returns the calendar name. */
 export async function testCalendarAccess(calendarId: string): Promise<string> {
   const data = await gcal("GET", `/calendars/${encodeURIComponent(calendarId)}`);

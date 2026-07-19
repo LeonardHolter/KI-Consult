@@ -1,7 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { get, put } from "@vercel/blob";
+import crypto from "crypto";
 import {
+  deleteEvent,
+  getEvent,
   getServiceAccount,
   insertEvent,
   listEvents,
@@ -91,6 +94,10 @@ export function calendarConnected(settings: Settings): boolean {
 /* ------------------------------------------------------------------ */
 
 export type Booking = {
+  /** Google Calendar event id (calendar mode) or a generated id (demo mode) — stable, used to cancel this specific booking. */
+  id: string;
+  /** True when the AI agent created this booking, vs. an event synced in from elsewhere on the connected calendar. Only agent bookings may be cancelled from the dashboard. */
+  isAgentBooking: boolean;
   customerName?: string;
   customerPhone?: string;
   service?: string;
@@ -183,6 +190,8 @@ function bookingsInWindow(
     .map((e) => {
       const priv = e.extendedProperties?.private ?? {};
       return {
+        id: e.id,
+        isAgentBooking: priv.hzAgent === "1",
         customerName: priv.customerName,
         customerPhone: priv.customerPhone,
         service: priv.service ?? e.summary ?? "Opptatt",
@@ -240,7 +249,10 @@ async function calendarBook(
   });
   if (!event.id) return { ok: false, error: "Kalenderen avviste bookingen." };
 
-  const bookings = [...slot.bookings, { customerName, customerPhone, service, bookedAt }];
+  const bookings = [
+    ...slot.bookings,
+    { id: event.id, isAgentBooking: true, customerName, customerPhone, service, bookedAt },
+  ];
   return {
     ok: true,
     slot: toSlotView(
@@ -250,6 +262,30 @@ async function calendarBook(
       bookings
     ),
   };
+}
+
+async function calendarCancel(
+  settings: Settings,
+  bookingId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  let event: GcalEvent;
+  try {
+    event = await getEvent(settings.calendarId!, bookingId);
+  } catch {
+    return { ok: false, error: "Fant ikke denne avtalen." };
+  }
+  // Re-verify server-side rather than trusting the caller: only bookings the
+  // agent itself created may be deleted from the dashboard. Anything else on
+  // the connected calendar (synced in from the store's other systems, or a
+  // manual entry) is out of bounds here.
+  if (event.extendedProperties?.private?.hzAgent !== "1") {
+    return {
+      ok: false,
+      error: "Denne avtalen er ikke laget av boten og kan ikke slettes herfra.",
+    };
+  }
+  await deleteEvent(settings.calendarId!, bookingId);
+  return { ok: true };
 }
 
 /* ------------------------------------------------------------------ */
@@ -267,17 +303,28 @@ const blobConfigured = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 type DemoBooking = Booking & { slotId: string; date: string; time: string };
 
 async function demoReadBookings(clientId: string): Promise<DemoBooking[]> {
+  let raw: DemoBooking[];
   try {
     if (blobConfigured()) {
       const result = await get(bookingsBlobPath(clientId), { access: "private" });
       if (!result || result.statusCode !== 200 || !result.stream) return [];
-      return JSON.parse(await new Response(result.stream).text()) as DemoBooking[];
+      raw = JSON.parse(await new Response(result.stream).text()) as DemoBooking[];
+    } else if (fs.existsSync(bookingsFile(clientId))) {
+      raw = JSON.parse(fs.readFileSync(bookingsFile(clientId), "utf-8"));
+    } else {
+      return [];
     }
-    if (!fs.existsSync(bookingsFile(clientId))) return [];
-    return JSON.parse(fs.readFileSync(bookingsFile(clientId), "utf-8"));
   } catch {
     return [];
   }
+  // Backfill id/isAgentBooking for records written before those fields
+  // existed — every demo booking was always agent-made (this store has no
+  // other writer), so the flag is unconditionally true.
+  return raw.map((b) => ({
+    ...b,
+    id: b.id ?? `${b.slotId}-${b.bookedAt ?? crypto.randomUUID()}`,
+    isAgentBooking: true,
+  }));
 }
 
 async function demoWriteBookings(clientId: string, bookings: DemoBooking[]) {
@@ -334,11 +381,25 @@ async function demoBook(
   }
 
   const bookedAt = new Date().toISOString();
+  const id = crypto.randomUUID();
   const all = await demoReadBookings(clientId);
-  all.push({ slotId, date: slot.date, time: slot.time, customerName, customerPhone, service, bookedAt });
+  all.push({
+    id,
+    isAgentBooking: true,
+    slotId,
+    date: slot.date,
+    time: slot.time,
+    customerName,
+    customerPhone,
+    service,
+    bookedAt,
+  });
   await demoWriteBookings(clientId, all);
 
-  const bookings = [...slot.bookings, { customerName, customerPhone, service, bookedAt }];
+  const bookings = [
+    ...slot.bookings,
+    { id, isAgentBooking: true, customerName, customerPhone, service, bookedAt },
+  ];
   return {
     ok: true,
     slot: toSlotView(
@@ -348,6 +409,18 @@ async function demoBook(
       bookings
     ),
   };
+}
+
+async function demoCancel(
+  clientId: string,
+  bookingId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const all = await demoReadBookings(clientId);
+  const idx = all.findIndex((b) => b.id === bookingId);
+  if (idx === -1) return { ok: false, error: "Fant ikke bookingen." };
+  all.splice(idx, 1);
+  await demoWriteBookings(clientId, all);
+  return { ok: true };
 }
 
 /* ------------------------------------------------------------------ */
@@ -385,6 +458,22 @@ export async function bookSlot(
   return calendarConnected(settings)
     ? calendarBook(settings, slotId, customerName, customerPhone, svc)
     : demoBook(clientId, settings, slotId, customerName, customerPhone, svc);
+}
+
+/**
+ * Cancels a single booking by id. Only ever removes bookings the agent
+ * itself created — calendarCancel re-checks the hzAgent marker server-side
+ * regardless of what the caller believes, so an event imported from the
+ * store's other systems can never be deleted from here.
+ */
+export async function cancelBooking(
+  clientId: string,
+  bookingId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const settings = await loadSettings(clientId);
+  return calendarConnected(settings)
+    ? calendarCancel(settings, bookingId)
+    : demoCancel(clientId, bookingId);
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import VoiceAgentCard from "@/components/VoiceAgentCard";
@@ -18,6 +18,8 @@ import CalendarConnectModal from "./CalendarConnectModal";
  */
 
 type Booking = {
+  id?: string;
+  isAgentBooking?: boolean;
   customerName?: string;
   customerPhone?: string;
   service?: string;
@@ -102,6 +104,9 @@ export default function PortalDashboard({
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [selected, setSelected] = useState<SelectedBooking | null>(null);
   const [calModalOpen, setCalModalOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
@@ -137,24 +142,32 @@ export default function PortalDashboard({
     return () => window.removeEventListener("keydown", onKey);
   }, [selected]);
 
+  // Fetches calendar data without touching state itself, so both the polling
+  // effect and the cancel-booking handler can drive it into state on their
+  // own terms (the effect needs to call it synchronously on mount, which a
+  // function that sets state directly isn't allowed to do).
+  const fetchCalendarView = useCallback(async () => {
+    try {
+      const url = clientId
+        ? `/api/bot/calendar-view?client=${clientId}`
+        : "/api/bot/calendar-view";
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }, [clientId]);
+
   useEffect(() => {
     let cancelled = false;
     async function poll() {
-      try {
-        const url = clientId
-          ? `/api/bot/calendar-view?client=${clientId}`
-          : "/api/bot/calendar-view";
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) return;
-        const d = await res.json();
-        if (cancelled) return;
-        setSlots(d.slots ?? []);
-        setCalConnected(Boolean(d.connected));
-        setCalName(d.calendarName);
-        setLastSync(new Date());
-      } catch {
-        /* keep last known state */
-      }
+      const d = await fetchCalendarView();
+      if (!d || cancelled) return;
+      setSlots(d.slots ?? []);
+      setCalConnected(Boolean(d.connected));
+      setCalName(d.calendarName);
+      setLastSync(new Date());
     }
     poll();
     const iv = setInterval(poll, 10_000);
@@ -165,7 +178,35 @@ export default function PortalDashboard({
     // Re-poll on clientId change: an admin switching clients keeps this same
     // component mounted (only the ?client= search param changes), so without
     // this dependency the interval would keep polling the previous client.
-  }, [clientId]);
+  }, [fetchCalendarView]);
+
+  async function handleCancelBooking() {
+    if (!selected?.booking.id) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const res = await fetch("/api/portal/bookings", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, bookingId: selected.booking.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Kunne ikke slette bookingen.");
+      setSelected(null);
+      setConfirmingCancel(false);
+      const d = await fetchCalendarView();
+      if (d) {
+        setSlots(d.slots ?? []);
+        setCalConnected(Boolean(d.connected));
+        setCalName(d.calendarName);
+        setLastSync(new Date());
+      }
+    } catch (e) {
+      setCancelError(e instanceof Error ? e.message : "Noe gikk galt.");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   const days = useMemo(() => [...new Set(slots.map((s) => s.date))].sort(), [slots]);
 
@@ -301,6 +342,26 @@ export default function PortalDashboard({
         .ctp-modal-fields dd { margin: 0; font-size: .92rem; color: #16190f; }
         .ctp-modal-fields a { color: #0d6b47; text-decoration: none; font-weight: 700; }
         .ctp-modal-fields a:hover { text-decoration: underline; }
+        .ctp-modal-cancel { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(154,154,140,.22); }
+        .ctp-modal-cancel-btn {
+          width: 100%; padding: 9px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 700;
+          border: 1px solid #e0847533; background: #fdf0ed; color: #c0392b; cursor: pointer; font-family: inherit;
+        }
+        .ctp-modal-cancel-btn:hover { background: #fbe3dd; }
+        .ctp-modal-cancel-btn:disabled { opacity: .5; cursor: default; }
+        .ctp-modal-cancel-confirm { display: flex; flex-direction: column; gap: 10px; }
+        .ctp-modal-cancel-confirm p { margin: 0; font-size: 13px; color: #3d4034; line-height: 1.5; }
+        .ctp-modal-cancel-actions { display: flex; gap: 8px; }
+        .ctp-modal-cancel-actions button {
+          flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 700;
+          cursor: pointer; font-family: inherit; border: 1px solid rgba(154,154,140,.4);
+        }
+        .ctp-modal-cancel-actions .is-danger { background: #c0392b; color: #fff; border-color: #c0392b; }
+        .ctp-modal-cancel-actions .is-danger:hover { background: #a5301f; }
+        .ctp-modal-cancel-actions .is-danger:disabled { opacity: .6; cursor: default; }
+        .ctp-modal-cancel-actions .is-ghost { background: #f3efe4; color: #16190f; }
+        .ctp-modal-cancel-error { margin: 0; font-size: 12.5px; color: #c0392b; }
+        .ctp-modal-imported-hint { margin: 20px 0 0; font-size: 12px; color: #9a9a8c; line-height: 1.5; }
       `}</style>
 
       <div className="ctp-bar">
@@ -430,15 +491,17 @@ export default function PortalDashboard({
                                     type="button"
                                     className={`ctp-chip is-booked ${svc.className}`}
                                     title="Klikk for navn og detaljer"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      setConfirmingCancel(false);
+                                      setCancelError(null);
                                       setSelected({
                                         booking: b,
                                         date,
                                         time: s.time,
                                         endTime: s.endTime,
                                         serviceKeyword: s.serviceKeyword,
-                                      })
-                                    }
+                                      });
+                                    }}
                                   >
                                     {b.service || "Booket"}
                                   </button>
@@ -506,6 +569,47 @@ export default function PortalDashboard({
                 </>
               )}
             </dl>
+
+            {selected.booking.isAgentBooking && selected.booking.id ? (
+              <div className="ctp-modal-cancel">
+                {!confirmingCancel ? (
+                  <button
+                    type="button"
+                    className="ctp-modal-cancel-btn"
+                    onClick={() => setConfirmingCancel(true)}
+                  >
+                    Slett booking
+                  </button>
+                ) : (
+                  <div className="ctp-modal-cancel-confirm">
+                    <p>Sikker på at du vil slette denne bookingen? Dette kan ikke angres.</p>
+                    <div className="ctp-modal-cancel-actions">
+                      <button
+                        type="button"
+                        className="is-ghost"
+                        onClick={() => setConfirmingCancel(false)}
+                        disabled={cancelling}
+                      >
+                        Avbryt
+                      </button>
+                      <button
+                        type="button"
+                        className="is-danger"
+                        onClick={handleCancelBooking}
+                        disabled={cancelling}
+                      >
+                        {cancelling ? "Sletter…" : "Ja, slett"}
+                      </button>
+                    </div>
+                    {cancelError && <p className="ctp-modal-cancel-error">{cancelError}</p>}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="ctp-modal-imported-hint">
+                Denne avtalen er importert fra Google Calendar og kan ikke slettes herfra.
+              </p>
+            )}
           </div>
         </div>
       )}

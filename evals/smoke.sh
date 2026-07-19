@@ -115,6 +115,9 @@ check "GET /api/portal/calendar?client=... -> 403" "403" "$status"
 status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/portal/calendar" -H "Content-Type: application/json" -d "{\"clientId\":\"$HANDZON_ID\",\"calendarId\":\"x\"}")
 check "POST /api/portal/calendar -> 403" "403" "$status"
 
+status=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/portal/bookings" -H "Content-Type: application/json" -d "{\"clientId\":\"$HANDZON_ID\",\"bookingId\":\"x\"}")
+check "DELETE /api/portal/bookings -> 403" "403" "$status"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
