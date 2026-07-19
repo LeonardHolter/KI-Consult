@@ -88,14 +88,16 @@ console.log("-- Branding --");
   console.log(`  current welcome message: "${welcome}"`);
   // Sabah, 2026-07-16: proposed replacing the current welcome with one that
   // says "velkommen til Handz On" and "Jeg heter Hanz og er ... digitale
-  // assistent" instead of the terser current wording.
+  // assistent" instead of the terser current wording. Leonard, 2026-07-17:
+  // "vi endrer velkomstmeldingen til nøyaktig det du foreslo" — implemented
+  // verbatim (including her paragraph break).
   const matchesRewrite = welcome.includes("velkommen til Handz On") && welcome.includes("digitale assistent");
   if (matchesRewrite) {
     console.log("  ok   - welcome message matches Sabah's requested rewrite (2026-07-16)");
     pass++;
   } else {
-    console.log("  PENDING - welcome message not yet updated to Sabah's requested rewrite (2026-07-16, not yet implemented)");
-    pending++;
+    console.log("  FAIL - welcome message does not match Sabah's requested rewrite (2026-07-16)");
+    fail++;
   }
 }
 
@@ -168,13 +170,13 @@ console.log("\n-- Pricing & durations --");
 await test("States utvendig vask takes ~1 time", "Hvor lang tid tar utvendig vask?", contains("1 time"));
 await test("States innvendig vask takes ~1 time", "Hvor lang tid tar innvendig vask?", contains("1 time"));
 await test("States ut- og innvendig vask takes ~1,5 time", "Hvor lang tid tar ut- og innvendig vask?", contains("1,5 time"));
-// Sabah, 2026-07-16 (latest email): gave the figure, asked Leonard to add it —
-// not yet in the knowledge base as of this migration.
+// Sabah, 2026-07-16: gave the figure, asked Leonard to add it. Leonard,
+// 2026-07-17: "Vi legger inn en veiledende tid på ca. 30–45 minutter" — added
+// to the BEHANDLINGSTID section alongside the other wash durations.
 await test(
   "States motorvask takes ~30–45 minutter",
   "Hvor lang tid tar motorvask?",
   (t) => contains("30")(t) && contains("45")(t),
-  { pendingFeature: "Sabah's 2026-07-16 email — figure provided, not yet added to the knowledge base" },
 );
 // Leonard, 2026-07-16: Hanz now states the >9H hardness proactively.
 await test("States ceramic coating hardness is >9H", "Hva er H-graden på keramisk lakkforsegling?", contains("9h"));
