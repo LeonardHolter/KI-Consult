@@ -172,10 +172,10 @@ function bookingsInWindow(
   const endMs = osloToUTC(date, endTime).getTime();
   return events
     .filter((e) => {
-      // Only count bookings the AI agent itself created. Other events on the
-      // connected calendar (personal meetings, manual entries without the
-      // hzAgent marker) shouldn't eat into the agent's booking capacity.
-      if (e.extendedProperties?.private?.hzAgent !== "1") return false;
+      // Count every busy event in this window, not just ones the agent
+      // itself created — the store syncs bookings from other systems into
+      // this same calendar, and the agent must never offer/double-book a
+      // slot that's already taken there.
       const evStart = new Date(e.start!.dateTime!).getTime();
       const evEnd = new Date(e.end!.dateTime!).getTime();
       return evStart < endMs && evEnd > startMs;
