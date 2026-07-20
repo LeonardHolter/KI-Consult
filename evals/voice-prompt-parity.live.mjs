@@ -264,6 +264,18 @@ async function main() {
     /Avslutt ALLTID replikken med et tydelig neste steg/i.test(voice),
   );
 
+  // Regression: gpt-realtime's audio track can end before its transcript —
+  // playback metering caught the model voicing the digit readback but
+  // dropping a short trailing "Stemmer det?"; the caller never heard the
+  // question even though the transcript showed it. The prompt must demand a
+  // full standalone confirmation sentence after digit strings, which is far
+  // less likely to be dropped by early audio EOS.
+  console.log("\n-- digit readbacks end in a full standalone question --");
+  check(
+    "voice prompt forbids a short tail-question glued to the last digit",
+    /EGEN, FULLSTENDIG setning/i.test(voice) && /Har jeg notert riktig nummer\?/i.test(voice),
+  );
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 }
