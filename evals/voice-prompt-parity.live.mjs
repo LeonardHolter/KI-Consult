@@ -293,6 +293,15 @@ async function main() {
     "voice prompt mandates the closing phrase ending in «Ha det bra!»",
     /Ha det bra!/.test(voice) && /ALDRI bare stoppe/i.test(voice),
   );
+  // Regression: the model merged booking confirmation + farewell into one
+  // ~17s reply and the audio track ended after ~11s — the farewell existed
+  // in the transcript but was never voiced. The farewell must be its own
+  // short turn, gated behind «Var det noe mer jeg kan hjelpe med?».
+  check(
+    "booking confirmation ends with 'noe mer?' — farewell is its own short turn",
+    /Var det noe mer jeg kan hjelpe med\?/.test(voice) &&
+      /IKKE si avskjeden i samme replikk/i.test(voice),
+  );
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
