@@ -54,6 +54,15 @@ export function useVoiceDemoTest() {
   // and ghost caller turns like «Nei, men det er nydelig».
   const audioCtxRef = useRef<AudioContext | null>(null);
   const meterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Playback-side meter, the counterpart to the mic meter. A live call
+  // reported confirmation questions "written but not spoken" while the
+  // server log showed full-length audio windows and zero truncations for
+  // those exact sentences — meaning if the audio was lost, it was lost
+  // LOCALLY (element/device), the one hop the server events can't see.
+  // This meters what actually flows out of the remote stream, so the next
+  // such report shows either playback.level: voice (audio reached the
+  // browser — device/volume problem) or silence (stream-level problem).
+  const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
@@ -303,7 +312,42 @@ export function useVoiceDemoTest() {
         }
         pc.ontrack = (e) => {
           audioEl.srcObject = e.streams[0];
+          // Meter the agent's audio as it arrives in the browser (see
+          // playbackTimerRef). Best-effort: metering must never break
+          // playback. Reading the stream in an AudioContext is safe because
+          // the element above also consumes it — Chrome only pumps WebRTC
+          // audio through an AudioContext when a media element is attached.
+          try {
+            const ctx = audioCtxRef.current;
+            if (ctx && !playbackTimerRef.current) {
+              const analyser = ctx.createAnalyser();
+              analyser.fftSize = 2048;
+              ctx.createMediaStreamSource(e.streams[0]).connect(analyser);
+              const buf = new Float32Array(analyser.fftSize);
+              let wasLoud = false;
+              playbackTimerRef.current = setInterval(() => {
+                analyser.getFloatTimeDomainData(buf);
+                let sum = 0;
+                for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+                const rms = Math.sqrt(sum / buf.length);
+                const loud = rms > 0.01;
+                if (loud !== wasLoud) {
+                  wasLoud = loud;
+                  pushEvent("in", loud ? "playback.level: voice" : "playback.level: quiet", {
+                    rms: Number(rms.toFixed(4)),
+                  });
+                }
+              }, 250);
+            }
+          } catch {
+            /* meter is diagnostic only */
+          }
         };
+        // Element-level stalls (pause/suspend/stalled) are the other way
+        // local playback dies silently — surface them in the log too.
+        for (const evName of ["playing", "pause", "stalled", "suspend", "ended"] as const) {
+          audioEl[`on${evName}`] = () => pushEvent("in", `audioEl.${evName}`, {});
+        }
         pc.addTrack(mic.getTracks()[0], mic);
 
         const dc = pc.createDataChannel("oai-events");
@@ -360,6 +404,10 @@ export function useVoiceDemoTest() {
     if (meterTimerRef.current) {
       clearInterval(meterTimerRef.current);
       meterTimerRef.current = null;
+    }
+    if (playbackTimerRef.current) {
+      clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
     }
     audioCtxRef.current?.close().catch(() => {});
     audioCtxRef.current = null;
