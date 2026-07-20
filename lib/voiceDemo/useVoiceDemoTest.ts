@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ReplyWatchdog } from "./replyWatchdog";
 import type { CallEvent, TranscriptItem, VoiceDemoSettings } from "./types";
 
@@ -64,6 +64,26 @@ export function useVoiceDemoTest() {
   // browser — device/volume problem) or silence (stream-level problem).
   const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Model-initiated hangup (finish_session): the disconnect waits for the
+  // farewell audio to finish playing (output_audio_buffer.stopped) —
+  // disconnecting on the tool call itself would cut «Ha det bra!» mid-air.
+  // disconnectRef exists because disconnect is defined below the memoised
+  // event handler that needs it.
+  const hangupPendingRef = useRef(false);
+  const hangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disconnectRef = useRef<(() => void) | null>(null);
+
+  const completeHangup = () => {
+    if (!hangupPendingRef.current) return;
+    hangupPendingRef.current = false;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
+    pushEvent("out", "finish_session — samtalen legges på", {});
+    disconnectRef.current?.();
+  };
+
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
   // and hand the result back over the data channel. Mirrors VoiceAgentCard —
@@ -119,6 +139,18 @@ export function useVoiceDemoTest() {
           | { type?: string; call_id?: string; name?: string; arguments?: string }
           | undefined;
         if (item?.type === "function_call" && item.call_id && item.name) {
+          if (item.name === "finish_session") {
+            // Client-side tool: never relayed to the server executor. The
+            // watchdog is done — no reply follows a hangup — and the actual
+            // disconnect waits for output_audio_buffer.stopped so the
+            // farewell finishes playing. Safety timer in case that event
+            // never comes (e.g. a farewell whose audio was dropped).
+            watchdogRef.current?.dispose();
+            hangupPendingRef.current = true;
+            hangupTimerRef.current = setTimeout(completeHangup, 12000);
+            pushEvent("in", "finish_session — venter på at avskjeden spilles ferdig", {});
+            break;
+          }
           void runToolCall(item.call_id, item.name, item.arguments ?? "{}");
         }
         break;
@@ -223,6 +255,8 @@ export function useVoiceDemoTest() {
       case "output_audio_buffer.stopped":
       case "output_audio_buffer.cleared":
         if (agentState === "speaking") setAgentState("idle");
+        // The farewell has finished playing — now the hangup can land.
+        if (hangupPendingRef.current) completeHangup();
         break;
       case "error":
         setError(ev.error?.message ?? JSON.stringify(ev.error ?? ev));
@@ -242,6 +276,11 @@ export function useVoiceDemoTest() {
       setEvents([]);
       setAgentState("idle");
       clientIdRef.current = clientId ?? null;
+      hangupPendingRef.current = false;
+      if (hangupTimerRef.current) {
+        clearTimeout(hangupTimerRef.current);
+        hangupTimerRef.current = null;
+      }
 
       watchdogRef.current?.dispose();
       watchdogRef.current = new ReplyWatchdog({
@@ -401,6 +440,11 @@ export function useVoiceDemoTest() {
 
   const disconnect = useCallback(() => {
     watchdogRef.current?.dispose();
+    hangupPendingRef.current = false;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
     if (meterTimerRef.current) {
       clearInterval(meterTimerRef.current);
       meterTimerRef.current = null;
@@ -421,6 +465,12 @@ export function useVoiceDemoTest() {
     setStatus("disconnected");
     setAgentState("idle");
   }, []);
+
+  // Keep the ref pointing at the current disconnect so completeHangup (used
+  // inside the memoised event handler above) never goes stale.
+  useEffect(() => {
+    disconnectRef.current = disconnect;
+  }, [disconnect]);
 
   return { status, agentState, transcript, events, error, connect, disconnect };
 }

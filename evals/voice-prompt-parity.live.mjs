@@ -214,6 +214,15 @@ async function main() {
     !/ikke tilgang til kalenderen/i.test(voice),
     "prompt still says it has no calendar access, but booking tools are now wired up",
   );
+  // finish_session is voice-only: the Realtime session registers it (the
+  // browser intercepts it to hang up), the chat bot has no such tool — so
+  // the voice prompt must document it and the chat prompt must NOT mention
+  // it (phantom-tool guard in both directions).
+  check("voice prompt documents finish_session", voice.includes("finish_session"));
+  check(
+    "chat prompt does NOT mention finish_session (chat has no such tool)",
+    !chat.includes("finish_session"),
+  );
   check(
     "voice prompt waits for success:true before confirming a booking",
     /success: ?true/i.test(voice),

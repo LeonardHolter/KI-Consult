@@ -83,14 +83,34 @@ export const BOOKING_TOOL_SCHEMAS = {
   },
 };
 
+/**
+ * Voice-only call-control tool. The name matches OpenAI's trained common
+ * tool (`finish_session`) — the realtime prompting guide says the model is
+ * trained on these exact names/shapes, so staying close maximises
+ * reliability. It is NOT part of BOOKING_TOOL_SCHEMAS on purpose: the chat
+ * bot has no call to hang up, and the server-side executor never sees it —
+ * the browser intercepts it and ends the WebRTC call locally (after the
+ * farewell audio finishes playing).
+ */
+export const FINISH_SESSION_TOOL = "finish_session";
+
 /** OpenAI Realtime session tool definitions, derived from the shared schemas. */
 export function realtimeToolDefs() {
-  return Object.entries(BOOKING_TOOL_SCHEMAS).map(([name, spec]) => ({
-    type: "function" as const,
-    name,
-    description: spec.description,
-    parameters: spec.parameters,
-  }));
+  return [
+    ...Object.entries(BOOKING_TOOL_SCHEMAS).map(([name, spec]) => ({
+      type: "function" as const,
+      name,
+      description: spec.description,
+      parameters: spec.parameters,
+    })),
+    {
+      type: "function" as const,
+      name: FINISH_SESSION_TOOL,
+      description:
+        "Avslutter telefonsamtalen (legger på). Kall denne KUN i samme replikk som du sier avslutningsfrasen, etter at kunden har bekreftet at de ikke trenger noe mer. Er det tvil om kunden er ferdig, spør først — ikke legg på.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  ];
 }
 
 export type BookingToolResult = Record<string, unknown>;

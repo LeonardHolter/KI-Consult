@@ -38,8 +38,21 @@ export default function VoiceAgentCard({
   // lib/voiceDemo/replyWatchdog.ts and its eval suite.
   const watchdogRef = useRef<ReplyWatchdog | null>(null);
 
+  // Set when the model calls finish_session (it says the farewell and hangs
+  // up in the same turn). The actual disconnect waits for
+  // output_audio_buffer.stopped so the farewell finishes PLAYING first —
+  // hanging up on the tool call itself would cut «Ha det bra!» mid-air,
+  // deliberately recreating the dropped-tail bug this flow exists to avoid.
+  const hangupPendingRef = useRef(false);
+  const hangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const cleanup = useCallback(() => {
     watchdogRef.current?.dispose();
+    hangupPendingRef.current = false;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
     dcRef.current?.close();
     pcRef.current?.close();
     micRef.current?.getTracks().forEach((t) => t.stop());
@@ -121,6 +134,21 @@ export default function VoiceAgentCard({
     [clientId],
   );
 
+  // The model hung up (finish_session): end the call the same way the stop
+  // button does, once the farewell audio has drained.
+  const completeHangup = useCallback(() => {
+    if (!hangupPendingRef.current) return;
+    hangupPendingRef.current = false;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
+    reportUsage();
+    cleanup();
+    setUiState("idle");
+    setAgentSpeaking(false);
+  }, [cleanup, reportUsage]);
+
   const handleServerEvent = useCallback((ev: Record<string, unknown>) => {
     // The watchdog sees every event, before any case can break early.
     watchdogRef.current?.handle(ev);
@@ -135,6 +163,17 @@ export default function VoiceAgentCard({
           | { type?: string; call_id?: string; name?: string; arguments?: string }
           | undefined;
         if (item?.type === "function_call" && item.call_id && item.name) {
+          if (item.name === "finish_session") {
+            // Client-side tool: never relayed to the server executor. The
+            // watchdog is done — no reply is expected after a hangup — and
+            // the disconnect waits for output_audio_buffer.stopped so the
+            // farewell finishes playing. Safety timer in case that event
+            // never comes (e.g. a farewell whose audio was dropped).
+            watchdogRef.current?.dispose();
+            hangupPendingRef.current = true;
+            hangupTimerRef.current = setTimeout(completeHangup, 12000);
+            break;
+          }
           void runToolCall(item.call_id, item.name, item.arguments ?? "{}");
         }
         break;
@@ -172,6 +211,8 @@ export default function VoiceAgentCard({
       case "output_audio_buffer.stopped":
       case "output_audio_buffer.cleared":
         setAgentSpeaking(false);
+        // The farewell has finished playing — now the hangup can land.
+        if (hangupPendingRef.current) completeHangup();
         break;
       case "error":
         setErrorMsg(
@@ -182,7 +223,7 @@ export default function VoiceAgentCard({
         setUiState("error");
         break;
     }
-  }, [runToolCall]);
+  }, [runToolCall, completeHangup]);
 
   const start = useCallback(async () => {
     setErrorMsg(null);
