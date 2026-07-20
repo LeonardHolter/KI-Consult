@@ -258,6 +258,12 @@ async function main() {
     /Lyder svaret IKKE som et navn/i.test(voice),
   );
 
+  console.log("\n-- every turn ends with an explicit next step --");
+  check(
+    "voice prompt requires each reply to end with a concrete question or next step",
+    /Avslutt ALLTID replikken med et tydelig neste steg/i.test(voice),
+  );
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 }
