@@ -431,10 +431,32 @@ export default function VoiceDemoTuner({
               </div>
             )}
 
-            <div className="vdt-row" style={{ marginTop: 12 }}>
+            <div className="vdt-row" style={{ marginTop: 12, gap: 14 }}>
               <button type="button" className="vdt-toggle-link" onClick={() => setShowEvents((v) => !v)}>
                 {showEvents ? "Skjul hendelseslogg" : `Vis hendelseslogg (${rt.events.length})`}
               </button>
+              {rt.events.length > 0 && (
+                <button
+                  type="button"
+                  className="vdt-toggle-link"
+                  onClick={() => {
+                    // Full payloads, not just event types — the on-screen log
+                    // alone has repeatedly been too thin to diagnose
+                    // silent-agent incidents.
+                    const blob = new Blob([JSON.stringify(rt.events, null, 2)], {
+                      type: "application/json",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `voice-log-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  Last ned full logg (JSON)
+                </button>
+              )}
             </div>
             {showEvents && (
               <div className="vdt-eventlog" style={{ marginTop: 8 }}>

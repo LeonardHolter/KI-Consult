@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { ReplyWatchdog } from "./replyWatchdog";
 import type { CallEvent, TranscriptItem, VoiceDemoSettings } from "./types";
 
 // WebRTC test client for the admin tuner — same connection architecture as
@@ -12,7 +13,10 @@ import type { CallEvent, TranscriptItem, VoiceDemoSettings } from "./types";
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 export type AgentState = "idle" | "listening" | "speaking";
 
-const MAX_EVENTS = 400;
+// High enough to hold a full multi-minute test call with payloads — this log
+// is the primary diagnosis surface for silent-agent incidents, and a capped
+// log has already cost us the decisive evidence once.
+const MAX_EVENTS = 2000;
 
 export function useVoiceDemoTest() {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
@@ -37,42 +41,19 @@ export function useVoiceDemoTest() {
   // handleServerEvent (which is memoised with no deps) can reach it.
   const clientIdRef = useRef<string | null>(null);
 
-  // The Realtime session occasionally produces a genuinely empty turn:
-  // response.created -> response.done, status "completed", zero output
-  // items — no audio, nothing spoken. First seen right after a tool-result
-  // nudge (the model booked successfully but never said so, needing up to 3
-  // retries in a row before it recovered). Confirmed AGAIN later happening
-  // after a perfectly ordinary, uninterrupted user turn (a phone-number
-  // confirmation) — no tool call anywhere nearby. So this isn't a
-  // tool-call-specific problem, it's a general session reliability gap:
-  // this receptionist should NEVER intentionally say nothing in response to
-  // a committed customer turn (see the "avslutt alltid replikken" prompt
-  // rule), so any "completed" response with empty output is always a bug,
-  // never deliberate — response.done below retries it unconditionally, on
-  // ANY trigger, not just after our own tool nudge.
-  //
-  // Deliberately NOT applied when status isn't "completed" (e.g.
-  // "cancelled" from a barge-in truncation — the tuner's "✂ klippet"
-  // marker): the caller is mid-interruption there, and forcing a new
-  // response could talk over whatever they're about to say next.
-  const emptyReplyRetriesRef = useRef(0);
-  const MAX_EMPTY_REPLY_RETRIES = 5;
-  const EMPTY_REPLY_RETRY_DELAY_MS = 400;
+  // Owns the "agent must never leave the caller in silence" contract. Four
+  // inline predecessors of this were patched against live calls and each
+  // still had a hole; the full history and every scenario live in
+  // lib/voiceDemo/replyWatchdog.ts and its eval suite.
+  const watchdogRef = useRef<ReplyWatchdog | null>(null);
 
-  // Whether the caller is mid-utterance right now. This — not the response
-  // status — is what decides if a silent turn is safe to retry.
-  //
-  // Earlier attempts gated the retry on status === "completed" and skipped
-  // "cancelled", assuming cancelled always meant barge-in. That was a guess,
-  // and it was wrong: a confirmed-silent turn (caller gave a phone number,
-  // agent went mute) never fired the retry, so the status must have been
-  // something else. Rather than keep guessing which status values OpenAI
-  // emits, use the invariant that actually matters — if the agent produced
-  // NO output and the caller isn't speaking, the conversation is dead and
-  // must be revived, whatever the server called it. If the caller IS
-  // speaking, stay quiet: a real response is coming anyway, and retrying
-  // would talk over them.
-  const userSpeakingRef = useRef(false);
+  // Mic level meter, logged into the event log. Exists to settle the echo
+  // question: if the server reports speech_started while our own mic energy
+  // stayed quiet, the "speech" was the agent's playback leaking back in —
+  // which would explain both the phantom barge-ins (the ✂ klippet marks)
+  // and ghost caller turns like «Nei, men det er nydelig».
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const meterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
@@ -107,10 +88,10 @@ export function useVoiceDemoTest() {
         }),
       );
       // The model does not continue on its own after a tool result — it
-      // needs an explicit nudge. If THIS nudge comes back empty, the
-      // general retry in response.done below (not scoped to tool calls)
-      // picks it up.
+      // needs an explicit nudge. The watchdog owns what happens if that
+      // nudge produces silence.
       dc.send(JSON.stringify({ type: "response.create" }));
+      watchdogRef.current?.expectReply();
       pushEvent("out", "function_call_output", { name, output });
     },
     [],
@@ -118,6 +99,8 @@ export function useVoiceDemoTest() {
 
   const handleServerEvent = useCallback((ev: Record<string, any>) => {
     pushEvent("in", String(ev.type), ev);
+    // The watchdog sees every event, before any case can break early.
+    watchdogRef.current?.handle(ev);
     switch (ev.type) {
       // See VoiceAgentCard: read the completed function_call ITEM, since
       // response.function_call_arguments.done has no call_id and the output
@@ -132,11 +115,7 @@ export function useVoiceDemoTest() {
         break;
       }
       case "input_audio_buffer.speech_started":
-        userSpeakingRef.current = true;
         setAgentState("listening");
-        break;
-      case "input_audio_buffer.speech_stopped":
-        userSpeakingRef.current = false;
         break;
       case "conversation.item.input_audio_transcription.completed": {
         const text = String(ev.transcript ?? "").trim();
@@ -173,6 +152,34 @@ export function useVoiceDemoTest() {
         );
         break;
       }
+      // The session is audio-only by config, but the model has been seen
+      // falling out of audio modality and emitting text. The caller hears
+      // nothing, and until this case existed the transcript showed nothing
+      // either — invisible silence. Render it, loudly marked, so a modality
+      // fallout is diagnosable at a glance.
+      case "response.output_text.delta": {
+        const itemId = String(ev.item_id ?? "assistant");
+        const delta = String(ev.delta ?? "");
+        setTranscript((prev) => {
+          const existing = prev.find((t) => t.id === itemId && t.kind === "assistant");
+          if (existing && existing.kind === "assistant") {
+            return prev.map((t) =>
+              t.id === itemId && t.kind === "assistant" ? { ...t, text: t.text + delta } : t,
+            );
+          }
+          return [
+            ...prev,
+            {
+              kind: "assistant",
+              id: itemId,
+              text: `[KUN TEKST — ingen lyd] ${delta}`,
+              at: Date.now(),
+              done: false,
+            },
+          ];
+        });
+        break;
+      }
       case "response.done": {
         // A response that ends as anything other than "completed" had its
         // audio cut before finishing — flag the bubble(s) it produced.
@@ -196,38 +203,9 @@ export function useVoiceDemoTest() {
           });
         }
 
-        // Zero output means the agent said nothing at all. Status is
-        // deliberately NOT part of this test — see userSpeakingRef above for
-        // why guessing at status values kept missing the real failures. The
-        // only thing that makes silence acceptable is the caller currently
-        // talking (a real response is coming, and retrying would talk over
-        // them).
-        const output = ev.response?.output ?? [];
-        const deadTurn = output.length === 0 && !userSpeakingRef.current;
-
-        if (deadTurn && emptyReplyRetriesRef.current < MAX_EMPTY_REPLY_RETRIES) {
-          emptyReplyRetriesRef.current += 1;
-          const attempt = emptyReplyRetriesRef.current;
-          setTimeout(() => {
-            // Re-check at fire time: the caller may have started speaking
-            // during the delay, in which case stay quiet.
-            if (userSpeakingRef.current) return;
-            const dc = dcRef.current;
-            if (dc && dc.readyState === "open") {
-              dc.send(JSON.stringify({ type: "response.create" }));
-              pushEvent("out", "response.create", {
-                note: `retry-empty-reply-${attempt}`,
-                afterStatus: respStatus ?? "unknown",
-              });
-            }
-          }, EMPTY_REPLY_RETRY_DELAY_MS);
-        } else if (output.length > 0) {
-          // Only a turn that actually produced something resets the budget.
-          // A silent turn skipped because the caller was mid-sentence must
-          // NOT refill it, or a talkative caller could reset the counter
-          // indefinitely and mask a genuinely stuck session.
-          emptyReplyRetriesRef.current = 0;
-        }
+        // Silence recovery lives in the ReplyWatchdog (fed above), which
+        // also covers the case this handler structurally can't: a committed
+        // caller turn where no response.done ever arrives.
         break;
       }
       case "output_audio_buffer.started":
@@ -255,12 +233,20 @@ export function useVoiceDemoTest() {
       setEvents([]);
       setAgentState("idle");
       clientIdRef.current = clientId ?? null;
-      // A previous call's disconnect() maxes this out to block any stale
-      // retry timeout; a fresh call needs it back at 0.
-      emptyReplyRetriesRef.current = 0;
-      // A call that ended mid-utterance would otherwise leave this stuck
-      // true and suppress every retry on the next call.
-      userSpeakingRef.current = false;
+
+      watchdogRef.current?.dispose();
+      watchdogRef.current = new ReplyWatchdog({
+        send: () => {
+          const dc = dcRef.current;
+          if (dc && dc.readyState === "open") {
+            dc.send(JSON.stringify({ type: "response.create" }));
+          }
+        },
+        // Every decision lands in the event log — this trail is the whole
+        // point; the silent-agent bug survived four fixes because the
+        // decisions were invisible.
+        log: (note, detail) => pushEvent("out", `watchdog: ${note}`, detail ?? {}),
+      });
 
       try {
         const sessionRes = await fetch("/api/portal/voice-demo/test-session", {
@@ -276,6 +262,35 @@ export function useVoiceDemoTest() {
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
         micRef.current = mic;
+
+        // Diagnostic mic meter: logs voice/quiet transitions with RMS energy
+        // so server-side speech_started events can be checked against what
+        // the mic actually picked up. Best-effort — a meter failure must
+        // never break the call.
+        try {
+          const ctx = new AudioContext();
+          audioCtxRef.current = ctx;
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 2048;
+          ctx.createMediaStreamSource(mic).connect(analyser);
+          const buf = new Float32Array(analyser.fftSize);
+          let wasLoud = false;
+          meterTimerRef.current = setInterval(() => {
+            analyser.getFloatTimeDomainData(buf);
+            let sum = 0;
+            for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+            const rms = Math.sqrt(sum / buf.length);
+            const loud = rms > 0.02;
+            if (loud !== wasLoud) {
+              wasLoud = loud;
+              pushEvent("in", loud ? "mic.level: voice" : "mic.level: quiet", {
+                rms: Number(rms.toFixed(4)),
+              });
+            }
+          }, 250);
+        } catch {
+          /* meter is diagnostic only */
+        }
 
         const pc = new RTCPeerConnection();
         pcRef.current = pc;
@@ -303,6 +318,7 @@ export function useVoiceDemoTest() {
         dc.onopen = () => {
           setStatus("connected");
           dc.send(JSON.stringify({ type: "response.create" }));
+          watchdogRef.current?.expectReply();
           pushEvent("out", "response.create", { note: "greet-first" });
         };
 
@@ -340,6 +356,13 @@ export function useVoiceDemoTest() {
   );
 
   const disconnect = useCallback(() => {
+    watchdogRef.current?.dispose();
+    if (meterTimerRef.current) {
+      clearInterval(meterTimerRef.current);
+      meterTimerRef.current = null;
+    }
+    audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current = null;
     dcRef.current?.close();
     pcRef.current?.close();
     micRef.current?.getTracks().forEach((t) => t.stop());
@@ -349,8 +372,6 @@ export function useVoiceDemoTest() {
     if (audioRef.current) audioRef.current.srcObject = null;
     setStatus("disconnected");
     setAgentState("idle");
-    // Stop any pending retry from firing after the call has already ended.
-    emptyReplyRetriesRef.current = MAX_EMPTY_REPLY_RETRIES;
   }, []);
 
   return { status, agentState, transcript, events, error, connect, disconnect };
