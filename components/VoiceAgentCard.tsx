@@ -67,8 +67,67 @@ export default function VoiceAgentCard({
     usageRef.current = { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 };
   }, [clientId]);
 
+  // Realtime tool calls arrive HERE, in the browser, because the WebRTC
+  // session is a direct browser<->OpenAI connection. We can't execute them
+  // client-side (the calendar needs server credentials), so we relay to
+  // /api/portal/voice-agent/tools and hand the result back over the data
+  // channel. The server decides sandbox-vs-live; we never send a scope.
+  const runToolCall = useCallback(
+    async (callId: string, name: string, argsJson: string) => {
+      let output: unknown;
+      try {
+        const res = await fetch("/api/portal/voice-agent/tools", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientId,
+            name,
+            arguments: argsJson ? JSON.parse(argsJson) : {},
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        output = res.ok
+          ? body.result
+          : { success: false, error: body.error ?? "Verktøyet feilet." };
+      } catch {
+        output = { success: false, error: "Fikk ikke kontakt med kalenderen." };
+      }
+
+      const dc = dcRef.current;
+      if (!dc || dc.readyState !== "open") return;
+      dc.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "function_call_output",
+            call_id: callId,
+            output: JSON.stringify(output),
+          },
+        }),
+      );
+      // The model does not continue on its own after a tool result — it needs
+      // an explicit nudge to speak the answer.
+      dc.send(JSON.stringify({ type: "response.create" }));
+    },
+    [clientId],
+  );
+
   const handleServerEvent = useCallback((ev: Record<string, unknown>) => {
     switch (ev.type) {
+      // Tool calls are picked up from the completed output ITEM, not from
+      // response.function_call_arguments.done. That event carries `name` and
+      // `arguments` but not `call_id` — and without the right call_id the
+      // function_call_output can't be matched back to the call, so the model
+      // just stalls. The item has all three.
+      case "response.output_item.done": {
+        const item = ev.item as
+          | { type?: string; call_id?: string; name?: string; arguments?: string }
+          | undefined;
+        if (item?.type === "function_call" && item.call_id && item.name) {
+          void runToolCall(item.call_id, item.name, item.arguments ?? "{}");
+        }
+        break;
+      }
       case "response.output_audio_transcript.delta":
         assistantTextRef.current += String(ev.delta ?? "");
         setLastMessage(assistantTextRef.current);
@@ -106,7 +165,7 @@ export default function VoiceAgentCard({
         setUiState("error");
         break;
     }
-  }, []);
+  }, [runToolCall]);
 
   const start = useCallback(async () => {
     setErrorMsg(null);

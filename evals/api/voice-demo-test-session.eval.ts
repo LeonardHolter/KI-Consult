@@ -79,4 +79,28 @@ describe("POST /api/portal/voice-demo/test-session", () => {
     expect(mintedWith.voice).toBe("marin");
     expect(mintedWith.noiseReduction).toBe("near_field");
   });
+
+  // Regression: a client agent's prompt documents get_available_demo_slots and
+  // book_demo_slot, but this route used to mint the test session WITHOUT tools.
+  // The model then announced "jeg sjekker kalenderen", found nothing to call,
+  // and degraded to emitting text instead of audio — the prompt/tool-list
+  // mismatch OpenAI's realtime guide warns about. Testing a prompt has to
+  // exercise the same tools the real dashboard agent gets.
+  it("registers the booking tools when testing a client agent", async () => {
+    vi.mocked(getProfile).mockResolvedValue(ADMIN);
+
+    await POST(req({ instructions: "client prompt", clientId: "c1" }));
+
+    const opts = vi.mocked(mintRealtimeClientSecret).mock.calls[0][1];
+    expect(opts).toMatchObject({ withTools: true });
+  });
+
+  it("registers NO tools for the marketing demo, which has no calendar behind it", async () => {
+    vi.mocked(getProfile).mockResolvedValue(ADMIN);
+
+    await POST(req({ instructions: "tannlege demo prompt" }));
+
+    const opts = vi.mocked(mintRealtimeClientSecret).mock.calls[0][1];
+    expect(opts?.withTools).toBeFalsy();
+  });
 });

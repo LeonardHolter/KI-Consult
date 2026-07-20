@@ -28,7 +28,9 @@ export async function POST(req: Request) {
     instructions: DEFAULT_VOICE_DEMO_PROMPT,
   };
 
-  const result = await mintRealtimeClientSecret(settings);
+  // Tools on: this is the one surface with an authenticated executor behind
+  // it (/api/portal/voice-agent/tools).
+  const result = await mintRealtimeClientSecret(settings, { withTools: true });
   if (!result.ok) return Response.json(result.body, { status: result.status });
   return Response.json({ clientSecret: result.clientSecret, model: result.model });
 }

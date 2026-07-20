@@ -1,8 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { after } from "next/server";
-import { bookSlot, loadSlots } from "@/lib/slots";
 import { clientIp, corsHeaders, isAllowedOrigin, rateLimit } from "@/lib/api-guard";
-import { osloParts } from "@/lib/google-calendar";
+import {
+  BOOKING_TOOL_SCHEMAS,
+  BOOK_SLOT_TOOL,
+  execBookingTool,
+} from "@/lib/bookingTools";
 import { logTurn } from "@/lib/portal-log";
 import { logBotEvent } from "@/lib/botEvents";
 import { getChatBotSettingsPublic } from "@/lib/chatBot/data";
@@ -68,135 +71,19 @@ KUNNSKAPSBASE (referanse for priser og tjenestedetaljer):
 ${settings.knowledgeBase}`;
 }
 
-const TOOLS: Anthropic.Tool[] = [
-  {
-    name: "get_available_demo_slots",
-    description:
-      "Henter ledige timer fra kalenderen. Bruk alltid dette verktøyet før du foreslår tidspunkter til kunden. Bruk near_time når et ønsket tidspunkt ikke er tilgjengelig, for å få de nærmeste alternativene øverst i listen.",
-    strict: true,
-    input_schema: {
-      type: "object",
-      properties: {
-        date: {
-          type: ["string", "null"],
-          description: "Filtrer til denne datoen (YYYY-MM-DD). Sett null for å hente alle dager.",
-        },
-        near_time: {
-          type: ["string", "null"],
-          description:
-            "Klokkeslett (HH:MM) resultatene skal sorteres etter nærhet til — bruk det tidspunktet kunden egentlig ønsket, slik at nærmeste ledige alternativ kommer først. Sett null hvis ikke aktuelt.",
-        },
-      },
-      required: ["date", "near_time"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "book_demo_slot",
-    description:
-      "Booker en demo-time for kunden. Bruk kun etter at kunden eksplisitt har bekreftet tjeneste, tidspunkt, navn og telefonnummer.",
-    strict: true,
-    input_schema: {
-      type: "object",
-      properties: {
-        date: {
-          type: "string",
-          description: "Datoen for timen, format YYYY-MM-DD, nøyaktig som returnert fra get_available_demo_slots",
-        },
-        time: {
-          type: "string",
-          description: "Klokkeslettet for timen, format HH:MM, nøyaktig som returnert fra get_available_demo_slots",
-        },
-        customer_name: { type: "string", description: "Kundens fulle navn" },
-        customer_phone: { type: "string", description: "Kundens telefonnummer" },
-        service: {
-          type: "string",
-          description:
-            "Tjenesten timen gjelder, f.eks. 'Utvendig vask - Basic', 'Polering', 'Hjulskift'",
-        },
-      },
-      required: ["date", "time", "customer_name", "customer_phone", "service"],
-      additionalProperties: false,
-    },
-  },
-];
+// Anthropic envelope around the shared schemas (lib/bookingTools.ts). The
+// voice agent builds an OpenAI Realtime envelope around the exact same
+// objects, so the two surfaces cannot be offered different arguments.
+const TOOLS: Anthropic.Tool[] = Object.entries(BOOKING_TOOL_SCHEMAS).map(([name, spec]) => ({
+  name,
+  description: spec.description,
+  strict: true,
+  input_schema: spec.parameters as Anthropic.Tool["input_schema"],
+}));
 
-const WEEKDAYS = [
-  "søndag",
-  "mandag",
-  "tirsdag",
-  "onsdag",
-  "torsdag",
-  "fredag",
-  "lørdag",
-];
-
-function toMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-
+/** The chat bot always books for real — sandbox is a voice-only concept. */
 async function execTool(clientId: string, name: string, input: unknown): Promise<string> {
-  if (name === "get_available_demo_slots") {
-    const { date, near_time } = (input ?? {}) as { date?: string | null; near_time?: string | null };
-    const now = osloParts(new Date().toISOString());
-    let filtered = (await loadSlots(clientId))
-      .filter((s) => !s.full)
-      .filter((s) => s.date !== now.date || s.time > now.time);
-    if (date) filtered = filtered.filter((s) => s.date === date);
-    let available = filtered.map((s) => {
-      const d = new Date(`${s.date}T${s.time}:00`);
-      return {
-        label: `${s.date === now.date ? "i dag" : WEEKDAYS[d.getDay()]} ${d.getDate()}. ${d.toLocaleString("no", { month: "long" })} kl. ${s.time}`,
-        date: s.date,
-        time: s.time,
-        location: s.location,
-        spots_left: s.capacity - s.bookedCount,
-        service_restriction: s.serviceKeyword ?? null,
-      };
-    });
-    if (near_time) {
-      const targetMin = toMinutes(near_time);
-      available = available.sort((a, b) =>
-        a.date !== b.date
-          ? a.date < b.date
-            ? -1
-            : 1
-          : Math.abs(toMinutes(a.time) - targetMin) - Math.abs(toMinutes(b.time) - targetMin)
-      );
-    } else {
-      available = available.sort((a, b) =>
-        a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.time < b.time ? -1 : 1
-      );
-    }
-    return JSON.stringify({
-      today: now.date,
-      current_time: now.time,
-      available_slots: available,
-      note: "Har et tidspunkt en service_restriction, må du nevne restriksjonen når du foreslår det til kunden. Bruk feltet 'today' til å vite hvilken dato som er i dag. Listen er sortert nærmest 'near_time' først når det er oppgitt.",
-    });
-  }
-  if (name === "book_demo_slot") {
-    const { date, time, customer_name, customer_phone, service } = input as {
-      date: string;
-      time: string;
-      customer_name: string;
-      customer_phone: string;
-      service: string;
-    };
-    const normalizedTime = time
-      .trim()
-      .replace(/^(\d):/, "0$1:")
-      .slice(0, 5);
-    const slot_id = `${date.trim()}-${normalizedTime.replace(":", "")}`;
-    const result = await bookSlot(clientId, slot_id, customer_name, customer_phone, service);
-    return JSON.stringify(
-      result.ok
-        ? { success: true, slot: result.slot }
-        : { success: false, error: result.error }
-    );
-  }
-  return JSON.stringify({ error: `Ukjent verktøy: ${name}` });
+  return JSON.stringify(await execBookingTool(clientId, name, input, "live"));
 }
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -357,7 +244,7 @@ export async function POST(req: Request) {
               }
               // Mark the conversation as converted only on a booking the tool
               // actually confirmed — not merely on the model attempting one.
-              if (block.name === "book_demo_slot") {
+              if (block.name === BOOK_SLOT_TOOL) {
                 try {
                   if (JSON.parse(value)?.success === true) bookedThisTurn = true;
                 } catch {

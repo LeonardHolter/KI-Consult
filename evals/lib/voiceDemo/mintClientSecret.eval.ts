@@ -49,7 +49,6 @@ describe("mintRealtimeClientSecret", () => {
       expect(body.session).toMatchObject({
         type: "realtime",
         model: "gpt-realtime",
-        instructions: "Du er Ida.",
         audio: {
           input: {
             transcription: { model: "gpt-4o-transcribe", language: "no" },
@@ -60,6 +59,17 @@ describe("mintRealtimeClientSecret", () => {
         },
       });
 
+      // The saved prompt is prefixed with the current Oslo date/time — the
+      // voice prompt is stored statically, so without this the agent can't
+      // resolve "i morgen" into the date the booking tool needs.
+      expect(body.session.instructions).toContain("Du er Ida.");
+      expect(body.session.instructions).toMatch(/# DAGENS DATO OG KLOKKESLETT/);
+      expect(body.session.instructions).toMatch(/\d{4}-\d{2}-\d{2}/);
+
+      // No tools unless explicitly asked for — the public marketing demo has
+      // nowhere to execute them.
+      expect(body.session.tools).toBeUndefined();
+
       return new Response(JSON.stringify({ value: "ek_abc123" }), { status: 200 });
     });
     vi.stubGlobal("fetch", fetchSpy);
@@ -68,6 +78,29 @@ describe("mintRealtimeClientSecret", () => {
 
     expect(result).toEqual({ ok: true, clientSecret: "ek_abc123", model: "gpt-realtime" });
     expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it("attaches the booking tools only when withTools is set", async () => {
+    const fetchSpy = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      expect(body.session.tool_choice).toBe("auto");
+      expect(body.session.tools.map((t: { name: string }) => t.name).sort()).toEqual([
+        "book_demo_slot",
+        "get_available_demo_slots",
+      ]);
+      // Realtime wants `parameters`, not Anthropic's `input_schema`.
+      for (const tool of body.session.tools) {
+        expect(tool.type).toBe("function");
+        expect(tool.parameters).toBeTruthy();
+        expect(tool.input_schema).toBeUndefined();
+      }
+      return new Response(JSON.stringify({ value: "ek_tools" }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await mintRealtimeClientSecret(settings, { withTools: true });
+
+    expect(result).toEqual({ ok: true, clientSecret: "ek_tools", model: "gpt-realtime" });
   });
 
   it("omits noise_reduction entirely when set to off", async () => {

@@ -295,22 +295,44 @@ async function calendarCancel(
 /* ------------------------------------------------------------------ */
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const bookingsFile = (clientId: string) => path.join(DATA_DIR, clientId, "demo-bookings.json");
-const bookingsBlobPath = (clientId: string) => `${clientId}/demo-bookings.json`;
+
+/**
+ * Which booking store a call operates against.
+ *
+ * "live"    — the client's real setup: their connected Google Calendar if one
+ *             is attached, otherwise the shared demo store. This is what the
+ *             website chat bot always uses.
+ * "sandbox" — a separate, isolated fake calendar that NEVER touches Google,
+ *             even when a real calendar is connected. Used to exercise the
+ *             voice agent's booking end-to-end without putting test bookings
+ *             in front of the business (see Settings.voiceBookingMode).
+ *
+ * The two stores are deliberately different Blob keys, so a sandbox booking
+ * can never be mistaken for — or collide with — a real one.
+ */
+export type BookingScope = "live" | "sandbox";
+
+const storeName = (scope: BookingScope) =>
+  scope === "sandbox" ? "voice-sandbox-bookings.json" : "demo-bookings.json";
+
+const bookingsFile = (clientId: string, scope: BookingScope) =>
+  path.join(DATA_DIR, clientId, storeName(scope));
+const bookingsBlobPath = (clientId: string, scope: BookingScope) =>
+  `${clientId}/${storeName(scope)}`;
 
 const blobConfigured = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
 type DemoBooking = Booking & { slotId: string; date: string; time: string };
 
-async function demoReadBookings(clientId: string): Promise<DemoBooking[]> {
+async function demoReadBookings(clientId: string, scope: BookingScope): Promise<DemoBooking[]> {
   let raw: DemoBooking[];
   try {
     if (blobConfigured()) {
-      const result = await get(bookingsBlobPath(clientId), { access: "private" });
+      const result = await get(bookingsBlobPath(clientId, scope), { access: "private" });
       if (!result || result.statusCode !== 200 || !result.stream) return [];
       raw = JSON.parse(await new Response(result.stream).text()) as DemoBooking[];
-    } else if (fs.existsSync(bookingsFile(clientId))) {
-      raw = JSON.parse(fs.readFileSync(bookingsFile(clientId), "utf-8"));
+    } else if (fs.existsSync(bookingsFile(clientId, scope))) {
+      raw = JSON.parse(fs.readFileSync(bookingsFile(clientId, scope), "utf-8"));
     } else {
       return [];
     }
@@ -327,24 +349,28 @@ async function demoReadBookings(clientId: string): Promise<DemoBooking[]> {
   }));
 }
 
-async function demoWriteBookings(clientId: string, bookings: DemoBooking[]) {
+async function demoWriteBookings(clientId: string, scope: BookingScope, bookings: DemoBooking[]) {
   if (blobConfigured()) {
-    await put(bookingsBlobPath(clientId), JSON.stringify(bookings, null, 2), {
+    await put(bookingsBlobPath(clientId, scope), JSON.stringify(bookings, null, 2), {
       access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
     });
   } else {
-    fs.mkdirSync(path.dirname(bookingsFile(clientId)), { recursive: true });
-    fs.writeFileSync(bookingsFile(clientId), JSON.stringify(bookings, null, 2));
+    fs.mkdirSync(path.dirname(bookingsFile(clientId, scope)), { recursive: true });
+    fs.writeFileSync(bookingsFile(clientId, scope), JSON.stringify(bookings, null, 2));
   }
 }
 
-async function demoSlotViews(clientId: string, settings: Settings): Promise<SlotView[]> {
+async function demoSlotViews(
+  clientId: string,
+  settings: Settings,
+  scope: BookingScope,
+): Promise<SlotView[]> {
   const dates = upcomingDates(settings.daysAhead);
   const templates = slotTemplates(settings);
-  const allBookings = await demoReadBookings(clientId);
+  const allBookings = await demoReadBookings(clientId, scope);
   const views: SlotView[] = [];
   for (const date of dates) {
     for (const tmpl of templates) {
@@ -362,9 +388,10 @@ async function demoBook(
   slotId: string,
   customerName: string,
   customerPhone: string,
-  service: string
+  service: string,
+  scope: BookingScope,
 ): Promise<{ ok: true; slot: SlotView } | { ok: false; error: string }> {
-  const views = await demoSlotViews(clientId, settings);
+  const views = await demoSlotViews(clientId, settings, scope);
   const slot = views.find((s) => s.id === slotId);
   if (!slot) return { ok: false, error: "Fant ikke denne timen." };
   if (slot.full) {
@@ -382,7 +409,7 @@ async function demoBook(
 
   const bookedAt = new Date().toISOString();
   const id = crypto.randomUUID();
-  const all = await demoReadBookings(clientId);
+  const all = await demoReadBookings(clientId, scope);
   all.push({
     id,
     isAgentBooking: true,
@@ -394,7 +421,7 @@ async function demoBook(
     service,
     bookedAt,
   });
-  await demoWriteBookings(clientId, all);
+  await demoWriteBookings(clientId, scope, all);
 
   const bookings = [
     ...slot.bookings,
@@ -413,13 +440,14 @@ async function demoBook(
 
 async function demoCancel(
   clientId: string,
-  bookingId: string
+  bookingId: string,
+  scope: BookingScope,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const all = await demoReadBookings(clientId);
+  const all = await demoReadBookings(clientId, scope);
   const idx = all.findIndex((b) => b.id === bookingId);
   if (idx === -1) return { ok: false, error: "Fant ikke bookingen." };
   all.splice(idx, 1);
-  await demoWriteBookings(clientId, all);
+  await demoWriteBookings(clientId, scope, all);
   return { ok: true };
 }
 
@@ -427,16 +455,22 @@ async function demoCancel(
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
-export async function loadSlots(clientId: string): Promise<SlotView[]> {
+export async function loadSlots(
+  clientId: string,
+  scope: BookingScope = "live",
+): Promise<SlotView[]> {
   const settings = await loadSettings(clientId);
-  if (!calendarConnected(settings)) return demoSlotViews(clientId, settings);
+  // Sandbox never consults Google, even when a calendar is connected — that
+  // isolation is the entire point of the scope.
+  if (scope === "sandbox") return demoSlotViews(clientId, settings, scope);
+  if (!calendarConnected(settings)) return demoSlotViews(clientId, settings, scope);
   try {
     return await calendarSlotViews(settings);
   } catch (err) {
     // Same degrade-to-demo reasoning as loadCalendarView: a stored calendarId
     // that's stopped being reachable shouldn't crash slot lookups.
     console.error(`loadSlots: calendar unreachable for client ${clientId}:`, err);
-    return demoSlotViews(clientId, settings);
+    return demoSlotViews(clientId, settings, scope);
   }
 }
 
@@ -445,10 +479,14 @@ export async function bookSlot(
   slotId: string,
   customerName: string,
   customerPhone: string,
-  service?: string
+  service?: string,
+  scope: BookingScope = "live",
 ): Promise<{ ok: true; slot: SlotView } | { ok: false; error: string }> {
   const settings = await loadSettings(clientId);
   const svc = service?.trim() || "Demo / rådgivning";
+  if (scope === "sandbox") {
+    return demoBook(clientId, settings, slotId, customerName, customerPhone, svc, scope);
+  }
   // Deliberately NOT falling back to demo mode here like the read paths do:
   // silently rerouting a real customer's booking into the local demo store
   // on a calendar error would tell them "you're booked" while the business
@@ -457,7 +495,7 @@ export async function bookSlot(
   // turns that into "beklager, teknisk feil" for the customer.
   return calendarConnected(settings)
     ? calendarBook(settings, slotId, customerName, customerPhone, svc)
-    : demoBook(clientId, settings, slotId, customerName, customerPhone, svc);
+    : demoBook(clientId, settings, slotId, customerName, customerPhone, svc, scope);
 }
 
 /**
@@ -468,12 +506,14 @@ export async function bookSlot(
  */
 export async function cancelBooking(
   clientId: string,
-  bookingId: string
+  bookingId: string,
+  scope: BookingScope = "live",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const settings = await loadSettings(clientId);
+  if (scope === "sandbox") return demoCancel(clientId, bookingId, scope);
   return calendarConnected(settings)
     ? calendarCancel(settings, bookingId)
-    : demoCancel(clientId, bookingId);
+    : demoCancel(clientId, bookingId, scope);
 }
 
 /* ------------------------------------------------------------------ */
@@ -498,6 +538,8 @@ export type CalendarView = {
   connected: boolean;
   location: string;
   calendarName?: string;
+  /** True when this view is the isolated voice sandbox, not the real setup. */
+  sandbox?: boolean;
 };
 
 async function calendarEvents(settings: Settings, dates: string[]): Promise<CalEvent[]> {
@@ -524,11 +566,17 @@ async function calendarEvents(settings: Settings, dates: string[]): Promise<CalE
   return out;
 }
 
-async function demoCalendarView(clientId: string, settings: Settings): Promise<CalendarView> {
-  const slots = await demoSlotViews(clientId, settings);
+async function demoCalendarView(
+  clientId: string,
+  settings: Settings,
+  scope: BookingScope,
+): Promise<CalendarView> {
+  const slots = await demoSlotViews(clientId, settings, scope);
   const events: CalEvent[] = slots.flatMap((s) =>
-    s.bookings.map((b, i) => ({
-      id: `${s.id}-${i}`,
+    s.bookings.map((b) => ({
+      // Use the booking's own id, not a positional one — the dashboard's
+      // delete action needs an id that survives other bookings being removed.
+      id: b.id,
       title: b.service || "Booket",
       date: s.date,
       start: s.time,
@@ -539,11 +587,21 @@ async function demoCalendarView(clientId: string, settings: Settings): Promise<C
       service: b.service,
     }))
   );
-  return { slots, events, connected: false, location: settings.locationName };
+  return {
+    slots,
+    events,
+    connected: false,
+    location: settings.locationName,
+    ...(scope === "sandbox" ? { sandbox: true as const } : {}),
+  };
 }
 
-export async function loadCalendarView(clientId: string): Promise<CalendarView> {
+export async function loadCalendarView(
+  clientId: string,
+  scope: BookingScope = "live",
+): Promise<CalendarView> {
   const settings = await loadSettings(clientId);
+  if (scope === "sandbox") return demoCalendarView(clientId, settings, scope);
   if (calendarConnected(settings)) {
     try {
       const dates = upcomingDates(settings.daysAhead);
@@ -565,8 +623,8 @@ export async function loadCalendarView(clientId: string): Promise<CalendarView> 
       // this is exactly what happened when the service account was
       // rotated and the old test calendar was no longer shared with it.
       console.error(`loadCalendarView: calendar unreachable for client ${clientId}:`, err);
-      return demoCalendarView(clientId, settings);
+      return demoCalendarView(clientId, settings, scope);
     }
   }
-  return demoCalendarView(clientId, settings);
+  return demoCalendarView(clientId, settings, scope);
 }

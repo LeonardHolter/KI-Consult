@@ -25,7 +25,13 @@ export async function DELETE(req: Request) {
     return Response.json({ error: "missing_client" }, { status: 400 });
   }
 
-  const result = await cancelBooking(clientId, body.bookingId);
+  // Which store the booking lives in. Unlike the voice agent's booking scope
+  // (server-decided, so a caller can't aim writes at the real calendar), this
+  // one is caller-supplied — it only ever deletes, and it must match the view
+  // the operator was looking at when they clicked.
+  const scope = body.scope === "sandbox" ? "sandbox" : "live";
+
+  const result = await cancelBooking(clientId, body.bookingId, scope);
   if (!result.ok) return Response.json({ error: result.error }, { status: 400 });
   return Response.json({ ok: true });
 }

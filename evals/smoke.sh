@@ -118,6 +118,33 @@ check "POST /api/portal/calendar -> 403" "403" "$status"
 status=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/portal/bookings" -H "Content-Type: application/json" -d "{\"clientId\":\"$HANDZON_ID\",\"bookingId\":\"x\"}")
 check "DELETE /api/portal/bookings -> 403" "403" "$status"
 
+# The voice agent's tool executor. Unauthenticated callers must never reach
+# the booking implementation — this is the one endpoint that can write a
+# booking without going through the chat bot's CORS/rate-limit path.
+status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/portal/voice-agent/tools" -H "Content-Type: application/json" -d "{\"clientId\":\"$HANDZON_ID\",\"name\":\"get_available_demo_slots\",\"arguments\":{}}")
+check "POST /api/portal/voice-agent/tools -> 403" "403" "$status"
+
+echo
+echo "-- voice sandbox calendar (isolated from the real one) --"
+body=$(curl -s "$BASE/api/calendar-view?client=$HANDZON_ID&scope=sandbox")
+if echo "$body" | grep -q '"sandbox":true'; then
+  echo "  ok   - GET /api/calendar-view?scope=sandbox returns the sandbox view"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL - scope=sandbox did not return a sandbox view: $(echo "$body" | head -c 200)"
+  FAIL=$((FAIL + 1))
+fi
+
+# The sandbox must never report a Google connection, even though this client
+# has a real calendar attached — that isolation is the whole point.
+if echo "$body" | grep -q '"connected":false'; then
+  echo "  ok   - sandbox view never reports a Google connection"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL - sandbox view claims a calendar connection"
+  FAIL=$((FAIL + 1))
+fi
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

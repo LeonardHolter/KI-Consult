@@ -201,18 +201,22 @@ async function main() {
   const urls = voice.match(/https?:\/\//g) || [];
   check("no raw http(s) URLs to read aloud", urls.length === 0, urls.length ? `found ${urls.length}` : "");
 
-  // The guide's Tool Selection warning: never name a tool the session lacks.
-  console.log("\n-- no phantom tools (Realtime session wires up none) --");
-  const tools = voice.match(/get_available_demo_slots|book_demo_slot/g) || [];
+  // The guide's Tool Selection warning cuts both ways: the prompt must name
+  // exactly the tools the session actually wires up (lib/bookingTools.ts),
+  // no more and no fewer.
+  console.log("\n-- tools match what the session actually wires up --");
+  for (const tool of ["get_available_demo_slots", "book_demo_slot"]) {
+    check(`voice prompt documents ${tool}`, voice.includes(tool));
+    check(`chat prompt documents ${tool}`, chat.includes(tool));
+  }
   check(
-    "voice prompt references no chat-only booking tools",
-    tools.length === 0,
-    tools.length ? `found: ${[...new Set(tools)].join(", ")}` : "",
+    "voice prompt no longer claims it cannot reach the calendar",
+    !/ikke tilgang til kalenderen/i.test(voice),
+    "prompt still says it has no calendar access, but booking tools are now wired up",
   );
   check(
-    "voice prompt states it cannot check the calendar",
-    /ikke tilgang til kalenderen/i.test(voice),
-    "expected an explicit 'ingen verktøy / ikke tilgang til kalenderen' statement",
+    "voice prompt waits for success:true before confirming a booking",
+    /success: ?true/i.test(voice),
   );
 
   console.log(`\n${pass} passed, ${fail} failed`);

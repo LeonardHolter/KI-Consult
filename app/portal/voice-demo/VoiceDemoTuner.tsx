@@ -104,7 +104,10 @@ export default function VoiceDemoTuner({
     setDiffAgainst(null);
   }
 
-  const testCall = () => rt.connect(settings);
+  // Pass clientId so the test session registers the booking tools the client
+  // prompt documents — without it the model narrates a calendar lookup it has
+  // no way to perform.
+  const testCall = () => rt.connect(settings, clientId);
 
   return (
     <div className="vdt">

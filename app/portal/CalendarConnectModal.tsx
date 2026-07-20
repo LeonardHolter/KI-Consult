@@ -8,6 +8,7 @@ type CalInfo = {
   calendarName: string | null;
   locationName: string;
   connected: boolean;
+  voiceBookingMode: "sandbox" | "live";
 };
 
 export default function CalendarConnectModal({ clientId, onClose }: { clientId: string; onClose: () => void }) {
@@ -72,6 +73,29 @@ export default function CalendarConnectModal({ clientId, onClose }: { clientId: 
     }
   }
 
+  async function setVoiceMode(mode: "sandbox" | "live") {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/portal/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, voiceBookingMode: mode }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Kunne ikke endre modus");
+      await refresh();
+      setStatus(
+        mode === "live"
+          ? "⚠ Stemmeagenten booker nå i den EKTE kalenderen — på lik linje med chatboten."
+          : "Stemmeagenten booker nå i testkalenderen. Ingenting havner i den ekte kalenderen.",
+      );
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Noe gikk galt.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function copyEmail() {
     if (!info?.serviceAccountEmail) return;
     try {
@@ -103,6 +127,14 @@ export default function CalendarConnectModal({ clientId, onClose }: { clientId: 
         .ccm-btn.primary:disabled { opacity: .5; cursor: default; }
         .ccm-btn.ghost { background: #f3efe4; color: #16190f; border: 1px solid rgba(154,154,140,.4); }
         .ccm-status { margin-top: 12px; font-size: 13px; color: #3d4034; }
+        .ccm-divider { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid rgba(154,154,140,.3); }
+        .ccm-seg { display: flex; gap: 8px; margin-top: 8px; }
+        .ccm-seg button { flex: 1; padding: 9px 10px; border-radius: 9px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid rgba(154,154,140,.4); background: #fff; color: #16190f; text-align: left; line-height: 1.35; }
+        .ccm-seg button small { display: block; font-weight: 400; color: #9a9a8c; font-size: 11px; margin-top: 2px; }
+        .ccm-seg button.on { border-color: #15c07c; background: #e4f7ee; color: #0d6b47; }
+        .ccm-seg button.on.warn { border-color: #e08475; background: #fdf0ed; color: #c0392b; }
+        .ccm-seg button.on small { color: inherit; opacity: .8; }
+        .ccm-seg button:disabled { opacity: .55; cursor: default; }
       `}</style>
       <div className="ccm" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Google Calendar-integrasjon">
         <button className="ccm-close" aria-label="Lukk" onClick={onClose}>✕</button>
@@ -158,9 +190,41 @@ export default function CalendarConnectModal({ clientId, onClose }: { clientId: 
                     </button>
                   )}
                 </div>
-                {status && <p className="ccm-status">{status}</p>}
               </>
             )}
+
+            {/* Voice booking target. Lives outside the service-account branch
+                on purpose: sandbox needs no Google credentials at all. */}
+            <div className="ccm-divider">
+              <label className="ccm-label">Stemmeagentens bookinger</label>
+              <div className="ccm-seg">
+                <button
+                  type="button"
+                  className={info.voiceBookingMode === "sandbox" ? "on" : ""}
+                  onClick={() => setVoiceMode("sandbox")}
+                  disabled={busy || info.voiceBookingMode === "sandbox"}
+                >
+                  Testkalender
+                  <small>Trygt å teste — rører aldri Google</small>
+                </button>
+                <button
+                  type="button"
+                  className={info.voiceBookingMode === "live" ? "on warn" : ""}
+                  onClick={() => setVoiceMode("live")}
+                  disabled={busy || info.voiceBookingMode === "live"}
+                >
+                  Ekte kalender
+                  <small>Samme som chatboten</small>
+                </button>
+              </div>
+              <p className="ccm-hint">
+                {info.voiceBookingMode === "live"
+                  ? "Stemmeagenten booker i den ekte kalenderen. Alt den booker er en reell avtale."
+                  : "Stemmeagenten booker i en egen testkalender. Bruk denne til å prøve ut bookingflyten før du slipper den løs på den ekte kalenderen."}
+              </p>
+            </div>
+
+            {status && <p className="ccm-status">{status}</p>}
           </>
         )}
       </div>

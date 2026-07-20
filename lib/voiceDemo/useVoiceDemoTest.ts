@@ -33,9 +33,63 @@ export function useVoiceDemoTest() {
     });
   };
 
+  // Which client's calendar tool calls resolve against. Captured on connect so
+  // handleServerEvent (which is memoised with no deps) can reach it.
+  const clientIdRef = useRef<string | null>(null);
+
+  // Realtime tool calls land in the browser, since the WebRTC session is a
+  // direct browser<->OpenAI connection. Relay to the authenticated executor
+  // and hand the result back over the data channel. Mirrors VoiceAgentCard —
+  // the tuner needs it too, or testing a tool-using prompt here silently
+  // behaves differently from the real dashboard agent.
+  const runToolCall = useCallback(
+    async (callId: string, name: string, argsJson: string) => {
+      let output: unknown;
+      try {
+        const res = await fetch("/api/portal/voice-agent/tools", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientId: clientIdRef.current,
+            name,
+            arguments: argsJson ? JSON.parse(argsJson) : {},
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        output = res.ok ? body.result : { success: false, error: body.error ?? "Verktøyet feilet." };
+      } catch {
+        output = { success: false, error: "Fikk ikke kontakt med kalenderen." };
+      }
+
+      const dc = dcRef.current;
+      if (!dc || dc.readyState !== "open") return;
+      dc.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: { type: "function_call_output", call_id: callId, output: JSON.stringify(output) },
+        }),
+      );
+      dc.send(JSON.stringify({ type: "response.create" }));
+      pushEvent("out", "function_call_output", { name, output });
+    },
+    [],
+  );
+
   const handleServerEvent = useCallback((ev: Record<string, any>) => {
     pushEvent("in", String(ev.type), ev);
     switch (ev.type) {
+      // See VoiceAgentCard: read the completed function_call ITEM, since
+      // response.function_call_arguments.done has no call_id and the output
+      // can't be matched back to the call without it.
+      case "response.output_item.done": {
+        const item = ev.item as
+          | { type?: string; call_id?: string; name?: string; arguments?: string }
+          | undefined;
+        if (item?.type === "function_call" && item.call_id && item.name) {
+          void runToolCall(item.call_id, item.name, item.arguments ?? "{}");
+        }
+        break;
+      }
       case "input_audio_buffer.speech_started":
         setAgentState("listening");
         break;
@@ -113,18 +167,22 @@ export function useVoiceDemoTest() {
   }, []);
 
   const connect = useCallback(
-    async (settings: VoiceDemoSettings & { instructions: string }) => {
+    async (
+      settings: VoiceDemoSettings & { instructions: string },
+      clientId?: string,
+    ) => {
       setError(null);
       setStatus("connecting");
       setTranscript([]);
       setEvents([]);
       setAgentState("idle");
+      clientIdRef.current = clientId ?? null;
 
       try {
         const sessionRes = await fetch("/api/portal/voice-demo/test-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(settings),
+          body: JSON.stringify(clientId ? { ...settings, clientId } : settings),
         });
         const sessionBody = await sessionRes.json();
         if (!sessionRes.ok) throw new Error(sessionBody.message ?? "Klarte ikke å starte testsamtale");

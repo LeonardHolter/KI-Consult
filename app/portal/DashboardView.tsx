@@ -107,6 +107,9 @@ export default function PortalDashboard({
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  // Which booking store the grid is showing: the real one, or the isolated
+  // sandbox the voice agent books into while it's being tested.
+  const [calScope, setCalScope] = useState<"live" | "sandbox">("live");
 
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
@@ -148,16 +151,19 @@ export default function PortalDashboard({
   // function that sets state directly isn't allowed to do).
   const fetchCalendarView = useCallback(async () => {
     try {
-      const url = clientId
-        ? `/api/bot/calendar-view?client=${clientId}`
-        : "/api/bot/calendar-view";
-      const res = await fetch(url, { cache: "no-store" });
+      const qs = new URLSearchParams();
+      if (clientId) qs.set("client", clientId);
+      if (calScope === "sandbox") qs.set("scope", "sandbox");
+      const suffix = qs.toString();
+      const res = await fetch(`/api/bot/calendar-view${suffix ? `?${suffix}` : ""}`, {
+        cache: "no-store",
+      });
       if (!res.ok) return null;
       return await res.json();
     } catch {
       return null;
     }
-  }, [clientId]);
+  }, [clientId, calScope]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,7 +194,7 @@ export default function PortalDashboard({
       const res = await fetch("/api/portal/bookings", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, bookingId: selected.booking.id }),
+        body: JSON.stringify({ clientId, bookingId: selected.booking.id, scope: calScope }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Kunne ikke slette bookingen.");
@@ -273,6 +279,13 @@ export default function PortalDashboard({
         .ctp-sync { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-weight: 700; }
         .ctp-sync.is-on { background: #e4f7ee; color: #0d6b47; }
         .ctp-sync.is-off { background: #efede2; color: #9a9a8c; }
+        .ctp-sync.is-sandbox { background: #fdf4e3; color: #a35a00; }
+        .ctp-scope { display: inline-flex; gap: 4px; padding: 3px; background: #f3efe4; border-radius: 999px; }
+        .ctp-scope button {
+          border: 0; background: transparent; color: #9a9a8c; cursor: pointer; font-family: inherit;
+          font-size: .72rem; font-weight: 700; padding: 4px 11px; border-radius: 999px;
+        }
+        .ctp-scope button.on { background: #fff; color: #16190f; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         .ctp-legend { display: flex; flex-wrap: wrap; gap: 6px; }
         .ctp-legend-item { padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; background: var(--svc-bg); color: var(--svc); }
 
@@ -427,10 +440,32 @@ export default function PortalDashboard({
             <h2>Ledige tider</h2>
             <div className="ctp-meta">
               <span>{slots[0]?.location ?? "Strømmen Senter"}</span>
-              <span className={`ctp-sync ${calConnected ? "is-on" : "is-off"}`}>
-                {calConnected
-                  ? `Synkronisert${calName ? `: ${calName.trim()}` : ""}`
-                  : "Demo-modus"}
+              {overviewHref && clientId && (
+                <span className="ctp-scope">
+                  <button
+                    type="button"
+                    className={calScope === "live" ? "on" : ""}
+                    onClick={() => setCalScope("live")}
+                  >
+                    Ekte
+                  </button>
+                  <button
+                    type="button"
+                    className={calScope === "sandbox" ? "on" : ""}
+                    onClick={() => setCalScope("sandbox")}
+                  >
+                    Testkalender
+                  </button>
+                </span>
+              )}
+              <span
+                className={`ctp-sync ${calScope === "sandbox" ? "is-sandbox" : calConnected ? "is-on" : "is-off"}`}
+              >
+                {calScope === "sandbox"
+                  ? "Testkalender — stemmeagent"
+                  : calConnected
+                    ? `Synkronisert${calName ? `: ${calName.trim()}` : ""}`
+                    : "Demo-modus"}
               </span>
               <div className="ctp-legend">
                 <span className="ctp-legend-item svc-wash">Bilvask</span>

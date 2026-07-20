@@ -30,6 +30,7 @@ export async function GET(req: Request) {
     calendarName: settings.calendarName ?? null,
     locationName: settings.locationName,
     connected: Boolean(settings.calendarId && sa),
+    voiceBookingMode: settings.voiceBookingMode ?? "sandbox",
   });
 }
 
@@ -38,16 +39,31 @@ export async function POST(req: Request) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
 
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body.clientId !== "string") {
+    return Response.json({ error: "missing_client" }, { status: 400 });
+  }
+
+  // Switching where the VOICE agent books. Deliberately its own branch, and
+  // handled BEFORE the service-account check: this setting is meaningful even
+  // with no Google credentials configured (sandbox needs none), and flipping
+  // to "live" is the moment test bookings start reaching the real calendar.
+  if (body.voiceBookingMode !== undefined) {
+    if (body.voiceBookingMode !== "sandbox" && body.voiceBookingMode !== "live") {
+      return Response.json({ error: "invalid_voice_booking_mode" }, { status: 400 });
+    }
+    const settings = await saveSettings(body.clientId, {
+      voiceBookingMode: body.voiceBookingMode,
+    });
+    return Response.json({ ok: true, voiceBookingMode: settings.voiceBookingMode });
+  }
+
+  // Everything past here talks to Google, so the credential is required.
   if (!getServiceAccount()) {
     return Response.json(
       { error: "GOOGLE_SERVICE_ACCOUNT_KEY er ikke satt på serveren." },
       { status: 500 },
     );
-  }
-
-  const body = await req.json().catch(() => null);
-  if (!body || typeof body.clientId !== "string") {
-    return Response.json({ error: "missing_client" }, { status: 400 });
   }
 
   if (body.disconnect) {

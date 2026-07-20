@@ -24,6 +24,19 @@ export type Settings = {
   lastSlotServiceKeyword: string;
   /** How many business days ahead to offer. */
   daysAhead: number;
+  /**
+   * Where the VOICE agent's bookings go.
+   *
+   * "sandbox" (default) — an isolated fake calendar, never Google, even when
+   *   a real calendar is connected. Lets the voice agent's booking flow be
+   *   exercised end-to-end without putting test bookings in front of the
+   *   business. The chat bot is unaffected and always books live.
+   * "live" — the voice agent books exactly where the chat bot does.
+   *
+   * Defaults to sandbox so a newly wired-up voice agent can never write to a
+   * real calendar until someone deliberately flips it.
+   */
+  voiceBookingMode: "sandbox" | "live";
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -37,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastSlotCapacity: 2,
   lastSlotServiceKeyword: "utvendig",
   daysAhead: 3,
+  voiceBookingMode: "sandbox",
 };
 
 // Booking-calendar config lives per client (Blob key keyed by client UUID) —
