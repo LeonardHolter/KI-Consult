@@ -44,9 +44,20 @@ export function useVoiceDemoTest() {
   // said "ja" again even though the booking had already gone through. These
   // track "we're waiting to hear something back from our own nudge" so
   // response.done can retry once it sees the turn came back empty.
+  //
+  // Confirmed AGAIN in a later call, worse: three empty turns in a row after
+  // get_available_demo_slots, which exceeded the original 2-retry cap — the
+  // conversation sat silent until the caller's own next utterance happened
+  // to surface the tool result. This seems tied to a barge-in truncation
+  // (the "✂ klippet" marker) leaving the session briefly unsettled right
+  // beforehand. 5 retries gives real headroom, and each one waits a beat
+  // before resending rather than firing instantly, on the theory that
+  // hammering response.create during that unsettled window is itself part
+  // of why it keeps coming back empty.
   const awaitingToolReplyRef = useRef(false);
   const toolReplyRetriesRef = useRef(0);
-  const MAX_TOOL_REPLY_RETRIES = 2;
+  const MAX_TOOL_REPLY_RETRIES = 5;
+  const TOOL_REPLY_RETRY_DELAY_MS = 400;
 
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
@@ -171,11 +182,18 @@ export function useVoiceDemoTest() {
           const isEmpty = output.length === 0;
           if (isEmpty && toolReplyRetriesRef.current < MAX_TOOL_REPLY_RETRIES) {
             toolReplyRetriesRef.current += 1;
-            const dc = dcRef.current;
-            if (dc && dc.readyState === "open") {
-              dc.send(JSON.stringify({ type: "response.create" }));
-              pushEvent("out", "response.create", { note: "retry-empty-tool-reply" });
-            }
+            const attempt = toolReplyRetriesRef.current;
+            setTimeout(() => {
+              // Re-check before sending: by the time this fires, a real
+              // response may already have arrived (clearing the flag), or
+              // the call may have ended.
+              if (!awaitingToolReplyRef.current) return;
+              const dc = dcRef.current;
+              if (dc && dc.readyState === "open") {
+                dc.send(JSON.stringify({ type: "response.create" }));
+                pushEvent("out", "response.create", { note: `retry-empty-tool-reply-${attempt}` });
+              }
+            }, TOOL_REPLY_RETRY_DELAY_MS);
           } else {
             // Either it spoke (output.length > 0) or we've retried enough —
             // stop chasing it either way, rather than retrying forever.
@@ -297,6 +315,8 @@ export function useVoiceDemoTest() {
     if (audioRef.current) audioRef.current.srcObject = null;
     setStatus("disconnected");
     setAgentState("idle");
+    // Stop any pending retry from firing after the call has already ended.
+    awaitingToolReplyRef.current = false;
   }, []);
 
   return { status, agentState, transcript, events, error, connect, disconnect };

@@ -41,7 +41,16 @@ export default function VoiceAgentCard({
   // retry once it sees the turn came back empty.
   const awaitingToolReplyRef = useRef(false);
   const toolReplyRetriesRef = useRef(0);
-  const MAX_TOOL_REPLY_RETRIES = 2;
+  // Confirmed live (event log): a response.create right after the tool
+  // result can come back empty up to THREE times in a row, not just once or
+  // twice — this seems tied to a barge-in truncation (the tuner's "✂
+  // klippet" marker) leaving the session briefly unsettled. 2 retries
+  // wasn't enough; 5 gives real headroom. Each retry also waits a beat
+  // before resending rather than firing instantly, on the theory that
+  // hammering response.create back-to-back during that unsettled window is
+  // itself part of why it keeps coming back empty.
+  const MAX_TOOL_REPLY_RETRIES = 5;
+  const TOOL_REPLY_RETRY_DELAY_MS = 400;
 
   const cleanup = useCallback(() => {
     dcRef.current?.close();
@@ -51,6 +60,8 @@ export default function VoiceAgentCard({
     pcRef.current = null;
     micRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
+    // Stop any pending retry from firing after the call has already ended.
+    awaitingToolReplyRef.current = false;
   }, []);
 
   // Reports the finished call's duration + token usage — the only place any
@@ -169,10 +180,16 @@ export default function VoiceAgentCard({
           const isEmpty = !response?.output || response.output.length === 0;
           if (isEmpty && toolReplyRetriesRef.current < MAX_TOOL_REPLY_RETRIES) {
             toolReplyRetriesRef.current += 1;
-            const dc = dcRef.current;
-            if (dc && dc.readyState === "open") {
-              dc.send(JSON.stringify({ type: "response.create" }));
-            }
+            setTimeout(() => {
+              // Re-check before sending: by the time this fires, a real
+              // response may already have arrived (clearing the flag), or
+              // the call may have ended.
+              if (!awaitingToolReplyRef.current) return;
+              const dc = dcRef.current;
+              if (dc && dc.readyState === "open") {
+                dc.send(JSON.stringify({ type: "response.create" }));
+              }
+            }, TOOL_REPLY_RETRY_DELAY_MS);
           } else {
             // Either it spoke (output.length > 0) or we've retried enough —
             // stop chasing it either way, rather than retrying forever.
