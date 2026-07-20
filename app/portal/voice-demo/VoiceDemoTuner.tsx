@@ -447,9 +447,26 @@ export default function VoiceDemoTuner({
                       e.type.startsWith("output_audio_buffer.cleared") ||
                       e.type.startsWith("input_audio_buffer.speech_started") ||
                       e.type.startsWith("connection.");
+                    // response.done is where silent-agent bugs hide: the type
+                    // alone can't tell an ordinary reply from a turn that
+                    // produced nothing. Show status + output count so the log
+                    // is diagnosable without opening devtools.
+                    let detail = "";
+                    if (e.type === "response.done") {
+                      const resp = (e.payload as { response?: { status?: string; output?: unknown[] } })
+                        ?.response;
+                      const n = resp?.output?.length ?? 0;
+                      detail = ` — ${resp?.status ?? "?"}, ${n} output${n === 1 ? "" : "s"}`;
+                    }
+                    const empty = detail.includes(", 0 output");
                     return (
-                      <div key={i} className={`vdt-event ${notable ? "notable" : ""}`}>
+                      <div
+                        key={i}
+                        className={`vdt-event ${notable ? "notable" : ""}`}
+                        style={empty ? { color: "#c2562c", fontWeight: 700 } : undefined}
+                      >
                         {e.dir === "in" ? "←" : "→"} {e.type}
+                        {detail}
                       </div>
                     );
                   })

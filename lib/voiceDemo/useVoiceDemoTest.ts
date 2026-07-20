@@ -59,6 +59,21 @@ export function useVoiceDemoTest() {
   const MAX_EMPTY_REPLY_RETRIES = 5;
   const EMPTY_REPLY_RETRY_DELAY_MS = 400;
 
+  // Whether the caller is mid-utterance right now. This — not the response
+  // status — is what decides if a silent turn is safe to retry.
+  //
+  // Earlier attempts gated the retry on status === "completed" and skipped
+  // "cancelled", assuming cancelled always meant barge-in. That was a guess,
+  // and it was wrong: a confirmed-silent turn (caller gave a phone number,
+  // agent went mute) never fired the retry, so the status must have been
+  // something else. Rather than keep guessing which status values OpenAI
+  // emits, use the invariant that actually matters — if the agent produced
+  // NO output and the caller isn't speaking, the conversation is dead and
+  // must be revived, whatever the server called it. If the caller IS
+  // speaking, stay quiet: a real response is coming anyway, and retrying
+  // would talk over them.
+  const userSpeakingRef = useRef(false);
+
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
   // and hand the result back over the data channel. Mirrors VoiceAgentCard —
@@ -117,7 +132,11 @@ export function useVoiceDemoTest() {
         break;
       }
       case "input_audio_buffer.speech_started":
+        userSpeakingRef.current = true;
         setAgentState("listening");
+        break;
+      case "input_audio_buffer.speech_stopped":
+        userSpeakingRef.current = false;
         break;
       case "conversation.item.input_audio_transcription.completed": {
         const text = String(ev.transcript ?? "").trim();
@@ -177,26 +196,36 @@ export function useVoiceDemoTest() {
           });
         }
 
-        // "completed" + zero output is always the bug (see the block
-        // comment above emptyReplyRetriesRef) — retry unconditionally,
-        // regardless of what triggered this response. "cancelled" (the
-        // clipped case just above) is a legitimate outcome and is left
-        // alone: the caller interrupted on purpose.
+        // Zero output means the agent said nothing at all. Status is
+        // deliberately NOT part of this test — see userSpeakingRef above for
+        // why guessing at status values kept missing the real failures. The
+        // only thing that makes silence acceptable is the caller currently
+        // talking (a real response is coming, and retrying would talk over
+        // them).
         const output = ev.response?.output ?? [];
-        const isEmptyCompleted = respStatus === "completed" && output.length === 0;
-        if (isEmptyCompleted && emptyReplyRetriesRef.current < MAX_EMPTY_REPLY_RETRIES) {
+        const deadTurn = output.length === 0 && !userSpeakingRef.current;
+
+        if (deadTurn && emptyReplyRetriesRef.current < MAX_EMPTY_REPLY_RETRIES) {
           emptyReplyRetriesRef.current += 1;
           const attempt = emptyReplyRetriesRef.current;
           setTimeout(() => {
+            // Re-check at fire time: the caller may have started speaking
+            // during the delay, in which case stay quiet.
+            if (userSpeakingRef.current) return;
             const dc = dcRef.current;
             if (dc && dc.readyState === "open") {
               dc.send(JSON.stringify({ type: "response.create" }));
-              pushEvent("out", "response.create", { note: `retry-empty-reply-${attempt}` });
+              pushEvent("out", "response.create", {
+                note: `retry-empty-reply-${attempt}`,
+                afterStatus: respStatus ?? "unknown",
+              });
             }
           }, EMPTY_REPLY_RETRY_DELAY_MS);
-        } else {
-          // Real output, a legitimate cancellation, or retries exhausted —
-          // any of these ends the retry chain.
+        } else if (output.length > 0) {
+          // Only a turn that actually produced something resets the budget.
+          // A silent turn skipped because the caller was mid-sentence must
+          // NOT refill it, or a talkative caller could reset the counter
+          // indefinitely and mask a genuinely stuck session.
           emptyReplyRetriesRef.current = 0;
         }
         break;
@@ -229,6 +258,9 @@ export function useVoiceDemoTest() {
       // A previous call's disconnect() maxes this out to block any stale
       // retry timeout; a fresh call needs it back at 0.
       emptyReplyRetriesRef.current = 0;
+      // A call that ended mid-utterance would otherwise leave this stuck
+      // true and suppress every retry on the next call.
+      userSpeakingRef.current = false;
 
       try {
         const sessionRes = await fetch("/api/portal/voice-demo/test-session", {
