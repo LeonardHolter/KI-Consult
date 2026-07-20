@@ -275,6 +275,24 @@ async function main() {
     "voice prompt forbids a short tail-question glued to the last digit",
     /EGEN, FULLSTENDIG setning/i.test(voice) && /Har jeg notert riktig nummer\?/i.test(voice),
   );
+  // Same audio-EOS hazard, summary edition: the booking summary used to END
+  // with the phone number, putting «Stemmer alt dette?» right after a digit
+  // string — the exact droppable-tail pattern. The summary must end on
+  // day/time and ask the question as its own sentence.
+  check(
+    "booking summary never ends on the phone number",
+    /Telefonnummeret skal ALDRI være det siste i oppsummeringen/i.test(voice),
+  );
+  check(
+    "summary confirmation is its own standalone sentence",
+    /«Stemmer alt dette\?» som en EGEN, fullstendig setning/i.test(voice),
+  );
+
+  console.log("\n-- calls always end with an explicit farewell --");
+  check(
+    "voice prompt mandates the closing phrase ending in «Ha det bra!»",
+    /Ha det bra!/.test(voice) && /ALDRI bare stoppe/i.test(voice),
+  );
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
