@@ -219,6 +219,30 @@ async function main() {
     /success: ?true/i.test(voice),
   );
 
+  // Regression: the agent once called book_demo_slot right after the caller
+  // said "ja" to a NAME correction mid-conversation, not to the full booking
+  // summary — and booked with a phone number the caller had just said was
+  // wrong. These assert the hardened gate (full-summary readback, ONE
+  // combined "stemmer alt dette?", and a fresh readback+yes after any
+  // correction) is present, not just any confirmation language.
+  console.log("\n-- booking confirmation gate is hardened against partial 'ja' --");
+  check(
+    "voice prompt requires the FULL summary in one turn before booking",
+    /HELE oppsummeringen samlet/i.test(voice),
+  );
+  check(
+    "voice prompt uses one unambiguous confirmation question",
+    /Stemmer alt dette\?/i.test(voice),
+  );
+  check(
+    "voice prompt explicitly rejects a partial 'ja' (name/time only) as booking confirmation",
+    /TELLER IKKE som bookingbekreftelse/i.test(voice),
+  );
+  check(
+    "voice prompt requires a FRESH yes after any correction, not the old one",
+    /et gammelt ja fra før rettelsen gjelder ikke lenger/i.test(voice),
+  );
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 }
