@@ -37,27 +37,27 @@ export function useVoiceDemoTest() {
   // handleServerEvent (which is memoised with no deps) can reach it.
   const clientIdRef = useRef<string | null>(null);
 
-  // The nudge sent after a tool result (response.create) occasionally comes
-  // back as a genuinely empty turn: response.created -> response.done with
-  // zero output items, no audio. Confirmed live: right after book_demo_slot
-  // succeeded, this happened twice in a row, so the caller heard silence and
-  // said "ja" again even though the booking had already gone through. These
-  // track "we're waiting to hear something back from our own nudge" so
-  // response.done can retry once it sees the turn came back empty.
+  // The Realtime session occasionally produces a genuinely empty turn:
+  // response.created -> response.done, status "completed", zero output
+  // items — no audio, nothing spoken. First seen right after a tool-result
+  // nudge (the model booked successfully but never said so, needing up to 3
+  // retries in a row before it recovered). Confirmed AGAIN later happening
+  // after a perfectly ordinary, uninterrupted user turn (a phone-number
+  // confirmation) — no tool call anywhere nearby. So this isn't a
+  // tool-call-specific problem, it's a general session reliability gap:
+  // this receptionist should NEVER intentionally say nothing in response to
+  // a committed customer turn (see the "avslutt alltid replikken" prompt
+  // rule), so any "completed" response with empty output is always a bug,
+  // never deliberate — response.done below retries it unconditionally, on
+  // ANY trigger, not just after our own tool nudge.
   //
-  // Confirmed AGAIN in a later call, worse: three empty turns in a row after
-  // get_available_demo_slots, which exceeded the original 2-retry cap — the
-  // conversation sat silent until the caller's own next utterance happened
-  // to surface the tool result. This seems tied to a barge-in truncation
-  // (the "✂ klippet" marker) leaving the session briefly unsettled right
-  // beforehand. 5 retries gives real headroom, and each one waits a beat
-  // before resending rather than firing instantly, on the theory that
-  // hammering response.create during that unsettled window is itself part
-  // of why it keeps coming back empty.
-  const awaitingToolReplyRef = useRef(false);
-  const toolReplyRetriesRef = useRef(0);
-  const MAX_TOOL_REPLY_RETRIES = 5;
-  const TOOL_REPLY_RETRY_DELAY_MS = 400;
+  // Deliberately NOT applied when status isn't "completed" (e.g.
+  // "cancelled" from a barge-in truncation — the tuner's "✂ klippet"
+  // marker): the caller is mid-interruption there, and forcing a new
+  // response could talk over whatever they're about to say next.
+  const emptyReplyRetriesRef = useRef(0);
+  const MAX_EMPTY_REPLY_RETRIES = 5;
+  const EMPTY_REPLY_RETRY_DELAY_MS = 400;
 
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
@@ -91,10 +91,10 @@ export function useVoiceDemoTest() {
           item: { type: "function_call_output", call_id: callId, output: JSON.stringify(output) },
         }),
       );
-      // See awaitingToolReplyRef above: this nudge can come back empty, in
-      // which case response.done retries it.
-      awaitingToolReplyRef.current = true;
-      toolReplyRetriesRef.current = 0;
+      // The model does not continue on its own after a tool result — it
+      // needs an explicit nudge. If THIS nudge comes back empty, the
+      // general retry in response.done below (not scoped to tool calls)
+      // picks it up.
       dc.send(JSON.stringify({ type: "response.create" }));
       pushEvent("out", "function_call_output", { name, output });
     },
@@ -177,28 +177,27 @@ export function useVoiceDemoTest() {
           });
         }
 
-        if (awaitingToolReplyRef.current) {
-          const output = ev.response?.output ?? [];
-          const isEmpty = output.length === 0;
-          if (isEmpty && toolReplyRetriesRef.current < MAX_TOOL_REPLY_RETRIES) {
-            toolReplyRetriesRef.current += 1;
-            const attempt = toolReplyRetriesRef.current;
-            setTimeout(() => {
-              // Re-check before sending: by the time this fires, a real
-              // response may already have arrived (clearing the flag), or
-              // the call may have ended.
-              if (!awaitingToolReplyRef.current) return;
-              const dc = dcRef.current;
-              if (dc && dc.readyState === "open") {
-                dc.send(JSON.stringify({ type: "response.create" }));
-                pushEvent("out", "response.create", { note: `retry-empty-tool-reply-${attempt}` });
-              }
-            }, TOOL_REPLY_RETRY_DELAY_MS);
-          } else {
-            // Either it spoke (output.length > 0) or we've retried enough —
-            // stop chasing it either way, rather than retrying forever.
-            awaitingToolReplyRef.current = false;
-          }
+        // "completed" + zero output is always the bug (see the block
+        // comment above emptyReplyRetriesRef) — retry unconditionally,
+        // regardless of what triggered this response. "cancelled" (the
+        // clipped case just above) is a legitimate outcome and is left
+        // alone: the caller interrupted on purpose.
+        const output = ev.response?.output ?? [];
+        const isEmptyCompleted = respStatus === "completed" && output.length === 0;
+        if (isEmptyCompleted && emptyReplyRetriesRef.current < MAX_EMPTY_REPLY_RETRIES) {
+          emptyReplyRetriesRef.current += 1;
+          const attempt = emptyReplyRetriesRef.current;
+          setTimeout(() => {
+            const dc = dcRef.current;
+            if (dc && dc.readyState === "open") {
+              dc.send(JSON.stringify({ type: "response.create" }));
+              pushEvent("out", "response.create", { note: `retry-empty-reply-${attempt}` });
+            }
+          }, EMPTY_REPLY_RETRY_DELAY_MS);
+        } else {
+          // Real output, a legitimate cancellation, or retries exhausted —
+          // any of these ends the retry chain.
+          emptyReplyRetriesRef.current = 0;
         }
         break;
       }
@@ -227,6 +226,9 @@ export function useVoiceDemoTest() {
       setEvents([]);
       setAgentState("idle");
       clientIdRef.current = clientId ?? null;
+      // A previous call's disconnect() maxes this out to block any stale
+      // retry timeout; a fresh call needs it back at 0.
+      emptyReplyRetriesRef.current = 0;
 
       try {
         const sessionRes = await fetch("/api/portal/voice-demo/test-session", {
@@ -316,7 +318,7 @@ export function useVoiceDemoTest() {
     setStatus("disconnected");
     setAgentState("idle");
     // Stop any pending retry from firing after the call has already ended.
-    awaitingToolReplyRef.current = false;
+    emptyReplyRetriesRef.current = MAX_EMPTY_REPLY_RETRIES;
   }, []);
 
   return { status, agentState, transcript, events, error, connect, disconnect };

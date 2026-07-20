@@ -31,26 +31,31 @@ export default function VoiceAgentCard({
   const assistantTextRef = useRef<string>("");
   const startedAtRef = useRef<number>(0);
   const usageRef = useRef({ inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 });
-  // The nudge we send after a tool result (response.create) occasionally
-  // comes back as a genuinely empty turn: response.created -> response.done
-  // with zero output items, no audio, nothing spoken. Confirmed live: right
-  // after book_demo_slot succeeded, this happened twice in a row, so the
-  // caller heard silence and said "ja" again — the agent had actually
-  // already booked, it just never told them. These two refs track "we're
-  // waiting to hear something back from our own nudge" so response.done can
-  // retry once it sees the turn came back empty.
-  const awaitingToolReplyRef = useRef(false);
-  const toolReplyRetriesRef = useRef(0);
-  // Confirmed live (event log): a response.create right after the tool
-  // result can come back empty up to THREE times in a row, not just once or
-  // twice — this seems tied to a barge-in truncation (the tuner's "✂
-  // klippet" marker) leaving the session briefly unsettled. 2 retries
-  // wasn't enough; 5 gives real headroom. Each retry also waits a beat
-  // before resending rather than firing instantly, on the theory that
-  // hammering response.create back-to-back during that unsettled window is
-  // itself part of why it keeps coming back empty.
-  const MAX_TOOL_REPLY_RETRIES = 5;
-  const TOOL_REPLY_RETRY_DELAY_MS = 400;
+  // The Realtime session occasionally produces a genuinely empty turn:
+  // response.created -> response.done, status "completed", zero output
+  // items — no audio, nothing spoken. First seen right after a tool-result
+  // nudge (the model booked successfully but never said so), but confirmed
+  // AGAIN happening after a perfectly ordinary, uninterrupted user turn —
+  // no tool call anywhere nearby. So this isn't a tool-call-specific
+  // problem, it's a general session reliability gap: this receptionist
+  // should NEVER intentionally say nothing in response to a committed
+  // customer turn (see the "avslutt alltid replikken" prompt rule), so any
+  // "completed" response with empty output is always a bug, never
+  // deliberate — response.done below retries it unconditionally, on ANY
+  // trigger, not just after our own tool nudge.
+  //
+  // Deliberately NOT applied when status isn't "completed" (e.g.
+  // "cancelled" from a barge-in truncation — the tuner's "✂ klippet"
+  // marker): the user is mid-interruption there, and forcing a new response
+  // could talk over whatever they're about to say next.
+  const emptyReplyRetriesRef = useRef(0);
+  // Confirmed live: this happened three times in a row after one tool
+  // result. 2 retries wasn't enough; 5 gives real headroom. Each retry also
+  // waits a beat before resending rather than firing instantly, on the
+  // theory that hammering response.create during whatever window produces
+  // this is itself part of why it keeps coming back empty.
+  const MAX_EMPTY_REPLY_RETRIES = 5;
+  const EMPTY_REPLY_RETRY_DELAY_MS = 400;
 
   const cleanup = useCallback(() => {
     dcRef.current?.close();
@@ -61,7 +66,7 @@ export default function VoiceAgentCard({
     micRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
     // Stop any pending retry from firing after the call has already ended.
-    awaitingToolReplyRef.current = false;
+    emptyReplyRetriesRef.current = MAX_EMPTY_REPLY_RETRIES;
   }, []);
 
   // Reports the finished call's duration + token usage — the only place any
@@ -128,10 +133,9 @@ export default function VoiceAgentCard({
         }),
       );
       // The model does not continue on its own after a tool result — it needs
-      // an explicit nudge to speak the answer. See awaitingToolReplyRef above:
-      // this nudge can come back empty, in which case response.done retries it.
-      awaitingToolReplyRef.current = true;
-      toolReplyRetriesRef.current = 0;
+      // an explicit nudge to speak the answer. If THIS nudge comes back
+      // empty, the general retry in response.done below (not scoped to
+      // tool calls) picks it up.
       dc.send(JSON.stringify({ type: "response.create" }));
     },
     [clientId],
@@ -166,7 +170,7 @@ export default function VoiceAgentCard({
         break;
       case "response.done": {
         const response = ev.response as
-          | { usage?: Record<string, unknown>; output?: unknown[] }
+          | { status?: string; usage?: Record<string, unknown>; output?: unknown[] }
           | undefined;
         const usage = response?.usage;
         if (usage) {
@@ -176,25 +180,24 @@ export default function VoiceAgentCard({
           usageRef.current.cacheReadInputTokens += Number(cached ?? 0);
         }
 
-        if (awaitingToolReplyRef.current) {
-          const isEmpty = !response?.output || response.output.length === 0;
-          if (isEmpty && toolReplyRetriesRef.current < MAX_TOOL_REPLY_RETRIES) {
-            toolReplyRetriesRef.current += 1;
-            setTimeout(() => {
-              // Re-check before sending: by the time this fires, a real
-              // response may already have arrived (clearing the flag), or
-              // the call may have ended.
-              if (!awaitingToolReplyRef.current) return;
-              const dc = dcRef.current;
-              if (dc && dc.readyState === "open") {
-                dc.send(JSON.stringify({ type: "response.create" }));
-              }
-            }, TOOL_REPLY_RETRY_DELAY_MS);
-          } else {
-            // Either it spoke (output.length > 0) or we've retried enough —
-            // stop chasing it either way, rather than retrying forever.
-            awaitingToolReplyRef.current = false;
-          }
+        // Only "completed" + empty output is the bug. "cancelled" (barge-in
+        // truncation — the tuner's "✂ klippet") is a legitimate outcome the
+        // customer caused on purpose; don't fight it with a retry.
+        const isEmptyCompleted =
+          response?.status === "completed" && (!response.output || response.output.length === 0);
+
+        if (isEmptyCompleted && emptyReplyRetriesRef.current < MAX_EMPTY_REPLY_RETRIES) {
+          emptyReplyRetriesRef.current += 1;
+          setTimeout(() => {
+            const dc = dcRef.current;
+            if (dc && dc.readyState === "open") {
+              dc.send(JSON.stringify({ type: "response.create" }));
+            }
+          }, EMPTY_REPLY_RETRY_DELAY_MS);
+        } else {
+          // Real output, a legitimate cancellation, or retries exhausted —
+          // any of these ends the retry chain.
+          emptyReplyRetriesRef.current = 0;
         }
         break;
       }
@@ -222,6 +225,9 @@ export default function VoiceAgentCard({
     assistantTextRef.current = "";
     setUiState("connecting");
     setAgentSpeaking(false);
+    // A previous call's cleanup() maxes this out to block any stale retry
+    // timeout; a fresh call needs it back at 0.
+    emptyReplyRetriesRef.current = 0;
 
     try {
       const res = await fetch("/api/portal/voice-agent/session", {
