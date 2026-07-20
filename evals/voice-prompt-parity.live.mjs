@@ -243,6 +243,21 @@ async function main() {
     /et gammelt ja fra før rettelsen gjelder ikke lenger/i.test(voice),
   );
 
+  // Regression: a fragmented/false VAD turn transcribed to a stray filler
+  // word ("nydelig" — one of the agent's own acknowledgement words) right
+  // after "hva er fullt navn?", and the agent used it as the customer's
+  // name without question. Asserts the prompt tells it to be suspicious of
+  // a name-shaped answer that clearly isn't one, and ask again instead.
+  console.log("\n-- rejects implausible names/phone numbers instead of guessing --");
+  check(
+    "voice prompt has an explicit 'implausible answer' rule for the name question",
+    /MISTENKELIG SVAR PÅ NAVNESPØRSMÅLET/i.test(voice),
+  );
+  check(
+    "the implausible-name rule is also referenced from the Kontaktinfo flow step",
+    /Lyder svaret IKKE som et navn/i.test(voice),
+  );
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);
 }

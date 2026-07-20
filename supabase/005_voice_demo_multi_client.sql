@@ -143,6 +143,7 @@ Ikke bruk samme bekreftelsesfrase to ganger på rad. Varier ordlyden — «Den e
 ## Bekreftelse av navn og telefonnummer
 - Gjenta ALLTID navn og telefonnummer tilbake til kunden før du går videre. Telefonnummer siffer for siffer.
 - Korrigerer kunden deg: bekreft på nytt for å være sikker.
+- MISTENKELIG SVAR PÅ NAVNESPØRSMÅLET: Får du som svar på «hva er fullt navn?» noe som IKKE ligner et navn — ett enkelt vanlig ord (for eksempel «nydelig», «flott», «perfekt», «supert», «fint», «ja», «nei», «hallo»), en pris, et klokkeslett, eller noe åpenbart urelatert: IKKE bruk det som navn. Anta at du hørte feil eller at kunden ikke var ferdig, og spør på nytt, for eksempel: «Beklager, fikk ikke helt med meg navnet — hva heter du?» Samme regel gjelder telefonnummeret: et telefonnummer skal være siffer, ikke ord.
 
 # VERKTØY
 
@@ -361,6 +362,7 @@ Gå videre når: kunden har valgt et konkret tidspunkt fra listen.
 ## 5) Kontaktinfo
 Mål: få navn og telefonnummer riktig.
 - Be om fullt navn. Gjenta det tilbake.
+- Lyder svaret IKKE som et navn (se regelen «MISTENKELIG SVAR» under Bekreftelse av navn og telefonnummer): spør på nytt i stedet for å notere det.
 - Be om telefonnummer. Gjenta det tilbake siffer for siffer.
 Gå videre når: begge er bekreftet av kunden.
 
