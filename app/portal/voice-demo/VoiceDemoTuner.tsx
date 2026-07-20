@@ -475,10 +475,18 @@ export default function VoiceDemoTuner({
                     // is diagnosable without opening devtools.
                     let detail = "";
                     if (e.type === "response.done") {
-                      const resp = (e.payload as { response?: { status?: string; output?: unknown[] } })
-                        ?.response;
+                      const resp = (
+                        e.payload as {
+                          response?: {
+                            status?: string;
+                            status_details?: { error?: { code?: string } };
+                            output?: unknown[];
+                          };
+                        }
+                      )?.response;
                       const n = resp?.output?.length ?? 0;
-                      detail = ` — ${resp?.status ?? "?"}, ${n} output${n === 1 ? "" : "s"}`;
+                      const code = resp?.status_details?.error?.code;
+                      detail = ` — ${resp?.status ?? "?"}, ${n} output${n === 1 ? "" : "s"}${code ? ` (${code})` : ""}`;
                     }
                     const empty = detail.includes(", 0 output");
                     return (

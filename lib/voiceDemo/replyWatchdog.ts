@@ -28,10 +28,27 @@ type ServerEvent = {
   type?: string;
   response?: {
     status?: string;
+    status_details?: {
+      type?: string;
+      error?: { type?: string; code?: string; message?: string };
+    };
     output?: OutputItem[];
   };
   error?: unknown;
 };
+
+/**
+ * Rate-limit errors state exactly when to come back: "Please try again in
+ * 6.232s" / "in 174ms". Parse that, because nudging any sooner is a
+ * guaranteed failure — a live call burned its entire 5-nudge budget in 3.4
+ * seconds against a 6-second throttle window, every attempt refused.
+ */
+export function parseRetryAfterMs(message: string | undefined): number | null {
+  const m = /try again in (\d+(?:\.\d+)?)\s*(ms|s)\b/i.exec(message ?? "");
+  if (!m) return null;
+  const value = Number(m[1]);
+  return m[2].toLowerCase() === "ms" ? Math.round(value) : Math.round(value * 1000);
+}
 
 type OutputItem = {
   type?: string;
@@ -158,16 +175,34 @@ export class ReplyWatchdog {
           this.log("silent response outside a cycle — ignoring", { status: ev.response?.status });
           break;
         }
-        // The caller heard nothing. Status is deliberately irrelevant —
-        // guessing at status values is how earlier fixes missed real
-        // failures. Text-only is called out because it means the model fell
-        // out of audio modality, which is a distinct upstream bug.
+        // The caller heard nothing. Status is deliberately irrelevant to
+        // WHETHER we retry — guessing at status values is how earlier fixes
+        // missed real failures — but the failure detail decides WHEN:
+        // a rate-limit error names its own retry window, and nudging inside
+        // it is a guaranteed refusal.
+        const err = ev.response?.status_details?.error;
         this.log(
           cls.hasText
             ? "TEXT-ONLY response — caller heard nothing"
             : "SILENT response — zero audible output",
-          { status: ev.response?.status, outputCount: cls.count },
+          {
+            status: ev.response?.status,
+            outputCount: cls.count,
+            ...(err ? { errorCode: err.code, errorMessage: err.message?.slice(0, 160) } : {}),
+          },
         );
+        if (err?.code === "rate_limit_exceeded") {
+          const retryAfter = parseRetryAfterMs(err.message);
+          if (retryAfter !== null) {
+            // Server-stated window + a little headroom for the bucket to
+            // actually free enough; clamped so a weird message can't stall
+            // us forever.
+            const delay = Math.min(Math.max(retryAfter + 500, 750), 20000);
+            this.log(`rate-limited — honoring server retry-after (${delay}ms)`);
+            this.scheduleNudge(delay);
+            break;
+          }
+        }
         this.scheduleNudge();
         break;
       }
@@ -210,12 +245,17 @@ export class ReplyWatchdog {
     this.clearDeadline();
   }
 
-  private scheduleNudge(): void {
+  private scheduleNudge(delayMs?: number): void {
     if (this.nudgesUsed >= this.maxNudges) {
       this.log("nudge budget exhausted — giving up on this turn");
       return;
     }
     this.clearNudge();
+    // Unless the server dictated a window (rate limits), back off
+    // exponentially: 400ms, 800, 1600, 3200, 3200 — repeated instant
+    // retries against a struggling server just waste the budget.
+    const delay =
+      delayMs ?? this.nudgeDelayMs * 2 ** Math.min(this.nudgesUsed, 3);
     this.nudgeTimer = setTimeout(() => {
       this.nudgeTimer = null;
       if (this.disposed) return;
@@ -243,7 +283,7 @@ export class ReplyWatchdog {
       this.log(`nudge ${this.nudgesUsed}/${this.maxNudges} — sending response.create`);
       this.send();
       this.startDeadline();
-    }, this.nudgeDelayMs);
+    }, delay);
   }
 
   private startDeadline(): void {

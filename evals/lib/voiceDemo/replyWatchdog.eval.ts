@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ReplyWatchdog, classifyOutput } from "@/lib/voiceDemo/replyWatchdog";
+import { ReplyWatchdog, classifyOutput, parseRetryAfterMs } from "@/lib/voiceDemo/replyWatchdog";
 
 // Each test here maps to a real way the live voice agent went silent (or
 // could have). The inline predecessors of this watchdog were patched four
@@ -60,6 +60,39 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+});
+
+// The exact failure a live call finally caught on tape: the org's 40k TPM
+// limit for gpt-realtime, every response request ~8.5k tokens, so responses
+// come back status=failed with a stated retry window. The old fixed-delay
+// nudges burned the whole budget inside that window — 5 refusals in 3.4s
+// against "try again in 6.2s".
+const doneRateLimited = (retryIn: string) => ({
+  type: "response.done",
+  response: {
+    status: "failed",
+    status_details: {
+      type: "failed",
+      error: {
+        type: "tokens",
+        code: "rate_limit_exceeded",
+        message: `Rate limit reached for gpt-realtime on tokens per min (TPM): Limit 40000, Requested 8571. Please try again in ${retryIn}. Visit https://platform.openai.com/account/rate-limits to learn more.`,
+      },
+    },
+    output: [],
+  },
+});
+
+describe("parseRetryAfterMs", () => {
+  it("parses seconds and milliseconds forms", () => {
+    expect(parseRetryAfterMs("Please try again in 6.232s. Visit ...")).toBe(6232);
+    expect(parseRetryAfterMs("Please try again in 174ms. Visit ...")).toBe(174);
+    expect(parseRetryAfterMs("Please try again in 13ms.")).toBe(13);
+  });
+  it("returns null when no window is stated", () => {
+    expect(parseRetryAfterMs("The server had an error")).toBeNull();
+    expect(parseRetryAfterMs(undefined)).toBeNull();
+  });
 });
 
 describe("classifyOutput", () => {
@@ -216,6 +249,47 @@ describe("ReplyWatchdog", () => {
     dog.handle(doneEmpty()); // and it was silent too
     vi.advanceTimersByTime(NUDGE_MS);
     expect(sends).toHaveLength(1);
+  });
+
+  it("honors the server's retry-after window when rate-limited (live incident #5)", () => {
+    const { dog, sends, logs } = makeDog();
+    dog.handle(commit);
+    dog.handle(created);
+    dog.handle(doneRateLimited("6.232s"));
+    // The old behavior — nudging at 400ms — was a guaranteed refusal.
+    vi.advanceTimersByTime(NUDGE_MS);
+    expect(sends).toHaveLength(0);
+    vi.advanceTimersByTime(6232 + 500 - NUDGE_MS - 1);
+    expect(sends).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(sends).toHaveLength(1);
+    expect(logs.some((l) => l.includes("rate-limited"))).toBe(true);
+  });
+
+  it("clamps an absurd or tiny stated retry window to sane bounds", () => {
+    const { dog, sends } = makeDog();
+    dog.handle(commit);
+    dog.handle(created);
+    dog.handle(doneRateLimited("13ms")); // floor: never sooner than 750ms
+    vi.advanceTimersByTime(749);
+    expect(sends).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(sends).toHaveLength(1);
+  });
+
+  it("backs off exponentially on repeated generic silent turns", () => {
+    const { dog, sends } = makeDog();
+    dog.handle(commit);
+    dog.handle(created);
+    dog.handle(doneEmpty());
+    vi.advanceTimersByTime(NUDGE_MS); // nudge 1 at 400ms
+    expect(sends).toHaveLength(1);
+    dog.handle(created);
+    dog.handle(doneEmpty());
+    vi.advanceTimersByTime(NUDGE_MS); // 400ms is no longer enough...
+    expect(sends).toHaveLength(1);
+    vi.advanceTimersByTime(NUDGE_MS); // ...nudge 2 lands at 800ms
+    expect(sends).toHaveLength(2);
   });
 
   it("dispose() cancels all pending timers", () => {
