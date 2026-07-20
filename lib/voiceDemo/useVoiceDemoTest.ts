@@ -37,6 +37,17 @@ export function useVoiceDemoTest() {
   // handleServerEvent (which is memoised with no deps) can reach it.
   const clientIdRef = useRef<string | null>(null);
 
+  // The nudge sent after a tool result (response.create) occasionally comes
+  // back as a genuinely empty turn: response.created -> response.done with
+  // zero output items, no audio. Confirmed live: right after book_demo_slot
+  // succeeded, this happened twice in a row, so the caller heard silence and
+  // said "ja" again even though the booking had already gone through. These
+  // track "we're waiting to hear something back from our own nudge" so
+  // response.done can retry once it sees the turn came back empty.
+  const awaitingToolReplyRef = useRef(false);
+  const toolReplyRetriesRef = useRef(0);
+  const MAX_TOOL_REPLY_RETRIES = 2;
+
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
   // and hand the result back over the data channel. Mirrors VoiceAgentCard —
@@ -69,6 +80,10 @@ export function useVoiceDemoTest() {
           item: { type: "function_call_output", call_id: callId, output: JSON.stringify(output) },
         }),
       );
+      // See awaitingToolReplyRef above: this nudge can come back empty, in
+      // which case response.done retries it.
+      awaitingToolReplyRef.current = true;
+      toolReplyRetriesRef.current = 0;
       dc.send(JSON.stringify({ type: "response.create" }));
       pushEvent("out", "function_call_output", { name, output });
     },
@@ -149,6 +164,23 @@ export function useVoiceDemoTest() {
                 : t,
             );
           });
+        }
+
+        if (awaitingToolReplyRef.current) {
+          const output = ev.response?.output ?? [];
+          const isEmpty = output.length === 0;
+          if (isEmpty && toolReplyRetriesRef.current < MAX_TOOL_REPLY_RETRIES) {
+            toolReplyRetriesRef.current += 1;
+            const dc = dcRef.current;
+            if (dc && dc.readyState === "open") {
+              dc.send(JSON.stringify({ type: "response.create" }));
+              pushEvent("out", "response.create", { note: "retry-empty-tool-reply" });
+            }
+          } else {
+            // Either it spoke (output.length > 0) or we've retried enough —
+            // stop chasing it either way, rather than retrying forever.
+            awaitingToolReplyRef.current = false;
+          }
         }
         break;
       }

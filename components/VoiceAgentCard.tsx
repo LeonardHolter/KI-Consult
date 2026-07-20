@@ -31,6 +31,17 @@ export default function VoiceAgentCard({
   const assistantTextRef = useRef<string>("");
   const startedAtRef = useRef<number>(0);
   const usageRef = useRef({ inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 });
+  // The nudge we send after a tool result (response.create) occasionally
+  // comes back as a genuinely empty turn: response.created -> response.done
+  // with zero output items, no audio, nothing spoken. Confirmed live: right
+  // after book_demo_slot succeeded, this happened twice in a row, so the
+  // caller heard silence and said "ja" again — the agent had actually
+  // already booked, it just never told them. These two refs track "we're
+  // waiting to hear something back from our own nudge" so response.done can
+  // retry once it sees the turn came back empty.
+  const awaitingToolReplyRef = useRef(false);
+  const toolReplyRetriesRef = useRef(0);
+  const MAX_TOOL_REPLY_RETRIES = 2;
 
   const cleanup = useCallback(() => {
     dcRef.current?.close();
@@ -106,7 +117,10 @@ export default function VoiceAgentCard({
         }),
       );
       // The model does not continue on its own after a tool result — it needs
-      // an explicit nudge to speak the answer.
+      // an explicit nudge to speak the answer. See awaitingToolReplyRef above:
+      // this nudge can come back empty, in which case response.done retries it.
+      awaitingToolReplyRef.current = true;
+      toolReplyRetriesRef.current = 0;
       dc.send(JSON.stringify({ type: "response.create" }));
     },
     [clientId],
@@ -140,12 +154,30 @@ export default function VoiceAgentCard({
         assistantTextRef.current = "";
         break;
       case "response.done": {
-        const usage = (ev.response as { usage?: Record<string, unknown> } | undefined)?.usage;
+        const response = ev.response as
+          | { usage?: Record<string, unknown>; output?: unknown[] }
+          | undefined;
+        const usage = response?.usage;
         if (usage) {
           usageRef.current.inputTokens += Number(usage.input_tokens ?? 0);
           usageRef.current.outputTokens += Number(usage.output_tokens ?? 0);
           const cached = (usage.input_token_details as { cached_tokens?: number } | undefined)?.cached_tokens;
           usageRef.current.cacheReadInputTokens += Number(cached ?? 0);
+        }
+
+        if (awaitingToolReplyRef.current) {
+          const isEmpty = !response?.output || response.output.length === 0;
+          if (isEmpty && toolReplyRetriesRef.current < MAX_TOOL_REPLY_RETRIES) {
+            toolReplyRetriesRef.current += 1;
+            const dc = dcRef.current;
+            if (dc && dc.readyState === "open") {
+              dc.send(JSON.stringify({ type: "response.create" }));
+            }
+          } else {
+            // Either it spoke (output.length > 0) or we've retried enough —
+            // stop chasing it either way, rather than retrying forever.
+            awaitingToolReplyRef.current = false;
+          }
         }
         break;
       }
