@@ -228,28 +228,33 @@ async function main() {
     /success: ?true/i.test(voice),
   );
 
-  // Regression: the agent once called book_demo_slot right after the caller
-  // said "ja" to a NAME correction mid-conversation, not to the full booking
-  // summary — and booked with a phone number the caller had just said was
-  // wrong. These assert the hardened gate (full-summary readback, ONE
-  // combined "stemmer alt dette?", and a fresh readback+yes after any
-  // correction) is present, not just any confirmation language.
-  console.log("\n-- booking confirmation gate is hardened against partial 'ja' --");
+  // The booking gate, revised 2026-07-21 per Leonard: the full combined
+  // summary («Da leser jeg opp alt ... Stemmer alt dette?») was CUT — every
+  // detail is confirmed as it's collected, so the recap only made calls
+  // longer. The digit-by-digit phone readback is now the booking trigger.
+  // The original hazard (booking on a "ja" aimed at a name correction, with
+  // a phone number the caller had just said was wrong) still needs a guard —
+  // it just anchors to the number question instead of the summary question.
+  console.log("\n-- booking gate: number confirmation triggers, no summary recap --");
   check(
-    "voice prompt requires the FULL summary in one turn before booking",
-    /HELE oppsummeringen samlet/i.test(voice),
+    "voice prompt makes the number confirmation the booking signal",
+    /Nummerbekreftelsen ER bookingsignalet/i.test(voice),
   );
   check(
-    "voice prompt uses one unambiguous confirmation question",
-    /Stemmer alt dette\?/i.test(voice),
+    "voice prompt forbids reading a full booking summary before booking",
+    /IKKE les opp noen samlet oppsummering/i.test(voice),
   );
   check(
-    "voice prompt explicitly rejects a partial 'ja' (name/time only) as booking confirmation",
-    /TELLER IKKE som bookingbekreftelse/i.test(voice),
+    "the cut is deliberate: no «Stemmer alt dette?» summary question remains",
+    !/Stemmer alt dette\?/i.test(voice),
+  );
+  check(
+    "voice prompt explicitly rejects a partial 'ja' (name/correction) as the booking signal",
+    /TELLER IKKE som bookingsignal/i.test(voice),
   );
   check(
     "voice prompt requires a FRESH yes after any correction, not the old one",
-    /et gammelt ja fra før rettelsen gjelder ikke lenger/i.test(voice),
+    /et gammelt ja fra før rettelsen gjelder ikke/i.test(voice),
   );
 
   // Regression: a fragmented/false VAD turn transcribed to a stray filler
@@ -265,6 +270,19 @@ async function main() {
   check(
     "the implausible-name rule is also referenced from the Kontaktinfo flow step",
     /Lyder svaret IKKE som et navn/i.test(voice),
+  );
+
+  // Regression 2026-07-21: the agent labeled a wash "Basic" but quoted 990
+  // — the PREMIUM price for that size — after skipping the Basic/Premium
+  // question entirely. Right column (size), wrong row (variant).
+  console.log("\n-- price precision: right row, and ask Basic vs Premium --");
+  check(
+    "voice prompt demands the price row match the variant (Basic vs Premium)",
+    /Basic og Premium er FORSKJELLIGE linjer/i.test(voice),
+  );
+  check(
+    "voice prompt asks Basic or Premium before quoting when unspecified",
+    /spør hvilken av dem det gjelder FØR du oppgir pris/i.test(voice),
   );
 
   console.log("\n-- every turn ends with an explicit next step --");
@@ -284,18 +302,6 @@ async function main() {
     "voice prompt forbids a short tail-question glued to the last digit",
     /EGEN, FULLSTENDIG setning/i.test(voice) && /Har jeg notert riktig nummer\?/i.test(voice),
   );
-  // Same audio-EOS hazard, summary edition: the booking summary used to END
-  // with the phone number, putting «Stemmer alt dette?» right after a digit
-  // string — the exact droppable-tail pattern. The summary must end on
-  // day/time and ask the question as its own sentence.
-  check(
-    "booking summary never ends on the phone number",
-    /Telefonnummeret skal ALDRI være det siste i oppsummeringen/i.test(voice),
-  );
-  check(
-    "summary confirmation is its own standalone sentence",
-    /«Stemmer alt dette\?» som en EGEN, fullstendig setning/i.test(voice),
-  );
 
   console.log("\n-- calls always end with an explicit farewell --");
   check(
@@ -305,10 +311,10 @@ async function main() {
   // Regression: the model merged booking confirmation + farewell into one
   // ~17s reply and the audio track ended after ~11s — the farewell existed
   // in the transcript but was never voiced. The farewell must be its own
-  // short turn, gated behind «Var det noe mer jeg kan hjelpe med?».
+  // short turn, gated behind «Var det noe mer jeg kan hjelpe deg med?».
   check(
     "booking confirmation ends with 'noe mer?' — farewell is its own short turn",
-    /Var det noe mer jeg kan hjelpe med\?/.test(voice) &&
+    /Var det noe mer jeg kan hjelpe deg med\?/.test(voice) &&
       /IKKE si avskjeden i samme replikk/i.test(voice),
   );
 
