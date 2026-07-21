@@ -272,6 +272,13 @@ async function main() {
     /Lyder svaret IKKE som et navn/i.test(voice),
   );
 
+  // Regression 2026-07-21: TTS read the abbreviation "kl." literally as
+  // letters instead of saying "klokken".
+  check(
+    "voice prompt bans the abbreviation «kl.» in favor of «klokken»",
+    /si ALLTID hele ordet «klokken»/i.test(voice),
+  );
+
   // Regression 2026-07-21: the agent labeled a wash "Basic" but quoted 990
   // — the PREMIUM price for that size — after skipping the Basic/Premium
   // question entirely. Right column (size), wrong row (variant).
