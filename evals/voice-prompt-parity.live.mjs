@@ -310,19 +310,34 @@ async function main() {
     /EGEN, FULLSTENDIG setning/i.test(voice) && /Har jeg notert riktig nummer\?/i.test(voice),
   );
 
-  console.log("\n-- calls always end with an explicit farewell --");
+  // Closing flow per Leonard 2026-07-21: after success:true the agent
+  // closes presumptively in ONE turn — booking confirmation + «...ønsker
+  // jeg deg en god dag videre!» + finish_session, no «noe mer?» question.
+  // The audio-EOS dropped-tail hazard (a merged ~17s closing once lost its
+  // whole farewell) is held off by forcing this turn SHORT: max two
+  // sentences, directions moved to the slot-selection step. A caller
+  // barge-in cancels the pending hangup client-side and step 7 re-closes.
+  console.log("\n-- presumptive one-turn closing, kept short --");
   check(
-    "voice prompt mandates the closing phrase ending in «Ha det bra!»",
-    /Ha det bra!/.test(voice) && /ALDRI bare stoppe/i.test(voice),
+    "closing turn = booking confirmation + «god dag videre» + finish_session together",
+    /ønsker jeg deg en god dag videre/i.test(voice) &&
+      /kall finish_session i SAMME replikk/i.test(voice),
   );
-  // Regression: the model merged booking confirmation + farewell into one
-  // ~17s reply and the audio track ended after ~11s — the farewell existed
-  // in the transcript but was never voiced. The farewell must be its own
-  // short turn, gated behind «Var det noe mer jeg kan hjelpe deg med?».
   check(
-    "booking confirmation ends with 'noe mer?' — farewell is its own short turn",
-    /Var det noe mer jeg kan hjelpe deg med\?/.test(voice) &&
-      /IKKE si avskjeden i samme replikk/i.test(voice),
+    "closing turn is forced short — no directions, max two sentences",
+    /maks to setninger/i.test(voice) && /leveringen ble nevnt i steg 4/i.test(voice),
+  );
+  check(
+    "directions moved to the slot-selection step, not the closing",
+    /Denne informasjonen hører hjemme HER, ikke i avslutningen/i.test(voice),
+  );
+  check(
+    "calls never just stop, and never hang up without a spoken farewell",
+    /ALDRI bare stoppe/i.test(voice) && /aldri på uten å ha sagt avskjeden/i.test(voice),
+  );
+  check(
+    "barge-in on the farewell continues the call and re-closes later",
+    /Avbryter kunden deg mens du sier avslutningen/i.test(voice),
   );
 
   console.log(`\n${pass} passed, ${fail} failed`);

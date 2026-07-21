@@ -149,6 +149,17 @@ export default function VoiceAgentCard({
     setAgentSpeaking(false);
   }, [cleanup, reportUsage]);
 
+  // The caller barged in on the farewell: the call is NOT over. The model
+  // handles their turn and calls finish_session again when it re-closes.
+  const cancelHangup = useCallback(() => {
+    if (!hangupPendingRef.current) return;
+    hangupPendingRef.current = false;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
+  }, []);
+
   const handleServerEvent = useCallback((ev: Record<string, unknown>) => {
     // The watchdog sees every event, before any case can break early.
     watchdogRef.current?.handle(ev);
@@ -165,11 +176,11 @@ export default function VoiceAgentCard({
         if (item?.type === "function_call" && item.call_id && item.name) {
           if (item.name === "finish_session") {
             // Client-side tool: never relayed to the server executor. The
-            // watchdog is done — no reply is expected after a hangup — and
-            // the disconnect waits for output_audio_buffer.stopped so the
-            // farewell finishes playing. Safety timer in case that event
-            // never comes (e.g. a farewell whose audio was dropped).
-            watchdogRef.current?.dispose();
+            // disconnect waits for output_audio_buffer.stopped so the
+            // farewell finishes playing; a barge-in cancels instead (see
+            // the cleared case). The watchdog stays alive until the hangup
+            // actually lands, in case the call continues. Safety timer in
+            // case neither stopped nor cleared ever arrives.
             hangupPendingRef.current = true;
             hangupTimerRef.current = setTimeout(completeHangup, 12000);
             break;
@@ -209,10 +220,15 @@ export default function VoiceAgentCard({
         setAgentSpeaking(true);
         break;
       case "output_audio_buffer.stopped":
-      case "output_audio_buffer.cleared":
         setAgentSpeaking(false);
         // The farewell has finished playing — now the hangup can land.
         if (hangupPendingRef.current) completeHangup();
+        break;
+      case "output_audio_buffer.cleared":
+        setAgentSpeaking(false);
+        // cleared = the caller interrupted the farewell — they have more to
+        // say, so the call continues instead of hanging up on them.
+        cancelHangup();
         break;
       case "error":
         setErrorMsg(
@@ -223,7 +239,7 @@ export default function VoiceAgentCard({
         setUiState("error");
         break;
     }
-  }, [runToolCall, completeHangup]);
+  }, [runToolCall, completeHangup, cancelHangup]);
 
   const start = useCallback(async () => {
     setErrorMsg(null);

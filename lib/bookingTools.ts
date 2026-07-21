@@ -107,7 +107,7 @@ export function realtimeToolDefs() {
       type: "function" as const,
       name: FINISH_SESSION_TOOL,
       description:
-        "Avslutter telefonsamtalen (legger på). Kall denne KUN i samme replikk som du sier avslutningsfrasen, etter at kunden har bekreftet at de ikke trenger noe mer. Er det tvil om kunden er ferdig, spør først — ikke legg på.",
+        "Avslutter telefonsamtalen (legger på). Kall den i SAMME replikk som avslutningen — normalt bookingbekreftelsen der du ønsker kunden en god dag videre, ellers en kort avskjed når kunden er ferdig. Blir du avbrutt mens du sier avslutningen, fortsetter samtalen automatisk og du kan kalle verktøyet igjen senere. Legg aldri på uten å si en avslutning først.",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   ];

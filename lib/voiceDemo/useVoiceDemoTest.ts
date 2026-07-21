@@ -84,6 +84,18 @@ export function useVoiceDemoTest() {
     disconnectRef.current?.();
   };
 
+  // The caller barged in on the farewell: the call is NOT over. The model
+  // handles their turn and calls finish_session again when it re-closes.
+  const cancelHangup = () => {
+    if (!hangupPendingRef.current) return;
+    hangupPendingRef.current = false;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
+    pushEvent("out", "finish_session avbrutt — kunden snakket, samtalen fortsetter", {});
+  };
+
   // Realtime tool calls land in the browser, since the WebRTC session is a
   // direct browser<->OpenAI connection. Relay to the authenticated executor
   // and hand the result back over the data channel. Mirrors VoiceAgentCard —
@@ -141,11 +153,11 @@ export function useVoiceDemoTest() {
         if (item?.type === "function_call" && item.call_id && item.name) {
           if (item.name === "finish_session") {
             // Client-side tool: never relayed to the server executor. The
-            // watchdog is done — no reply follows a hangup — and the actual
             // disconnect waits for output_audio_buffer.stopped so the
-            // farewell finishes playing. Safety timer in case that event
-            // never comes (e.g. a farewell whose audio was dropped).
-            watchdogRef.current?.dispose();
+            // farewell finishes playing; a barge-in cancels instead (see
+            // the cleared case). The watchdog stays alive until the hangup
+            // actually lands, in case the call continues. Safety timer in
+            // case neither stopped nor cleared ever arrives.
             hangupPendingRef.current = true;
             hangupTimerRef.current = setTimeout(completeHangup, 12000);
             pushEvent("in", "finish_session — venter på at avskjeden spilles ferdig", {});
@@ -253,10 +265,15 @@ export function useVoiceDemoTest() {
         setAgentState("speaking");
         break;
       case "output_audio_buffer.stopped":
-      case "output_audio_buffer.cleared":
         if (agentState === "speaking") setAgentState("idle");
         // The farewell has finished playing — now the hangup can land.
         if (hangupPendingRef.current) completeHangup();
+        break;
+      case "output_audio_buffer.cleared":
+        if (agentState === "speaking") setAgentState("idle");
+        // cleared = the caller interrupted the farewell — they have more to
+        // say, so the call continues instead of hanging up on them.
+        cancelHangup();
         break;
       case "error":
         setError(ev.error?.message ?? JSON.stringify(ev.error ?? ev));
