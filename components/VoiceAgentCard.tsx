@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ReplyWatchdog } from "@/lib/voiceDemo/replyWatchdog";
+import { planRecordingUpload } from "@/lib/voiceRecordings.client";
 
 // WebRTC connection to the client's saved voice agent (settings live in
 // Supabase, tuned from /portal/voice-demo). Same architecture as the
@@ -66,7 +67,9 @@ export default function VoiceAgentCard({
   const recordStartedAtRef = useRef<number>(0);
 
   // Stops the recorder and uploads what it captured. Fire-and-forget: a
-  // failed upload must never break the hangup path the user is on.
+  // failed upload must never break the hangup path the user is on — but
+  // every skip and failure is logged, because a silent no-op here already
+  // cost us a lost client-call recording once.
   const stopRecordingAndUpload = useCallback(() => {
     const recorder = recorderRef.current;
     recorderRef.current = null;
@@ -81,24 +84,28 @@ export default function VoiceAgentCard({
       void ctx?.close().catch(() => {});
       const chunks = recordChunksRef.current;
       recordChunksRef.current = [];
-      if (!startedAt || chunks.length === 0) return;
-      const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
-      // A call that never really started (a couple of KB of container
-      // headers) isn't worth reviewing or storing.
-      if (blob.size < 20 * 1024) return;
-      const durationSeconds = (Date.now() - startedAt) / 1000;
-      const params = new URLSearchParams({
-        startedAt: new Date(startedAt).toISOString(),
-        durationSeconds: String(durationSeconds),
+      const decision = planRecordingUpload({
+        chunks,
+        mimeType: recorder.mimeType,
+        startedAt,
+        clientId,
       });
-      if (clientId) params.set("clientId", clientId);
-      fetch(`/api/portal/voice-agent/recordings?${params}`, {
+      if (!decision.plan) {
+        console.warn(`[voice-recording] skipped upload: ${decision.reason}`);
+        return;
+      }
+      fetch(decision.plan.url, {
         method: "POST",
-        headers: { "Content-Type": blob.type },
-        body: blob,
-      }).catch(() => {
-        /* best-effort — the call itself already ended fine */
-      });
+        headers: { "Content-Type": decision.plan.contentType },
+        body: decision.plan.blob,
+        // Survives the tab closing right after hangup.
+        keepalive: decision.plan.blob.size < 60 * 1024,
+      })
+        .then((res) => {
+          if (!res.ok) console.warn(`[voice-recording] upload failed: HTTP ${res.status}`);
+          else console.info(`[voice-recording] saved (${decision.plan.blob.size} B)`);
+        })
+        .catch((e) => console.warn("[voice-recording] upload failed:", e));
     };
 
     if (recorder.state === "inactive") {
@@ -389,6 +396,12 @@ export default function VoiceAgentCard({
       // fall through to whatever container the browser can produce.
       try {
         const recCtx = new AudioContext();
+        // The context is created after two await boundaries (session fetch +
+        // the mic permission prompt), so Chrome may have expired the user
+        // activation and started it SUSPENDED — in that state the mix
+        // produces zero bytes and the whole call records as nothing, which
+        // is exactly how a client-dashboard recording silently vanished.
+        if (recCtx.state !== "running") void recCtx.resume().catch(() => {});
         const recDest = recCtx.createMediaStreamDestination();
         recCtx.createMediaStreamSource(mic).connect(recDest);
         recordCtxRef.current = recCtx;
@@ -444,6 +457,11 @@ export default function VoiceAgentCard({
         setUiState("active");
         startedAtRef.current = Date.now();
         recordStartedAtRef.current = Date.now();
+        // Belt and suspenders for the suspended-AudioContext case: by now
+        // the mic capture is live, and Chrome permits resuming alongside an
+        // active capture even without fresh user activation.
+        const recCtx = recordCtxRef.current;
+        if (recCtx && recCtx.state !== "running") void recCtx.resume().catch(() => {});
         dc.send(JSON.stringify({ type: "response.create" }));
         watchdogRef.current?.expectReply();
       };
