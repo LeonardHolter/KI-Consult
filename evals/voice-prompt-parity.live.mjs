@@ -342,6 +342,21 @@ async function main() {
     "barge-in on the farewell continues the call and re-closes later",
     /Avbryter kunden deg mens du sier avslutningen/i.test(voice),
   );
+  // Regression 2026-07-22: the caller answered the farewell with a polite
+  // «Ok, god dag» — the client cancelled the hangup (correct), the model
+  // replied politely but never re-called finish_session, and the call hung
+  // open forever. Two-part fix: a cancelled hangup now reports success:false
+  // back as the tool result, and the prompt makes a reciprocal greeting an
+  // explicit re-close case.
+  check(
+    "a reciprocal goodbye gets one short line + finish_session again",
+    /En gjensidig hilsen er IKKE et nytt spørsmål/i.test(voice),
+  );
+  check(
+    "the model knows a cancelled hangup means it must call finish_session again",
+    /success: false som forteller at det ikke ble lagt på/i.test(voice) &&
+      /ikke over før et finish_session-kall har fått fullføre/i.test(voice),
+  );
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail === 0 ? 0 : 1);

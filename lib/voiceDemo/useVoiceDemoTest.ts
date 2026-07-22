@@ -71,11 +71,15 @@ export function useVoiceDemoTest() {
   // event handler that needs it.
   const hangupPendingRef = useRef(false);
   const hangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // call_id of the pending finish_session, so a cancelled hangup can report
+  // back to the model that it must close again.
+  const hangupCallIdRef = useRef<string | null>(null);
   const disconnectRef = useRef<(() => void) | null>(null);
 
   const completeHangup = () => {
     if (!hangupPendingRef.current) return;
     hangupPendingRef.current = false;
+    hangupCallIdRef.current = null;
     if (hangupTimerRef.current) {
       clearTimeout(hangupTimerRef.current);
       hangupTimerRef.current = null;
@@ -84,8 +88,10 @@ export function useVoiceDemoTest() {
     disconnectRef.current?.();
   };
 
-  // The caller barged in on the farewell: the call is NOT over. The model
-  // handles their turn and calls finish_session again when it re-closes.
+  // The caller barged in on the farewell: the call is NOT over. Report the
+  // aborted hangup back as the tool result — without this the model
+  // believes it already hung up and never re-calls finish_session, leaving
+  // the call dangling forever after a reciprocal "takk, i like måte".
   const cancelHangup = () => {
     if (!hangupPendingRef.current) return;
     hangupPendingRef.current = false;
@@ -94,6 +100,23 @@ export function useVoiceDemoTest() {
       hangupTimerRef.current = null;
     }
     pushEvent("out", "finish_session avbrutt — kunden snakket, samtalen fortsetter", {});
+    const callId = hangupCallIdRef.current;
+    hangupCallIdRef.current = null;
+    const dc = dcRef.current;
+    if (callId && dc && dc.readyState === "open") {
+      const output = {
+        success: false,
+        reason:
+          "Kunden fortsatte samtalen, så det ble ikke lagt på. Svar kunden, og kall finish_session på nytt i samme replikk som din neste avslutning.",
+      };
+      dc.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: { type: "function_call_output", call_id: callId, output: JSON.stringify(output) },
+        }),
+      );
+      pushEvent("out", "function_call_output", { name: "finish_session", output });
+    }
   };
 
   // Realtime tool calls land in the browser, since the WebRTC session is a
@@ -159,6 +182,7 @@ export function useVoiceDemoTest() {
             // actually lands, in case the call continues. Safety timer in
             // case neither stopped nor cleared ever arrives.
             hangupPendingRef.current = true;
+            hangupCallIdRef.current = item.call_id;
             hangupTimerRef.current = setTimeout(completeHangup, 12000);
             pushEvent("in", "finish_session — venter på at avskjeden spilles ferdig", {});
             break;
