@@ -85,6 +85,7 @@ describe("mintRealtimeClientSecret", () => {
       const body = JSON.parse(init.body as string);
       expect(body.session.tool_choice).toBe("auto");
       expect(body.session.tools.map((t: { name: string }) => t.name).sort()).toEqual([
+        "add_booking_note",
         "book_demo_slot",
         "finish_session",
         "get_available_demo_slots",

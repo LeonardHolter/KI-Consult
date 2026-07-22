@@ -14,11 +14,12 @@
 // The voice agent passes whatever the client's Settings.voiceBookingMode says
 // — "sandbox" until someone deliberately switches it to live.
 
-import { bookSlot, loadSlots, type BookingScope } from "@/lib/slots";
+import { appendBookingNote, bookSlot, loadSlots, type BookingScope } from "@/lib/slots";
 import { osloParts } from "@/lib/google-calendar";
 
 export const GET_SLOTS_TOOL = "get_available_demo_slots";
 export const BOOK_SLOT_TOOL = "book_demo_slot";
+export const ADD_NOTE_TOOL = "add_booking_note";
 
 const WEEKDAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
 
@@ -78,6 +79,34 @@ export const BOOKING_TOOL_SCHEMAS = {
         },
       },
       required: ["date", "time", "customer_name", "customer_phone", "service"],
+      additionalProperties: false,
+    },
+  },
+  [ADD_NOTE_TOOL]: {
+    description:
+      "Legger et notat på en booking som ALLEREDE er opprettet i denne samtalen — for eksempel når kunden etter bookingen ønsker en vurdering av PDR/bulk eller en ekstra tjeneste uten fast pris. Notatet legges i bookingens tjenestefelt så avdelingen ser det ved levering. Bruk KUN for tilleggsønsker på en eksisterende booking — aldri for å endre tidspunkt eller avbestille (det kan du ikke; henvis til avdelingen). Si aldri at noe er notert før verktøyet har svart success: true.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "Datoen bookingen ble gjort på, format YYYY-MM-DD, nøyaktig som da du booket",
+        },
+        time: {
+          type: "string",
+          description: "Klokkeslettet bookingen ble gjort på, format HH:MM, nøyaktig som da du booket",
+        },
+        customer_phone: {
+          type: "string",
+          description: "Telefonnummeret bookingen ble gjort med",
+        },
+        note: {
+          type: "string",
+          description:
+            "Kort notat til avdelingen, f.eks. 'Kunden ønsker vurdering/pris av PDR/bulk ved levering'",
+        },
+      },
+      required: ["date", "time", "customer_phone", "note"],
       additionalProperties: false,
     },
   },
@@ -198,6 +227,30 @@ export async function execBookingTool(
       );
       return result.ok
         ? { success: true, slot: result.slot }
+        : { success: false, error: result.error };
+    }
+
+    if (name === ADD_NOTE_TOOL) {
+      const { date, time, customer_phone, note } = (input ?? {}) as {
+        date?: string;
+        time?: string;
+        customer_phone?: string;
+        note?: string;
+      };
+      if (!date || !time || !customer_phone || !note) {
+        return { success: false, error: "Mangler dato, tid, telefonnummer eller notat." };
+      }
+      const normalizedTime = time.trim().replace(/^(\d):/, "0$1:").slice(0, 5);
+      const result = await appendBookingNote(
+        clientId,
+        date.trim(),
+        normalizedTime,
+        customer_phone,
+        note,
+        scope,
+      );
+      return result.ok
+        ? { success: true, service: result.service }
         : { success: false, error: result.error };
     }
 

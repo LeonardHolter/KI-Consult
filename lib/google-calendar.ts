@@ -133,6 +133,19 @@ export async function insertEvent(
   return gcal("POST", `/calendars/${encodeURIComponent(calendarId)}/events`, event);
 }
 
+/** Partial update — only the given fields change, everything else stays. */
+export async function patchEvent(
+  calendarId: string,
+  eventId: string,
+  patch: Record<string, unknown>
+): Promise<GcalEvent> {
+  return gcal(
+    "PATCH",
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    patch
+  );
+}
+
 export async function getEvent(calendarId: string, eventId: string): Promise<GcalEvent> {
   return gcal(
     "GET",

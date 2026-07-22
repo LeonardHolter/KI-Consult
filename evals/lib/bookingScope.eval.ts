@@ -38,6 +38,7 @@ vi.mock("@/lib/google-calendar", async () => {
     insertEvent: vi.fn(async () => ({ id: "gcal-event-id" })),
     getEvent: vi.fn(async () => ({ id: "gcal-event-id", extendedProperties: { private: { hzAgent: "1" } } })),
     deleteEvent: vi.fn(async () => undefined),
+    patchEvent: vi.fn(async () => ({ id: "gcal-event-id" })),
   };
 });
 
@@ -55,8 +56,8 @@ vi.mock("@/lib/settings", async () => {
   };
 });
 
-import { insertEvent, listEvents } from "@/lib/google-calendar";
-import { bookSlot, loadSlots, cancelBooking } from "@/lib/slots";
+import { insertEvent, listEvents, patchEvent } from "@/lib/google-calendar";
+import { appendBookingNote, bookSlot, loadSlots, cancelBooking } from "@/lib/slots";
 import { execBookingTool } from "@/lib/bookingTools";
 
 const CLIENT = "11111111-2222-3333-4444-555555555555";
@@ -65,6 +66,7 @@ beforeEach(() => {
   blobStore.clear();
   vi.mocked(insertEvent).mockClear();
   vi.mocked(listEvents).mockClear();
+  vi.mocked(patchEvent).mockClear();
   process.env.BLOB_READ_WRITE_TOKEN = "test-token";
 });
 
@@ -151,6 +153,100 @@ describe("execBookingTool honours the scope it is given", () => {
 
     expect(booked.success).toBe(true);
     expect(insertEvent).not.toHaveBeenCalled();
+  });
+
+  it("appends a post-booking note in the sandbox without touching Google", async () => {
+    const slotId = await firstSandboxSlotId();
+    const booked = await bookSlot(CLIENT, slotId, "Sabah Ali", "91787801", "Motorvask", "sandbox");
+    expect(booked.ok).toBe(true);
+    const slot = booked.ok ? booked.slot : null;
+
+    // Spaced phone formatting must still match the stored booking.
+    const noted = await execBookingTool(
+      CLIENT,
+      "add_booking_note",
+      {
+        date: slot!.date,
+        time: slot!.time,
+        customer_phone: "917 87 801",
+        note: "Kunden ønsker vurdering/pris av PDR/bulk ved levering",
+      },
+      "sandbox",
+    );
+
+    expect(noted.success).toBe(true);
+    expect(noted.service).toBe("Motorvask + Kunden ønsker vurdering/pris av PDR/bulk ved levering");
+    expect(patchEvent).not.toHaveBeenCalled();
+    expect(listEvents).not.toHaveBeenCalled();
+
+    // The note survived into the store — and re-adding it doesn't stack.
+    const again = await appendBookingNote(
+      CLIENT,
+      slot!.date,
+      slot!.time,
+      "91787801",
+      "Kunden ønsker vurdering/pris av PDR/bulk ved levering",
+      "sandbox",
+    );
+    expect(again).toEqual({
+      ok: true,
+      service: "Motorvask + Kunden ønsker vurdering/pris av PDR/bulk ved levering",
+    });
+  });
+
+  it("fails cleanly when no booking matches the note's date/time/phone", async () => {
+    const out = await execBookingTool(
+      CLIENT,
+      "add_booking_note",
+      { date: "2026-01-01", time: "09:30", customer_phone: "00000000", note: "PDR" },
+      "sandbox",
+    );
+    expect(out.success).toBe(false);
+    expect(String(out.error)).toMatch(/Fant ingen booking/);
+  });
+
+  it("append note in live scope patches the matching hzAgent calendar event", async () => {
+    vi.mocked(listEvents).mockResolvedValueOnce([
+      {
+        id: "evt-1",
+        start: { dateTime: "2026-08-01T14:30:00+02:00" },
+        extendedProperties: {
+          private: {
+            hzAgent: "1",
+            customerName: "Sabah Ali",
+            customerPhone: "91787801",
+            service: "Motorvask",
+          },
+        },
+      },
+    ]);
+
+    const result = await appendBookingNote(
+      CLIENT,
+      "2026-08-01",
+      "14:30",
+      "917 87 801",
+      "Kunden ønsker vurdering/pris av PDR/bulk",
+      "live",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      service: "Motorvask + Kunden ønsker vurdering/pris av PDR/bulk",
+    });
+    expect(patchEvent).toHaveBeenCalledWith(
+      "real-calendar@handzon.no",
+      "evt-1",
+      expect.objectContaining({
+        summary: "Motorvask + Kunden ønsker vurdering/pris av PDR/bulk – Sabah Ali",
+        extendedProperties: {
+          private: expect.objectContaining({
+            hzAgent: "1",
+            service: "Motorvask + Kunden ønsker vurdering/pris av PDR/bulk",
+          }),
+        },
+      }),
+    );
   });
 
   it("returns a structured error rather than throwing on an unknown tool", async () => {

@@ -8,6 +8,7 @@ import {
   getServiceAccount,
   insertEvent,
   listEvents,
+  patchEvent,
   osloParts,
   osloToUTC,
   osloToday,
@@ -496,6 +497,70 @@ export async function bookSlot(
   return calendarConnected(settings)
     ? calendarBook(settings, slotId, customerName, customerPhone, svc)
     : demoBook(clientId, settings, slotId, customerName, customerPhone, svc, scope);
+}
+
+/* ------------------------------------------------------------------ */
+/* Post-booking notes — a wish that surfaces AFTER the booking is made */
+/* (e.g. «ønsker vurdering av PDR/bulk») gets appended to the existing */
+/* booking's service field, so the department actually sees it. The    */
+/* booking is identified by date + time + phone: the model reliably    */
+/* knows those, unlike internal ids.                                   */
+/* ------------------------------------------------------------------ */
+
+const digitsOnly = (s: string) => s.replace(/\D/g, "");
+
+export async function appendBookingNote(
+  clientId: string,
+  date: string,
+  time: string,
+  customerPhone: string,
+  note: string,
+  scope: BookingScope = "live",
+): Promise<{ ok: true; service: string } | { ok: false; error: string }> {
+  const trimmedNote = note.trim();
+  if (!trimmedNote) return { ok: false, error: "Notatet er tomt." };
+  const settings = await loadSettings(clientId);
+
+  if (scope === "live" && calendarConnected(settings)) {
+    const startUTC = osloToUTC(date, "00:00");
+    const endUTC = new Date(startUTC.getTime() + 24 * 3600 * 1000);
+    const events = await listEvents(settings.calendarId!, startUTC.toISOString(), endUTC.toISOString());
+    const match = events.find((e) => {
+      const priv = e.extendedProperties?.private;
+      if (priv?.hzAgent !== "1" || !e.start?.dateTime) return false;
+      const start = osloParts(e.start.dateTime);
+      return (
+        start.date === date &&
+        start.time === time &&
+        digitsOnly(priv.customerPhone ?? "") === digitsOnly(customerPhone)
+      );
+    });
+    if (!match) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
+    const priv = match.extendedProperties?.private ?? {};
+    const service = priv.service ?? match.summary ?? "";
+    if (service.includes(trimmedNote)) return { ok: true, service };
+    const newService = service ? `${service} + ${trimmedNote}` : trimmedNote;
+    await patchEvent(settings.calendarId!, match.id, {
+      summary: `${newService} – ${priv.customerName ?? ""}`.trim(),
+      extendedProperties: { private: { ...priv, service: newService } },
+    });
+    return { ok: true, service: newService };
+  }
+
+  const bookings = await demoReadBookings(clientId, scope);
+  const idx = bookings.findIndex(
+    (b) =>
+      b.date === date &&
+      b.time === time &&
+      digitsOnly(b.customerPhone ?? "") === digitsOnly(customerPhone),
+  );
+  if (idx === -1) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
+  const service = bookings[idx].service ?? "";
+  if (service.includes(trimmedNote)) return { ok: true, service };
+  const newService = service ? `${service} + ${trimmedNote}` : trimmedNote;
+  bookings[idx] = { ...bookings[idx], service: newService };
+  await demoWriteBookings(clientId, scope, bookings);
+  return { ok: true, service: newService };
 }
 
 /**

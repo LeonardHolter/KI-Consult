@@ -219,6 +219,16 @@ async function main() {
   // the voice prompt must document it and the chat prompt must NOT mention
   // it (phantom-tool guard in both directions).
   check("voice prompt documents finish_session", voice.includes("finish_session"));
+  // Regression (Sabah's voice test 2026-07-22): a post-booking PDR/bulk wish
+  // got a spoken "vi tar en vurdering når du kommer" but no note anywhere —
+  // the booking was already made and the agent had no way to amend it. The
+  // add_booking_note tool closes that gap; the prompt must document it and
+  // forbid promising a note without a success:true from the tool.
+  check("voice prompt documents add_booking_note", voice.includes("add_booking_note"));
+  check(
+    "post-booking wishes must go through the tool, never just a spoken promise",
+    /Lov ALDRI et notat uten å faktisk kalle verktøyet/i.test(voice),
+  );
   check(
     "chat prompt does NOT mention finish_session (chat has no such tool)",
     !chat.includes("finish_session"),
