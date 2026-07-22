@@ -57,7 +57,13 @@ vi.mock("@/lib/settings", async () => {
 });
 
 import { insertEvent, listEvents, patchEvent } from "@/lib/google-calendar";
-import { appendBookingNote, bookSlot, loadSlots, cancelBooking } from "@/lib/slots";
+import {
+  appendBookingNote,
+  bookSlot,
+  cancelBooking,
+  clearSandboxBookings,
+  loadSlots,
+} from "@/lib/slots";
 import { execBookingTool } from "@/lib/bookingTools";
 
 const CLIENT = "11111111-2222-3333-4444-555555555555";
@@ -92,6 +98,20 @@ describe("sandbox scope never reaches Google Calendar", () => {
     expect(insertEvent).not.toHaveBeenCalled();
     // ...and it landed in the sandbox-specific key, not the shared demo one.
     expect([...blobStore.keys()]).toEqual([`${CLIENT}/voice-sandbox-bookings.json`]);
+  });
+
+  it("clearSandboxBookings wipes the sandbox store and never touches Google", async () => {
+    const slotId = await firstSandboxSlotId();
+    await bookSlot(CLIENT, slotId, "En", "11111111", "Vask utvendig", "sandbox");
+    await bookSlot(CLIENT, slotId, "To", "22222222", "Vask utvendig", "sandbox");
+
+    const { removed } = await clearSandboxBookings(CLIENT);
+    expect(removed).toBe(2);
+
+    const after = await loadSlots(CLIENT, "sandbox");
+    expect(after.every((s) => s.bookedCount === 0)).toBe(true);
+    expect(insertEvent).not.toHaveBeenCalled();
+    expect(listEvents).not.toHaveBeenCalled();
   });
 
   it("cancelBooking(sandbox) removes from the sandbox store without touching the calendar", async () => {

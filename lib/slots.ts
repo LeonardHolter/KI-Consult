@@ -509,6 +509,14 @@ export async function bookSlot(
 
 const digitsOnly = (s: string) => s.replace(/\D/g, "");
 
+/** Wipes every sandbox booking for the client. Sandbox-only by construction
+ *  — the writer is the demo store, which never touches Google Calendar. */
+export async function clearSandboxBookings(clientId: string): Promise<{ removed: number }> {
+  const existing = await demoReadBookings(clientId, "sandbox");
+  await demoWriteBookings(clientId, "sandbox", []);
+  return { removed: existing.length };
+}
+
 export async function appendBookingNote(
   clientId: string,
   date: string,

@@ -41,12 +41,29 @@ export default function VoiceRecordingsPanel({
 }: {
   clientId: string;
   /** Admin view: badge client-made calls so real conversations stand out
-   *  from admin test calls. Meaningless for the client (they only ever see
-   *  their own calls), so it's off there. */
+   *  from admin test calls, and show delete buttons. Off for the client —
+   *  they can listen to their own calls but not remove review material. */
   showOrigin?: boolean;
 }) {
   const [recordings, setRecordings] = useState<RecordingMeta[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  // id of the recording whose delete button is in its "Sikker?" stage.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(
+        `/api/portal/voice-agent/recordings/${id}?clientId=${clientId}`,
+        { method: "DELETE" },
+      );
+      if (res.ok) {
+        setRecordings((prev) => prev?.filter((r) => r.id !== id) ?? prev);
+        if (openId === id) setOpenId(null);
+      }
+    } finally {
+      setConfirmDeleteId(null);
+    }
+  };
 
   const load = useCallback(async (): Promise<RecordingMeta[]> => {
     try {
@@ -149,32 +166,85 @@ export default function VoiceRecordingsPanel({
                 <span style={{ fontSize: 12.5, color: MUTED }}>
                   {fmtDuration(r.durationSeconds)} · {(r.sizeBytes / 1024).toFixed(0)} kB
                 </span>
-                {openId !== r.id && (
-                  <button
-                    onClick={() => setOpenId(r.id)}
-                    style={{
-                      border: `1px solid ${MUTED}66`,
-                      background: "transparent",
-                      borderRadius: 8,
-                      padding: "4px 12px",
-                      fontSize: 12.5,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      color: INK,
-                    }}
-                  >
-                    Spill av
-                  </button>
-                )}
+                <span style={{ display: "inline-flex", gap: 6 }}>
+                  {openId !== r.id && (
+                    <button
+                      onClick={() => setOpenId(r.id)}
+                      style={{
+                        border: `1px solid ${MUTED}66`,
+                        background: "transparent",
+                        borderRadius: 8,
+                        padding: "4px 12px",
+                        fontSize: 12.5,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        color: INK,
+                      }}
+                    >
+                      Spill av
+                    </button>
+                  )}
+                  {showOrigin &&
+                    (confirmDeleteId === r.id ? (
+                      <button
+                        onClick={() => void handleDelete(r.id)}
+                        onBlur={() => setConfirmDeleteId(null)}
+                        style={{
+                          border: "1px solid #c2562c",
+                          background: "#c2562c",
+                          borderRadius: 8,
+                          padding: "4px 12px",
+                          fontSize: 12.5,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          color: "#fff",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Sikker?
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteId(r.id)}
+                        style={{
+                          border: "1px solid #c2562c66",
+                          background: "transparent",
+                          borderRadius: 8,
+                          padding: "4px 12px",
+                          fontSize: 12.5,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          color: "#c2562c",
+                        }}
+                      >
+                        Slett
+                      </button>
+                    ))}
+                </span>
               </div>
               {openId === r.id && (
                 // Mounted on demand so listing the panel never streams audio.
+                // MediaRecorder's webm has no duration header, so the browser
+                // reports Infinity and pins the scrubber at max; the huge-seek
+                // trick forces it to compute the real duration, and the API
+                // route's Range support makes the timeline seekable.
                 <audio
                   controls
                   autoPlay
                   preload="none"
                   src={`/api/portal/voice-agent/recordings/${r.id}?clientId=${clientId}`}
                   style={{ width: "100%", marginTop: 10 }}
+                  onLoadedMetadata={(e) => {
+                    const el = e.currentTarget;
+                    if (el.duration === Infinity) {
+                      const back = () => {
+                        el.removeEventListener("seeked", back);
+                        el.currentTime = 0;
+                      };
+                      el.addEventListener("seeked", back);
+                      el.currentTime = 1e10;
+                    }
+                  }}
                 />
               )}
             </li>

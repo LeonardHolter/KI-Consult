@@ -108,6 +108,8 @@ export default function PortalDashboard({
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [confirmingClearSandbox, setConfirmingClearSandbox] = useState(false);
+  const [clearingSandbox, setClearingSandbox] = useState(false);
   // Which booking store the grid is showing: the real one, or the isolated
   // sandbox the voice agent books into while it's being tested.
   const [calScope, setCalScope] = useState<"live" | "sandbox">("live");
@@ -186,6 +188,28 @@ export default function PortalDashboard({
     // component mounted (only the ?client= search param changes), so without
     // this dependency the interval would keep polling the previous client.
   }, [fetchCalendarView]);
+
+  // Admin: wipe all sandbox bookings so a test round starts from a clean
+  // grid. Two-step confirm inline; the endpoint is admin-only server-side.
+  async function handleClearSandbox() {
+    if (!clientId) return;
+    setClearingSandbox(true);
+    try {
+      const res = await fetch(`/api/portal/sandbox-bookings?clientId=${clientId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        const d = await fetchCalendarView();
+        if (d) {
+          setSlots(d.slots ?? []);
+          setLastSync(new Date());
+        }
+      }
+    } finally {
+      setClearingSandbox(false);
+      setConfirmingClearSandbox(false);
+    }
+  }
 
   async function handleCancelBooking() {
     if (!selected?.booking.id) return;
@@ -467,6 +491,33 @@ export default function PortalDashboard({
                     Testkalender
                   </button>
                 </span>
+              )}
+              {overviewHref && clientId && calScope === "sandbox" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    confirmingClearSandbox ? handleClearSandbox() : setConfirmingClearSandbox(true)
+                  }
+                  onBlur={() => setConfirmingClearSandbox(false)}
+                  disabled={clearingSandbox}
+                  style={{
+                    border: "1px solid #c2562c66",
+                    background: confirmingClearSandbox ? "#c2562c" : "transparent",
+                    color: confirmingClearSandbox ? "#fff" : "#c2562c",
+                    borderRadius: 8,
+                    padding: "4px 12px",
+                    fontSize: 12.5,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    fontWeight: confirmingClearSandbox ? 700 : 400,
+                  }}
+                >
+                  {clearingSandbox
+                    ? "Tømmer…"
+                    : confirmingClearSandbox
+                      ? "Sikker? Tøm alt"
+                      : "Tøm testkalender"}
+                </button>
               )}
               <span
                 className={`ctp-sync ${calScope === "sandbox" ? "is-sandbox" : calConnected ? "is-on" : "is-off"}`}

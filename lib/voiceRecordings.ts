@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 
 /* ------------------------------------------------------------------ */
 /* Voice-call recordings — the browser mixes mic + agent audio into    */
@@ -91,18 +91,21 @@ export async function saveRecording(
   return full;
 }
 
-/** Returns the audio bytes + metadata for the playback route, or null. */
+/** Returns the audio bytes + metadata for the playback route, or null.
+ *  Always a full Buffer: the playback route needs Content-Length and HTTP
+ *  Range support for the <audio> scrubber to be seekable, and recordings
+ *  are small (~240 KB/min), so buffering is the simpler correct choice. */
 export async function readRecording(
   clientId: string,
   id: string,
-): Promise<{ bytes: Buffer | ReadableStream; meta: RecordingMeta } | null> {
+): Promise<{ bytes: Buffer; meta: RecordingMeta } | null> {
   const meta = (await listRecordings(clientId)).find((e) => e.id === id);
   if (!meta) return null;
   try {
     if (blobConfigured()) {
       const result = await get(audioBlobPath(clientId, id), { access: "private" });
       if (!result || result.statusCode !== 200 || !result.stream) return null;
-      return { bytes: result.stream, meta };
+      return { bytes: Buffer.from(await new Response(result.stream).arrayBuffer()), meta };
     }
     if (fs.existsSync(audioFile(clientId, id))) {
       return { bytes: fs.readFileSync(audioFile(clientId, id)), meta };
@@ -111,4 +114,19 @@ export async function readRecording(
   } catch {
     return null;
   }
+}
+
+/** Removes one recording: audio blob first, then its index entry. */
+export async function deleteRecording(clientId: string, id: string): Promise<boolean> {
+  const entries = await listRecordings(clientId);
+  if (!entries.some((e) => e.id === id)) return false;
+  if (blobConfigured()) {
+    await del(audioBlobPath(clientId, id)).catch(() => {
+      /* already gone is fine — the index entry still gets removed */
+    });
+  } else if (fs.existsSync(audioFile(clientId, id))) {
+    fs.unlinkSync(audioFile(clientId, id));
+  }
+  await writeIndex(clientId, entries.filter((e) => e.id !== id));
+  return true;
 }
