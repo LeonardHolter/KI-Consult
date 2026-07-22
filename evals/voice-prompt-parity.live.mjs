@@ -291,6 +291,21 @@ async function main() {
     /ALLE spørsmål der svaret avhenger av hvilken av de to/i.test(voice) &&
       /er innvendig inkludert i prisen/i.test(voice),
   );
+  // Follow-up regression, same call pattern: the clarifying question now
+  // fired, but when the caller answered "rens" the agent HALLUCINATED that
+  // it was included in the coating. The list only ever said what IS
+  // included, so the model had no fact for "not included" — now inclusion
+  // is closed-world (only what a service's line states) and the coating
+  // line says exterior-only explicitly.
+  check(
+    "inclusion is closed-world: not on the service's line means not included",
+    /inkluderer KUN det som står på dens linje/i.test(voice) &&
+      /Si ALDRI at noe er inkludert uten at listen sier det eksplisitt/i.test(voice),
+  );
+  check(
+    "the coating explicitly excludes interior services",
+    /Forseglingen gjelder KUN lakken utvendig/i.test(voice),
+  );
 
   // Regression 2026-07-21: TTS read the abbreviation "kl." literally as
   // letters instead of saying "klokken".
