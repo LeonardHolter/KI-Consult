@@ -170,7 +170,7 @@ export function useVoiceDemoTest() {
       case "input_audio_buffer.speech_started":
         setAgentState("listening");
         // Caller speech during the shutdown sequence (farewell playing, or
-        // the 1s grace window after it) aborts the hangup.
+        // the 4s grace window after it) aborts the hangup.
         cancelHangup();
         break;
       case "conversation.item.input_audio_transcription.completed": {
@@ -269,12 +269,12 @@ export function useVoiceDemoTest() {
         break;
       case "output_audio_buffer.stopped":
         if (agentState === "speaking") setAgentState("idle");
-        // The farewell has finished playing — hang up after a 1s grace
+        // The farewell has finished playing — hang up after a 4s grace
         // window so the caller can still jump in and stop the shutdown.
         if (hangupPendingRef.current) {
           if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
-          hangupTimerRef.current = setTimeout(completeHangup, 1000);
-          pushEvent("out", "finish_session — lyd ferdig, legger på om 1 sekund", {});
+          hangupTimerRef.current = setTimeout(completeHangup, 4000);
+          pushEvent("out", "finish_session — lyd ferdig, legger på om 4 sekunder", {});
         }
         break;
       case "output_audio_buffer.cleared":
