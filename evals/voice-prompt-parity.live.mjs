@@ -281,6 +281,13 @@ async function main() {
     "the implausible-name rule is also referenced from the Kontaktinfo flow step",
     /Lyder svaret IKKE som et navn/i.test(voice),
   );
+  // Per Leonard 2026-07-22: the name is NOT read back — short receipt, move
+  // on. Only the phone number gets the digit-by-digit readback.
+  check(
+    "the name is not repeated back to the caller",
+    /Navnet skal du IKKE gjenta tilbake/i.test(voice) &&
+      /IKKE gjenta det tilbake — kvitter kort/i.test(voice),
+  );
 
   // Regression (Sabah, both surfaces): «er innvendig inkludert i prisen?»
   // got an answer that ASSUMED vask (voice) or rens (chat) instead of
