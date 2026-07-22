@@ -290,6 +290,16 @@ export function useVoiceDemoTest() {
       }
       case "output_audio_buffer.started":
         setAgentState("speaking");
+        // The closing audio is actually playing — the short "audio never
+        // came" safety timer must not kill it mid-sentence (a booking tool
+        // round-trip plus a long closing line once ate the whole 12s budget
+        // and the hangup cut the final words). From here the stopped event
+        // owns the hangup; keep only a generous stuck-stream fallback.
+        if (hangupPendingRef.current) {
+          if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
+          hangupTimerRef.current = setTimeout(completeHangup, 60000);
+          pushEvent("out", "finish_session — lyd i gang, venter på at den spilles ferdig", {});
+        }
         break;
       case "output_audio_buffer.stopped":
         if (agentState === "speaking") setAgentState("idle");
