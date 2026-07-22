@@ -1,0 +1,30 @@
+// Streams one recording's audio to the admin review panel's <audio>
+// element. Auth per request (session cookie), so private blobs stay
+// private — no direct storage URL ever reaches the browser.
+
+import { getProfile } from "@/lib/portal/data";
+import { readRecording } from "@/lib/voiceRecordings";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const profile = await getProfile();
+  if (!profile || profile.role !== "admin") {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+  const clientId = new URL(req.url).searchParams.get("clientId");
+  if (!clientId) return Response.json({ error: "no_client" }, { status: 400 });
+
+  const { id } = await params;
+  // The id is only honored if it exists in the client's index, so a crafted
+  // path can never reach another client's (or non-recording) blob.
+  const rec = await readRecording(clientId, id);
+  if (!rec) return Response.json({ error: "not_found" }, { status: 404 });
+
+  return new Response(rec.bytes as BodyInit, {
+    headers: {
+      "Content-Type": rec.mimeType,
+      "Cache-Control": "private, max-age=3600",
+    },
+  });
+}

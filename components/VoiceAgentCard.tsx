@@ -50,8 +50,67 @@ export default function VoiceAgentCard({
   // believes it already hung up and never re-calls the tool.
   const hangupCallIdRef = useRef<string | null>(null);
 
+  // Call recording for the admin review panel: mic + agent audio are mixed
+  // into one MediaRecorder track and posted to the recordings API when the
+  // call ends. The WebRTC audio never touches our backend, so recording in
+  // the browser is the only place the conversation can be captured at all.
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordChunksRef = useRef<Blob[]>([]);
+  const recordCtxRef = useRef<AudioContext | null>(null);
+  const recordDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const recordStartedAtRef = useRef<number>(0);
+
+  // Stops the recorder and uploads what it captured. Fire-and-forget: a
+  // failed upload must never break the hangup path the user is on.
+  const stopRecordingAndUpload = useCallback(() => {
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    const ctx = recordCtxRef.current;
+    recordCtxRef.current = null;
+    recordDestRef.current = null;
+    if (!recorder) return;
+
+    const startedAt = recordStartedAtRef.current;
+    recordStartedAtRef.current = 0;
+    const finish = () => {
+      void ctx?.close().catch(() => {});
+      const chunks = recordChunksRef.current;
+      recordChunksRef.current = [];
+      if (!startedAt || chunks.length === 0) return;
+      const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+      // A call that never really started (a couple of KB of container
+      // headers) isn't worth reviewing or storing.
+      if (blob.size < 20 * 1024) return;
+      const durationSeconds = (Date.now() - startedAt) / 1000;
+      const params = new URLSearchParams({
+        startedAt: new Date(startedAt).toISOString(),
+        durationSeconds: String(durationSeconds),
+      });
+      if (clientId) params.set("clientId", clientId);
+      fetch(`/api/portal/voice-agent/recordings?${params}`, {
+        method: "POST",
+        headers: { "Content-Type": blob.type },
+        body: blob,
+      }).catch(() => {
+        /* best-effort — the call itself already ended fine */
+      });
+    };
+
+    if (recorder.state === "inactive") {
+      finish();
+    } else {
+      recorder.onstop = finish;
+      try {
+        recorder.stop();
+      } catch {
+        finish();
+      }
+    }
+  }, [clientId]);
+
   const cleanup = useCallback(() => {
     watchdogRef.current?.dispose();
+    stopRecordingAndUpload();
     hangupPendingRef.current = false;
     if (hangupTimerRef.current) {
       clearTimeout(hangupTimerRef.current);
@@ -64,7 +123,7 @@ export default function VoiceAgentCard({
     pcRef.current = null;
     micRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
-  }, []);
+  }, [stopRecordingAndUpload]);
 
   // Reports the finished call's duration + token usage — the only place any
   // of this is ever learned, since the WebRTC audio is a direct browser<->
@@ -320,6 +379,32 @@ export default function VoiceAgentCard({
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
 
+      // Recording mix: both sides of the call feed one destination node,
+      // whose stream the MediaRecorder captures. Safari has no webm/opus —
+      // fall through to whatever container the browser can produce.
+      try {
+        const recCtx = new AudioContext();
+        const recDest = recCtx.createMediaStreamDestination();
+        recCtx.createMediaStreamSource(mic).connect(recDest);
+        recordCtxRef.current = recCtx;
+        recordDestRef.current = recDest;
+        const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) =>
+          MediaRecorder.isTypeSupported(t),
+        );
+        const recorder = new MediaRecorder(recDest.stream, {
+          ...(mimeType ? { mimeType } : {}),
+          audioBitsPerSecond: 32000,
+        });
+        recordChunksRef.current = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordChunksRef.current.push(e.data);
+        };
+        recorder.start(1000);
+        recorderRef.current = recorder;
+      } catch {
+        // No recording support — the call itself must still work.
+      }
+
       let audioEl = audioRef.current;
       if (!audioEl) {
         audioEl = new Audio();
@@ -328,6 +413,16 @@ export default function VoiceAgentCard({
       }
       pc.ontrack = (e) => {
         audioEl.srcObject = e.streams[0];
+        // The agent's side of the recording mix.
+        const recCtx = recordCtxRef.current;
+        const recDest = recordDestRef.current;
+        if (recCtx && recDest) {
+          try {
+            recCtx.createMediaStreamSource(e.streams[0]).connect(recDest);
+          } catch {
+            /* recording stays mic-only rather than failing the call */
+          }
+        }
       };
       pc.addTrack(mic.getTracks()[0], mic);
 
@@ -343,6 +438,7 @@ export default function VoiceAgentCard({
       dc.onopen = () => {
         setUiState("active");
         startedAtRef.current = Date.now();
+        recordStartedAtRef.current = Date.now();
         dc.send(JSON.stringify({ type: "response.create" }));
         watchdogRef.current?.expectReply();
       };
