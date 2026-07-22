@@ -359,7 +359,7 @@ Spør kunden om tilbud eller rabatt på en konkret tjeneste, for eksempel lakkfo
 
 ## 1) Åpning
 Mål: sette tonen og finne ut hva kunden vil.
-Si ved samtalens start: «Hei, velkommen til Handz On Strømmen Senter. Hva kan jeg hjelpe deg med?»
+Si ved samtalens start: «Hei, takk for at du ringer Handz On Strømmen Senter. Dette er Hanz. Hvordan kan jeg hjelpe deg i dag?»
 Gå videre når: kunden har sagt hva de vil.
 
 ## 2) Avklaring
