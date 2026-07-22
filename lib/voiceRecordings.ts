@@ -1,14 +1,21 @@
 import fs from "fs";
 import path from "path";
-import { del, get, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 
 /* ------------------------------------------------------------------ */
 /* Voice-call recordings — the browser mixes mic + agent audio into    */
 /* one MediaRecorder track and posts the result here on hangup. Stored */
 /* as PRIVATE blobs (they are real conversations), served only through */
-/* the authenticated playback route; a per-client index.json carries   */
-/* the metadata the review panel lists. Mirrors the slots.ts storage   */
-/* idiom: Vercel Blob when configured, local data/ dir in dev.         */
+/* the authenticated playback route.                                   */
+/*                                                                     */
+/* Design constraint learned the hard way: Vercel Blob caches          */
+/* OVERWRITTEN paths for up to ~60s, so a shared mutable index.json    */
+/* plus read-modify-write deletion resurrected deleted entries (delete */
+/* B read a stale index that still contained just-deleted A, and wrote */
+/* A back). Therefore: NO shared mutable state. Every recording is two */
+/* immutable blobs — the audio and a {id}.meta.json written exactly    */
+/* once — listing enumerates the store, and deletion deletes the two   */
+/* blobs. There is nothing left to resurrect from.                     */
 /* ------------------------------------------------------------------ */
 
 export type RecordingMeta = {
@@ -18,53 +25,61 @@ export type RecordingMeta = {
   sizeBytes: number;
   mimeType: string;
   /** Who made the call. Admin test calls are hidden from the client's
-   *  dashboard; missing (pre-field recordings) is treated as "admin" —
-   *  every recording from before this field existed was an admin test. */
+   *  dashboard; missing (pre-field recordings) is treated as "admin". */
   recordedBy?: "admin" | "client";
 };
 
-/** Newest first. Capped so the index (and the panel) can't grow unbounded. */
-const MAX_INDEX_ENTRIES = 200;
+/** Newest first; the panel never renders more than this. */
+const MAX_LISTED = 200;
 
 const DATA_DIR = path.join(process.cwd(), "data");
+const META_SUFFIX = ".meta.json";
 
-const indexBlobPath = (clientId: string) => `${clientId}/voice-recordings/index.json`;
-const audioBlobPath = (clientId: string, id: string) => `${clientId}/voice-recordings/${id}`;
+const prefix = (clientId: string) => `${clientId}/voice-recordings/`;
+const audioBlobPath = (clientId: string, id: string) => `${prefix(clientId)}${id}`;
+const metaBlobPath = (clientId: string, id: string) => `${prefix(clientId)}${id}${META_SUFFIX}`;
 
-const indexFile = (clientId: string) =>
-  path.join(DATA_DIR, clientId, "voice-recordings", "index.json");
-const audioFile = (clientId: string, id: string) =>
-  path.join(DATA_DIR, clientId, "voice-recordings", id);
+const recordingsDir = (clientId: string) => path.join(DATA_DIR, clientId, "voice-recordings");
+const audioFile = (clientId: string, id: string) => path.join(recordingsDir(clientId), id);
+const metaFile = (clientId: string, id: string) =>
+  path.join(recordingsDir(clientId), `${id}${META_SUFFIX}`);
 
 const blobConfigured = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
-export async function listRecordings(clientId: string): Promise<RecordingMeta[]> {
+async function readJsonBlob(pathname: string): Promise<RecordingMeta | null> {
   try {
-    if (blobConfigured()) {
-      const result = await get(indexBlobPath(clientId), { access: "private" });
-      if (!result || result.statusCode !== 200 || !result.stream) return [];
-      return JSON.parse(await new Response(result.stream).text()) as RecordingMeta[];
-    }
-    if (fs.existsSync(indexFile(clientId))) {
-      return JSON.parse(fs.readFileSync(indexFile(clientId), "utf-8"));
-    }
-    return [];
+    const result = await get(pathname, { access: "private" });
+    if (!result || result.statusCode !== 200 || !result.stream) return null;
+    return JSON.parse(await new Response(result.stream).text()) as RecordingMeta;
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function writeIndex(clientId: string, entries: RecordingMeta[]) {
-  if (blobConfigured()) {
-    await put(indexBlobPath(clientId), JSON.stringify(entries, null, 2), {
-      access: "private",
-      contentType: "application/json",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
-  } else {
-    fs.mkdirSync(path.dirname(indexFile(clientId)), { recursive: true });
-    fs.writeFileSync(indexFile(clientId), JSON.stringify(entries, null, 2));
+export async function listRecordings(clientId: string): Promise<RecordingMeta[]> {
+  try {
+    let metas: RecordingMeta[];
+    if (blobConfigured()) {
+      const { blobs } = await list({ prefix: prefix(clientId), limit: 1000 });
+      const metaPaths = blobs
+        .map((b) => b.pathname)
+        .filter((p) => p.endsWith(META_SUFFIX));
+      metas = (await Promise.all(metaPaths.map(readJsonBlob))).filter(
+        (m): m is RecordingMeta => m !== null,
+      );
+    } else if (fs.existsSync(recordingsDir(clientId))) {
+      metas = fs
+        .readdirSync(recordingsDir(clientId))
+        .filter((f) => f.endsWith(META_SUFFIX))
+        .map((f) => JSON.parse(fs.readFileSync(path.join(recordingsDir(clientId), f), "utf-8")));
+    } else {
+      return [];
+    }
+    return metas
+      .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
+      .slice(0, MAX_LISTED);
+  } catch {
+    return [];
   }
 }
 
@@ -75,19 +90,23 @@ export async function saveRecording(
 ): Promise<RecordingMeta> {
   const full: RecordingMeta = { ...meta, sizeBytes: bytes.byteLength };
   if (blobConfigured()) {
+    // Both blobs are write-once (unique id per call) — allowOverwrite stays
+    // off on purpose so nothing here can ever become mutable shared state.
     await put(audioBlobPath(clientId, meta.id), bytes, {
       access: "private",
       contentType: meta.mimeType,
       addRandomSuffix: false,
-      allowOverwrite: true,
+    });
+    await put(metaBlobPath(clientId, meta.id), JSON.stringify(full, null, 2), {
+      access: "private",
+      contentType: "application/json",
+      addRandomSuffix: false,
     });
   } else {
-    fs.mkdirSync(path.dirname(audioFile(clientId, meta.id)), { recursive: true });
+    fs.mkdirSync(recordingsDir(clientId), { recursive: true });
     fs.writeFileSync(audioFile(clientId, meta.id), bytes);
+    fs.writeFileSync(metaFile(clientId, meta.id), JSON.stringify(full, null, 2));
   }
-  const existing = await listRecordings(clientId);
-  const next = [full, ...existing.filter((e) => e.id !== full.id)].slice(0, MAX_INDEX_ENTRIES);
-  await writeIndex(clientId, next);
   return full;
 }
 
@@ -99,16 +118,19 @@ export async function readRecording(
   clientId: string,
   id: string,
 ): Promise<{ bytes: Buffer; meta: RecordingMeta } | null> {
-  const meta = (await listRecordings(clientId)).find((e) => e.id === id);
-  if (!meta) return null;
   try {
     if (blobConfigured()) {
+      const meta = await readJsonBlob(metaBlobPath(clientId, id));
+      if (!meta) return null;
       const result = await get(audioBlobPath(clientId, id), { access: "private" });
       if (!result || result.statusCode !== 200 || !result.stream) return null;
       return { bytes: Buffer.from(await new Response(result.stream).arrayBuffer()), meta };
     }
-    if (fs.existsSync(audioFile(clientId, id))) {
-      return { bytes: fs.readFileSync(audioFile(clientId, id)), meta };
+    if (fs.existsSync(metaFile(clientId, id)) && fs.existsSync(audioFile(clientId, id))) {
+      return {
+        bytes: fs.readFileSync(audioFile(clientId, id)),
+        meta: JSON.parse(fs.readFileSync(metaFile(clientId, id), "utf-8")),
+      };
     }
     return null;
   } catch {
@@ -116,17 +138,18 @@ export async function readRecording(
   }
 }
 
-/** Removes one recording: audio blob first, then its index entry. */
+/** Removes one recording: both its blobs. No index exists, so a deletion
+ *  can never be undone by a concurrent stale read elsewhere. */
 export async function deleteRecording(clientId: string, id: string): Promise<boolean> {
-  const entries = await listRecordings(clientId);
-  if (!entries.some((e) => e.id === id)) return false;
   if (blobConfigured()) {
-    await del(audioBlobPath(clientId, id)).catch(() => {
-      /* already gone is fine — the index entry still gets removed */
-    });
-  } else if (fs.existsSync(audioFile(clientId, id))) {
-    fs.unlinkSync(audioFile(clientId, id));
+    const meta = await readJsonBlob(metaBlobPath(clientId, id));
+    if (!meta) return false;
+    await del(metaBlobPath(clientId, id)).catch(() => {});
+    await del(audioBlobPath(clientId, id)).catch(() => {});
+    return true;
   }
-  await writeIndex(clientId, entries.filter((e) => e.id !== id));
+  if (!fs.existsSync(metaFile(clientId, id))) return false;
+  fs.unlinkSync(metaFile(clientId, id));
+  if (fs.existsSync(audioFile(clientId, id))) fs.unlinkSync(audioFile(clientId, id));
   return true;
 }

@@ -22,6 +22,11 @@ vi.mock("@vercel/blob", () => ({
   del: vi.fn(async (key: string) => {
     blobStore.delete(key);
   }),
+  list: vi.fn(async ({ prefix }: { prefix: string }) => ({
+    blobs: [...blobStore.keys()]
+      .filter((k) => k.startsWith(prefix))
+      .map((pathname) => ({ pathname })),
+  })),
 }));
 
 // Switchable auth: each test decides who is calling.
@@ -170,6 +175,38 @@ describe("visibility — the both-dashboards contract", () => {
 });
 
 describe("deletion", () => {
+  it("a deletion STAYS deleted through later uploads and deletes (no index to resurrect from)", async () => {
+    // The live bug this pins down: with a shared index.json, deleting B
+    // read a stale index that still contained just-deleted A and wrote A
+    // back — recordings reappeared after every delete. The immutable
+    // per-recording layout has no shared state, so later mutations cannot
+    // resurrect anything.
+    asClient();
+    const a = await upload(`startedAt=2026-07-22T10:00:00.000Z&durationSeconds=10`);
+    const b = await upload(`startedAt=2026-07-22T10:05:00.000Z&durationSeconds=10`);
+
+    asAdmin();
+    const delOne = (id: string) =>
+      DELETE_ONE(
+        new Request(`http://test/api/portal/voice-agent/recordings/${id}?clientId=${CLIENT_ID}`, {
+          method: "DELETE",
+        }),
+        { params: Promise.resolve({ id }) },
+      );
+    expect((await delOne(a.id)).status).toBe(200);
+    expect((await delOne(b.id)).status).toBe(200);
+
+    // Later mutations after the deletes...
+    asClient();
+    const c = await upload(`startedAt=2026-07-22T10:10:00.000Z&durationSeconds=10`);
+
+    // ...and neither A nor B is back, anywhere.
+    asAdmin();
+    expect((await list(`clientId=${CLIENT_ID}`)).map((r) => r.id)).toEqual([c.id]);
+    expect((await play(a.id, `clientId=${CLIENT_ID}`)).status).toBe(404);
+    expect((await play(b.id, `clientId=${CLIENT_ID}`)).status).toBe(404);
+  });
+
   it("only an admin can delete; the recording is then gone for everyone", async () => {
     asClient();
     const rec = await upload(`startedAt=2026-07-22T10:00:00.000Z&durationSeconds=42`);
