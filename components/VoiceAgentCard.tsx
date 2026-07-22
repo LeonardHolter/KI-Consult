@@ -221,13 +221,22 @@ export default function VoiceAgentCard({
         break;
       case "output_audio_buffer.stopped":
         setAgentSpeaking(false);
-        // The farewell has finished playing — now the hangup can land.
-        if (hangupPendingRef.current) completeHangup();
+        // The farewell has finished playing — hang up after a 1s grace
+        // window so the caller can still jump in and stop the shutdown.
+        if (hangupPendingRef.current) {
+          if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
+          hangupTimerRef.current = setTimeout(completeHangup, 1000);
+        }
         break;
       case "output_audio_buffer.cleared":
         setAgentSpeaking(false);
         // cleared = the caller interrupted the farewell — they have more to
         // say, so the call continues instead of hanging up on them.
+        cancelHangup();
+        break;
+      case "input_audio_buffer.speech_started":
+        // Caller speech during the shutdown sequence (farewell playing, or
+        // the 1s grace window after it) aborts the hangup.
         cancelHangup();
         break;
       case "error":

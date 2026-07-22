@@ -325,11 +325,14 @@ async function main() {
   );
   check(
     "closing turn is forced short — no directions, max two sentences",
-    /maks to setninger/i.test(voice) && /leveringen ble nevnt i steg 4/i.test(voice),
+    /maks to setninger/i.test(voice) && /IKKE legg til veibeskrivelse/i.test(voice),
   );
+  // Per Leonard 2026-07-22: the agent volunteered the Elkjøp/P3 directions
+  // while proposing slots. Directions are answer-only knowledge now.
   check(
-    "directions moved to the slot-selection step, not the closing",
-    /Denne informasjonen hører hjemme HER, ikke i avslutningen/i.test(voice),
+    "directions are only given when the caller asks, never volunteered",
+    /KUN når kunden spør hvor dere holder til/i.test(voice) &&
+      /ALDRI uoppfordret/i.test(voice),
   );
   check(
     "calls never just stop, and never hang up without a spoken farewell",
