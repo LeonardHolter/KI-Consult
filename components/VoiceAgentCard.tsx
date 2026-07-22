@@ -14,11 +14,16 @@ type UiState = "idle" | "connecting" | "active" | "error";
 export default function VoiceAgentCard({
   clientId,
   unavailable,
+  variant = "full",
 }: {
   clientId?: string;
   /** Shows a disabled placeholder instead of a working call button — for
    *  rolling the feature out to admin first while it's still being tuned. */
   unavailable?: boolean;
+  /** "full" (admin): status text + live transcript + buttons.
+   *  "minimal" (client dashboard): just a big centered circle that pulses
+   *  while the agent speaks — no live transcription. */
+  variant?: "full" | "minimal";
 }) {
   const [uiState, setUiState] = useState<UiState>("idle");
   const [agentSpeaking, setAgentSpeaking] = useState(false);
@@ -494,6 +499,43 @@ export default function VoiceAgentCard({
           ? "Agenten snakker…"
           : "Lytter — si noe"
         : "Klar";
+
+  // Client-facing view: one big tappable circle, no live transcript — the
+  // conversation is heard, not read. Errors still surface as text; a mute
+  // failure would otherwise look like a dead button.
+  if (variant === "minimal") {
+    const inCall = uiState === "active" || uiState === "connecting";
+    return (
+      <div className="vacm">
+        <style>{`
+          .vacm { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 14px; padding: 44px 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-height: 320px; }
+          .vacm-circle { width: 148px; height: 148px; border-radius: 50%; border: none; cursor: pointer; transition: background .3s ease, box-shadow .3s ease; background: ${uiState === "active" ? "radial-gradient(circle at 50% 38%, #1ACE87, #15C07C)" : uiState === "connecting" ? "#d9d5c6" : "radial-gradient(circle at 50% 38%, #20241a, #16190f)"}; box-shadow: ${uiState === "active" ? "0 0 0 10px rgba(21,192,124,.14)" : "0 10px 30px rgba(22,25,15,.18)"}; }
+          .vacm-circle.speaking { animation: vacm-pulse 1.05s ease-in-out infinite; }
+          .vacm-circle.connecting { animation: vacm-breathe 1.6s ease-in-out infinite; }
+          @keyframes vacm-pulse { 0%,100% { transform: scale(1); box-shadow: 0 0 0 10px rgba(21,192,124,.14); } 50% { transform: scale(1.1); box-shadow: 0 0 0 24px rgba(21,192,124,.07); } }
+          @keyframes vacm-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+          .vacm-label { font-family: var(--font-space-mono), monospace; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; font-weight: 700; color: ${uiState === "active" ? "#0d6b47" : "#9a9a8c"}; }
+          .vacm-err { font-size: 13.5px; color: #c2562c; max-width: 46ch; text-align: center; }
+        `}</style>
+        <button
+          type="button"
+          aria-label={inCall ? "Legg på" : "Ring agenten"}
+          className={`vacm-circle ${agentSpeaking ? "speaking" : ""} ${uiState === "connecting" ? "connecting" : ""}`}
+          onClick={inCall ? stop : start}
+        />
+        <div className="vacm-label">
+          {uiState === "connecting"
+            ? "Kobler til…"
+            : uiState === "active"
+              ? agentSpeaking
+                ? "Agenten snakker"
+                : "Lytter — si noe"
+              : "Trykk for å ringe agenten"}
+        </div>
+        {errorMsg && <div className="vacm-err">{errorMsg}</div>}
+      </div>
+    );
+  }
 
   if (unavailable) {
     return (

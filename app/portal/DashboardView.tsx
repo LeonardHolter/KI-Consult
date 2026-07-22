@@ -433,10 +433,11 @@ export default function PortalDashboard({
           høyre — det er nøyaktig samme bot som kundene dine snakker med.
         </p>
 
-        <VoiceAgentCard clientId={clientId} unavailable={!overviewHref} />
-        {/* Recordings are real conversations — the review panel is an
-            admin-only surface, same gate as the voice card itself. */}
-        {overviewHref && clientId && <VoiceRecordingsPanel clientId={clientId} />}
+        {/* Admin gets the full card (status + live transcript); a client
+            account gets the minimal one — a pulsing circle, no transcript.
+            The conversation is heard, and reviewed via the recordings. */}
+        <VoiceAgentCard clientId={clientId} variant={overviewHref ? "full" : "minimal"} />
+        {clientId && <VoiceRecordingsPanel clientId={clientId} />}
         <div style={{ height: 20 }} />
 
         <div className="ctp-card">

@@ -87,7 +87,7 @@ export default function VoiceRecordingsPanel({ clientId }: { clientId: string })
         </button>
       </div>
       <p style={{ margin: "6px 0 12px", fontSize: 12.5, color: MUTED, lineHeight: 1.5 }}>
-        Hver samtale med taleagenten tas opp og kan spilles av her. Kun synlig for admin.
+        Hver samtale med taleagenten tas opp og kan spilles av her.
       </p>
 
       {recordings === null ? (

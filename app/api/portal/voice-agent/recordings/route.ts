@@ -50,12 +50,13 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   const profile = await getProfile();
-  // Review is admin-only: recordings are real conversations, and the
-  // dashboard's voice card is an admin surface today.
-  if (!profile || profile.role !== "admin") {
-    return Response.json({ error: "forbidden" }, { status: 403 });
-  }
-  const clientId = new URL(req.url).searchParams.get("clientId");
+  if (!profile) return Response.json({ error: "forbidden" }, { status: 403 });
+  // Admin picks the client; a client account is pinned to its own client —
+  // the query param is ignored for them, never trusted.
+  const clientId =
+    profile.role === "admin"
+      ? new URL(req.url).searchParams.get("clientId")
+      : profile.client_id;
   if (!clientId) return Response.json({ error: "no_client" }, { status: 400 });
   return Response.json({ recordings: await listRecordings(clientId) });
 }
