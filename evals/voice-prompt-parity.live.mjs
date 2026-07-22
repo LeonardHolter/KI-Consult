@@ -361,8 +361,9 @@ async function main() {
   // barge-in cancels the pending hangup client-side and step 7 re-closes.
   console.log("\n-- presumptive one-turn closing, kept short --");
   check(
-    "closing turn = booking confirmation + «god dag videre» + finish_session together",
-    /ønsker jeg deg en god dag videre/i.test(voice) &&
+    "closing turn = booking confirmation + 5s auto-hangup notice + finish_session together",
+    /kan du avslutte samtalen nå/i.test(voice) &&
+      /avsluttes den automatisk om fem sekunder/i.test(voice) &&
       /kall finish_session i SAMME replikk/i.test(voice),
   );
   check(
