@@ -44,7 +44,8 @@ export default function VoiceDemoTuner({
   clientName?: string;
 }) {
   const [settings, setSettings] = useState<FullSettings>(initialSettings);
-  const [savedInstructions, setSavedInstructions] = useState(initialSettings.instructions);
+  const [savedSettings, setSavedSettings] = useState<FullSettings>(initialSettings);
+  const savedInstructions = savedSettings.instructions;
   const [history, setHistory] = useState(initialHistory);
   const [showDiff, setShowDiff] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -61,7 +62,14 @@ export default function VoiceDemoTuner({
   const td = settings.turnDetection;
   const setTd = (next: TurnDetectionConfig) => set("turnDetection", next);
 
-  const dirty = settings.instructions !== savedInstructions;
+  // Dirty must cover EVERY setting, not just the prompt — a toggled noise
+  // reduction or voice with an unchanged prompt used to leave the save
+  // button disabled, making setting-only changes unpublishable.
+  const promptDirty = settings.instructions !== savedInstructions;
+  const dirty = useMemo(
+    () => JSON.stringify(settings) !== JSON.stringify(savedSettings),
+    [settings, savedSettings],
+  );
 
   const liveDiff = useMemo(
     () => (showDiff ? diffLines(savedInstructions, settings.instructions) : []),
@@ -85,11 +93,14 @@ export default function VoiceDemoTuner({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Lagring feilet");
-      if (dirty) {
+      // The prompt-history snapshot only makes sense when the PROMPT changed
+      // — a settings-only save (voice, VAD, noise reduction) must not stack
+      // identical prompt snapshots.
+      if (promptDirty) {
         setHistory((prev) => [{ instructions: savedInstructions, savedAt: new Date().toISOString() }, ...prev].slice(0, 20));
       }
-      setSavedInstructions(settings.instructions);
-      setSaveMsg(clientId ? "Lagret — live på dashbordet nå." : "Lagret — live på nettsiden nå.");
+      setSavedSettings(settings);
+      setSaveMsg(clientId ? "Publisert — live på dashbordet nå." : "Lagret — live på nettsiden nå.");
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : "Noe gikk galt.");
     } finally {
@@ -326,9 +337,13 @@ export default function VoiceDemoTuner({
             />
             <div className="vdt-row" style={{ marginTop: 10 }}>
               <button type="button" className="vdt-btn primary" onClick={save} disabled={saving || !dirty}>
-                {saving ? "Lagrer…" : "Lagre"}
+                {saving
+                  ? "Publiserer…"
+                  : clientId
+                    ? "Publiser til dashbordet"
+                    : "Lagre"}
               </button>
-              {dirty && (
+              {promptDirty && (
                 <button type="button" className="vdt-btn ghost" onClick={() => setShowDiff((v) => !v)}>
                   {showDiff ? "Skjul endringer" : "Vis endringer"}
                 </button>
@@ -341,7 +356,7 @@ export default function VoiceDemoTuner({
               {saveMsg && <span className="vdt-msg">{saveMsg}</span>}
             </div>
 
-            {showDiff && dirty && (
+            {showDiff && promptDirty && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 12, color: "#9a9a8c", marginBottom: 6 }}>
                   +{liveDiffCounts.added} −{liveDiffCounts.removed} mot sist lagret
