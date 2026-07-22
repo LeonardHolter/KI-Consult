@@ -110,6 +110,7 @@ export default function PortalDashboard({
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [confirmingClearSandbox, setConfirmingClearSandbox] = useState(false);
   const [clearingSandbox, setClearingSandbox] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   // Which booking store the grid is showing: the real one, or the isolated
   // sandbox the voice agent books into while it's being tested.
   const [calScope, setCalScope] = useState<"live" | "sandbox">("live");
@@ -188,6 +189,23 @@ export default function PortalDashboard({
     // component mounted (only the ?client= search param changes), so without
     // this dependency the interval would keep polling the previous client.
   }, [fetchCalendarView]);
+
+  // Manual refresh: the grid already polls every 10s, but after a test call
+  // books something you want to see it NOW, not up to ten seconds later.
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      const d = await fetchCalendarView();
+      if (d) {
+        setSlots(d.slots ?? []);
+        setCalConnected(Boolean(d.connected));
+        setCalName(d.calendarName);
+        setLastSync(new Date());
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // Admin: wipe all sandbox bookings so a test round starts from a clean
   // grid. Two-step confirm inline; the endpoint is admin-only server-side.
@@ -492,6 +510,24 @@ export default function PortalDashboard({
                   </button>
                 </span>
               )}
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={refreshing}
+                style={{
+                  border: "1px solid #9a9a8c66",
+                  background: "transparent",
+                  color: "#16190f",
+                  borderRadius: 8,
+                  padding: "4px 12px",
+                  fontSize: 12.5,
+                  cursor: refreshing ? "default" : "pointer",
+                  fontFamily: "inherit",
+                  opacity: refreshing ? 0.6 : 1,
+                }}
+              >
+                {refreshing ? "Oppdaterer…" : "Oppdater"}
+              </button>
               {overviewHref && clientId && calScope === "sandbox" && (
                 <button
                   type="button"
