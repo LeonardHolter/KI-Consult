@@ -75,13 +75,21 @@ export default function VoiceRecordingsPanel({
     }
   }, [clientId]);
 
+  // Poll like the calendar grid does (it uses 10s): the storage is shared
+  // between the admin and client dashboards, so an admin deleting a
+  // recording — or a new call landing — must show up here without a page
+  // reload. Slightly slower cadence since this list changes rarely.
   useEffect(() => {
     let cancelled = false;
-    load().then((list) => {
-      if (!cancelled) setRecordings(list);
-    });
+    const poll = () =>
+      load().then((list) => {
+        if (!cancelled) setRecordings(list);
+      });
+    void poll();
+    const iv = setInterval(poll, 15_000);
     return () => {
       cancelled = true;
+      clearInterval(iv);
     };
   }, [load]);
 
