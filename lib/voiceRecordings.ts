@@ -17,6 +17,10 @@ export type RecordingMeta = {
   durationSeconds: number;
   sizeBytes: number;
   mimeType: string;
+  /** Who made the call. Admin test calls are hidden from the client's
+   *  dashboard; missing (pre-field recordings) is treated as "admin" —
+   *  every recording from before this field existed was an admin test. */
+  recordedBy?: "admin" | "client";
 };
 
 /** Newest first. Capped so the index (and the panel) can't grow unbounded. */
@@ -87,21 +91,21 @@ export async function saveRecording(
   return full;
 }
 
-/** Returns the audio bytes + content type for the playback route, or null. */
+/** Returns the audio bytes + metadata for the playback route, or null. */
 export async function readRecording(
   clientId: string,
   id: string,
-): Promise<{ bytes: Buffer | ReadableStream; mimeType: string } | null> {
+): Promise<{ bytes: Buffer | ReadableStream; meta: RecordingMeta } | null> {
   const meta = (await listRecordings(clientId)).find((e) => e.id === id);
   if (!meta) return null;
   try {
     if (blobConfigured()) {
       const result = await get(audioBlobPath(clientId, id), { access: "private" });
       if (!result || result.statusCode !== 200 || !result.stream) return null;
-      return { bytes: result.stream, mimeType: meta.mimeType };
+      return { bytes: result.stream, meta };
     }
     if (fs.existsSync(audioFile(clientId, id))) {
-      return { bytes: fs.readFileSync(audioFile(clientId, id)), mimeType: meta.mimeType };
+      return { bytes: fs.readFileSync(audioFile(clientId, id)), meta };
     }
     return null;
   } catch {

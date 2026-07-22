@@ -13,6 +13,7 @@ type RecordingMeta = {
   durationSeconds: number;
   sizeBytes: number;
   mimeType: string;
+  recordedBy?: "admin" | "client";
 };
 
 const INK = "#16190f";
@@ -34,7 +35,16 @@ function fmtDuration(s: number): string {
   return m > 0 ? `${m} min ${sec} s` : `${sec} s`;
 }
 
-export default function VoiceRecordingsPanel({ clientId }: { clientId: string }) {
+export default function VoiceRecordingsPanel({
+  clientId,
+  showOrigin,
+}: {
+  clientId: string;
+  /** Admin view: badge client-made calls so real conversations stand out
+   *  from admin test calls. Meaningless for the client (they only ever see
+   *  their own calls), so it's off there. */
+  showOrigin?: boolean;
+}) {
   const [recordings, setRecordings] = useState<RecordingMeta[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -116,7 +126,26 @@ export default function VoiceRecordingsPanel({ clientId }: { clientId: string })
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: 13.5, color: INK }}>{fmtWhen(r.startedAt)}</span>
+                <span style={{ fontSize: 13.5, color: INK }}>
+                  {fmtWhen(r.startedAt)}
+                  {showOrigin && r.recordedBy === "client" && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                        color: "#0d6b47",
+                        background: "#15c07c22",
+                        borderRadius: 6,
+                        padding: "2px 7px",
+                      }}
+                    >
+                      Kunde
+                    </span>
+                  )}
+                </span>
                 <span style={{ fontSize: 12.5, color: MUTED }}>
                   {fmtDuration(r.durationSeconds)} · {(r.sizeBytes / 1024).toFixed(0)} kB
                 </span>

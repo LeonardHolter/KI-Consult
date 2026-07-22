@@ -42,7 +42,15 @@ export async function POST(req: Request) {
 
   const meta = await saveRecording(
     clientId,
-    { id, startedAt, durationSeconds: Math.max(0, Math.round(durationSeconds)), mimeType },
+    {
+      id,
+      startedAt,
+      durationSeconds: Math.max(0, Math.round(durationSeconds)),
+      mimeType,
+      // Who made the call decides where it shows: admin test calls stay
+      // off the client's dashboard, client calls show in both places.
+      recordedBy: profile.role === "admin" ? "admin" : "client",
+    },
     bytes,
   );
   return Response.json({ ok: true, recording: meta });
@@ -58,5 +66,11 @@ export async function GET(req: Request) {
       ? new URL(req.url).searchParams.get("clientId")
       : profile.client_id;
   if (!clientId) return Response.json({ error: "no_client" }, { status: 400 });
-  return Response.json({ recordings: await listRecordings(clientId) });
+  const all = await listRecordings(clientId);
+  // Admin reviews everything; the client only sees their own calls — an
+  // admin's test call never shows on the client dashboard. Recordings from
+  // before recordedBy existed were all admin tests, so missing = admin.
+  const visible =
+    profile.role === "admin" ? all : all.filter((r) => r.recordedBy === "client");
+  return Response.json({ recordings: visible });
 }

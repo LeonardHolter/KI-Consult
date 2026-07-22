@@ -23,10 +23,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // path can never reach another client's (or non-recording) blob.
   const rec = await readRecording(clientId, id);
   if (!rec) return Response.json({ error: "not_found" }, { status: 404 });
+  // Same visibility rule as the listing: a client can only play their own
+  // calls — admin test recordings (incl. pre-recordedBy ones) 404 for them.
+  if (profile.role !== "admin" && rec.meta.recordedBy !== "client") {
+    return Response.json({ error: "not_found" }, { status: 404 });
+  }
 
   return new Response(rec.bytes as BodyInit, {
     headers: {
-      "Content-Type": rec.mimeType,
+      "Content-Type": rec.meta.mimeType,
       "Cache-Control": "private, max-age=3600",
     },
   });

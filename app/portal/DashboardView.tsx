@@ -437,7 +437,9 @@ export default function PortalDashboard({
             account gets the minimal one — a pulsing circle, no transcript.
             The conversation is heard, and reviewed via the recordings. */}
         <VoiceAgentCard clientId={clientId} variant={overviewHref ? "full" : "minimal"} />
-        {clientId && <VoiceRecordingsPanel clientId={clientId} />}
+        {clientId && (
+          <VoiceRecordingsPanel clientId={clientId} showOrigin={Boolean(overviewHref)} />
+        )}
         <div style={{ height: 20 }} />
 
         <div className="ctp-card">
