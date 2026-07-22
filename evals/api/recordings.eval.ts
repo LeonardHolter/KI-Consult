@@ -11,7 +11,9 @@ const blobStore = new Map<string, Buffer | string>();
 vi.mock("@vercel/blob", () => ({
   get: vi.fn(async (key: string) => {
     if (!blobStore.has(key)) return null;
-    return { statusCode: 200, stream: new Response(blobStore.get(key)!).body };
+    const val = blobStore.get(key)!;
+    const body = typeof val === "string" ? val : new Uint8Array(val);
+    return { statusCode: 200, stream: new Response(body).body };
   }),
   put: vi.fn(async (key: string, body: Buffer | string) => {
     blobStore.set(key, body);
