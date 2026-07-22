@@ -447,7 +447,10 @@ export default function PortalDashboard({
             <h2>Ledige tider</h2>
             <div className="ctp-meta">
               <span>{slots[0]?.location ?? "Strømmen Senter"}</span>
-              {overviewHref && clientId && (
+              {/* Clients get the switch too: their voice agent books in the
+                  sandbox while it's being tested, and those bookings are
+                  invisible without the test calendar. */}
+              {clientId && (
                 <span className="ctp-scope">
                   <button
                     type="button"
