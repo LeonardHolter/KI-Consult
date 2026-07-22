@@ -282,6 +282,16 @@ async function main() {
     /Lyder svaret IKKE som et navn/i.test(voice),
   );
 
+  // Regression (Sabah, both surfaces): «er innvendig inkludert i prisen?»
+  // got an answer that ASSUMED vask (voice) or rens (chat) instead of
+  // asking which one — the old rule only covered price questions, so
+  // non-price questions slipped past it.
+  check(
+    "the innvendig ambiguity rule covers ALL answers, not just price questions",
+    /ALLE spørsmål der svaret avhenger av hvilken av de to/i.test(voice) &&
+      /er innvendig inkludert i prisen/i.test(voice),
+  );
+
   // Regression 2026-07-21: TTS read the abbreviation "kl." literally as
   // letters instead of saying "klokken".
   check(
