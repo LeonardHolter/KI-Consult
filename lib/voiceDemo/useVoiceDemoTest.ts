@@ -74,6 +74,10 @@ export function useVoiceDemoTest() {
   // call_id of the pending finish_session, so a cancelled hangup can report
   // back to the model that it must close again.
   const hangupCallIdRef = useRef<string | null>(null);
+  // How many times we've answered a BARE finish_session (no closing spoken)
+  // with say-your-closing-now instructions. Capped so a model stuck in
+  // bare-call mode can't loop forever — after that the safety timers own it.
+  const hangupRecoveriesRef = useRef(0);
   const disconnectRef = useRef<(() => void) | null>(null);
 
   const completeHangup = () => {
@@ -283,9 +287,58 @@ export function useVoiceDemoTest() {
           });
         }
 
-        // Silence recovery lives in the ReplyWatchdog (fed above), which
-        // also covers the case this handler structurally can't: a committed
-        // caller turn where no response.done ever arrives.
+        // The model sometimes calls finish_session as a BARE turn — no
+        // closing line spoken. Left unanswered, the next generic nudge has
+        // no context and the model improvises confusion («samtalen ble ikke
+        // avsluttet ennå») instead of confirming the booking. Answer the
+        // dangling tool call with explicit instructions and ask for the
+        // closing NOW; the armed hangup then completes after its audio.
+        {
+          const output = (ev.response?.output ?? []) as Array<{
+            type?: string;
+            name?: string;
+            content?: Array<{ type?: string }>;
+          }>;
+          const hasAudio = output.some(
+            (i) => i.type === "message" && i.content?.some((c) => c.type === "output_audio"),
+          );
+          const calledFinish = output.some(
+            (i) => i.type === "function_call" && i.name === "finish_session",
+          );
+          if (
+            hangupPendingRef.current &&
+            calledFinish &&
+            !hasAudio &&
+            hangupRecoveriesRef.current < 3
+          ) {
+            hangupRecoveriesRef.current += 1;
+            const callId = hangupCallIdRef.current;
+            const dc = dcRef.current;
+            if (callId && dc && dc.readyState === "open") {
+              const out = {
+                success: true,
+                note: "Opphenget er klart og skjer automatisk når avslutningsreplikken din er ferdig spilt. Si avslutningsreplikken NÅ: bekreft bookingen hvis en nettopp ble gjort, og si at kunden kan avslutte nå eller at samtalen avsluttes automatisk om fem sekunder. Ikke kall finish_session på nytt.",
+              };
+              dc.send(
+                JSON.stringify({
+                  type: "conversation.item.create",
+                  item: {
+                    type: "function_call_output",
+                    call_id: callId,
+                    output: JSON.stringify(out),
+                  },
+                }),
+              );
+              dc.send(JSON.stringify({ type: "response.create" }));
+              watchdogRef.current?.expectReply();
+              pushEvent("out", "finish_session uten tale — ber om avslutningsreplikken nå", {});
+            }
+          }
+        }
+
+        // Other silence recovery lives in the ReplyWatchdog (fed above),
+        // which also covers the case this handler structurally can't: a
+        // committed caller turn where no response.done ever arrives.
         break;
       }
       case "output_audio_buffer.started":
@@ -336,6 +389,7 @@ export function useVoiceDemoTest() {
       setAgentState("idle");
       clientIdRef.current = clientId ?? null;
       hangupPendingRef.current = false;
+      hangupRecoveriesRef.current = 0;
       if (hangupTimerRef.current) {
         clearTimeout(hangupTimerRef.current);
         hangupTimerRef.current = null;
