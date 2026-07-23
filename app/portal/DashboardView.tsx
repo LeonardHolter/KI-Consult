@@ -112,8 +112,12 @@ export default function PortalDashboard({
   const [clearingSandbox, setClearingSandbox] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // Which booking store the grid is showing: the real one, or the isolated
-  // sandbox the voice agent books into while it's being tested.
-  const [calScope, setCalScope] = useState<"live" | "sandbox">("live");
+  // sandbox the voice agent books into while it's being tested. A client
+  // account (no overviewHref) defaults to the sandbox so it sees its voice
+  // agent's test bookings out of the box; admin keeps the live view.
+  const [calScope, setCalScope] = useState<"live" | "sandbox">(
+    overviewHref ? "live" : "sandbox",
+  );
 
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
