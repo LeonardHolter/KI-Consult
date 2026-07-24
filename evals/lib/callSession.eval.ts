@@ -36,9 +36,11 @@ class FakeWs {
   }
 }
 
-import { runCallSession } from "@/lib/telephony/callSession";
+import { GREETING_DELAY_MS, runCallSession } from "@/lib/telephony/callSession";
 
 let fake: FakeWs;
+// Browser-style start (no turnDetection): greets immediately, no settle window
+// — keeps the existing tool/hangup tests simple.
 function start() {
   fake = new FakeWs();
   void runCallSession({
@@ -87,13 +89,18 @@ describe("runCallSession", () => {
     });
     fake.emit("open");
 
-    // On open: VAD off + buffer cleared, in that order, before the greeting.
-    const openMsgs = fake.parsed;
-    const vadOff = openMsgs.find(
+    // On open: VAD off + buffer cleared immediately — and NO greeting yet
+    // (the settle window is still running).
+    const vadOff = fake.parsed.find(
       (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection === null,
     );
     expect(vadOff).toBeTruthy();
     expect(fake.typesSent()).toContain("input_audio_buffer.clear");
+    expect(fake.typesSent()).not.toContain("response.create"); // deaf & silent
+
+    // After the settle window, Hanz greets.
+    await vi.advanceTimersByTimeAsync(GREETING_DELAY_MS);
+    expect(fake.typesSent()).toContain("response.create");
 
     // Greeting finishes -> VAD restored to the original config.
     fake.emit(

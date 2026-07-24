@@ -39,6 +39,9 @@ export type CallSummary = {
 const GRACE_MS = 5000; // caller can still speak in this window after the close
 const HANGUP_SAFETY_MS = 12_000; // if the closing audio never comes
 const MAX_HANGUP_RECOVERIES = 3;
+// Deaf-and-silent settle window at the start of a phone call: VAD is off and
+// Hanz stays quiet while the SIP leg's connect-noise passes, THEN he greets.
+export const GREETING_DELAY_MS = 2000;
 
 export type RunCallOptions = {
   callId: string;
@@ -84,6 +87,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     // noise), so it's gated on turnDetection being supplied.
     let greetingDone = opts.turnDetection === undefined;
     let greetingGuard: NodeJS.Timeout | null = null;
+    let settleTimer: NodeJS.Timeout | null = null;
     const restoreVad = () => {
       if (greetingDone) return;
       greetingDone = true;
@@ -101,6 +105,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       watchdog.dispose();
       clearHangupTimer();
       if (greetingGuard) clearTimeout(greetingGuard);
+      if (settleTimer) clearTimeout(settleTimer);
       try {
         ws.close();
       } catch {
@@ -185,18 +190,27 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     ws.on("open", () => {
       startedAt = Date.now();
       log("call ws open", { callId });
-      // Disable VAD + clear connect-noise, THEN greet, so the opening plays in
-      // full. VAD is restored on the greeting's response.done (below).
+
+      const greet = () => {
+        if (settled) return;
+        // Drop line noise captured during the settle window, then speak.
+        if (opts.turnDetection !== undefined) send({ type: "input_audio_buffer.clear" });
+        send({ type: "response.create" });
+        watchdog.expectReply();
+        // Safety net: restore VAD even if the greeting never completes.
+        if (opts.turnDetection !== undefined) greetingGuard = setTimeout(restoreVad, 10_000);
+      };
+
       if (opts.turnDetection !== undefined) {
+        // Phone: go deaf (VAD off) immediately and stay quiet for the settle
+        // window so connect-noise passes, THEN greet. VAD is restored on the
+        // greeting's response.done.
         send({ type: "session.update", session: { audio: { input: { turn_detection: null } } } });
         send({ type: "input_audio_buffer.clear" });
-        // Safety net: restore VAD even if the greeting never completes, so a
-        // stalled greeting can't leave the caller permanently unheard.
-        greetingGuard = setTimeout(restoreVad, 10_000);
+        settleTimer = setTimeout(greet, GREETING_DELAY_MS);
+      } else {
+        greet();
       }
-      // Greet first — the caller expects the receptionist to speak.
-      send({ type: "response.create" });
-      watchdog.expectReply();
     });
 
     ws.on("message", (raw: WebSocket.RawData) => {
