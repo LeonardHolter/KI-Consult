@@ -146,6 +146,12 @@ describe("runCallSession", () => {
       (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection === null,
     );
     expect(muted).toBeTruthy();
+    // EVERY session.update must carry session.type — without it the GA API
+    // rejects the update (missing_required_parameter) and the gate silently
+    // never engages. That exact bug shipped once; this keeps it caught.
+    for (const m of fake.parsed.filter((x) => x.type === "session.update")) {
+      expect(m.session.type).toBe("realtime");
+    }
 
     // Agent finishes speaking -> after the echo tail, buffer cleared + VAD
     // restored to the original server_vad config.

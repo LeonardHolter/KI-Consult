@@ -142,7 +142,10 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       clearUnmuteTimer(); // agent (re)started speaking — cancel any pending unmute
       if (inputMuted) return;
       inputMuted = true;
-      send({ type: "session.update", session: { audio: { input: { turn_detection: null } } } });
+      send({
+        type: "session.update",
+        session: { type: "realtime", audio: { input: { turn_detection: null } } },
+      });
       log("half-duplex: muted (agent speaking)");
     };
     const scheduleUnmute = () => {
@@ -151,7 +154,10 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       unmuteTimer = setTimeout(() => {
         inputMuted = false;
         send({ type: "input_audio_buffer.clear" });
-        send({ type: "session.update", session: { audio: { input: { turn_detection: opts.turnDetection } } } });
+        send({
+          type: "session.update",
+          session: { type: "realtime", audio: { input: { turn_detection: opts.turnDetection } } },
+        });
         log("half-duplex: listening");
       }, ECHO_TAIL_MS);
     };
