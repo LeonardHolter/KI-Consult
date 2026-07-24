@@ -221,6 +221,7 @@ export default function Home() {
               }}
             >
               <span
+                className="live-dot"
                 style={{
                   width: 7,
                   height: 7,

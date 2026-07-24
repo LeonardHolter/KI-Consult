@@ -34,6 +34,20 @@ html {
   scroll-behavior: smooth;
 }
 
+/* "Online" status dot - gentle pulse, doesn't affect layout size. */
+.live-dot {
+  animation: live-dot-pulse 1.8s ease-in-out infinite;
+}
+@keyframes live-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+}
+
 /* --- Interactive hover states (originally `style-hover` in the design) --- */
 .btn-primary {
   background: #15c07c;
