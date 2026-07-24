@@ -51,6 +51,10 @@ export type RunCallOptions = {
   /** Called once when the call ends, with duration + token usage — the phone
    *  equivalent of the browser agent's reportUsage(). Best-effort. */
   onComplete?: (summary: CallSummary) => void;
+  /** The session's turn-detection config. On a phone call it's disabled for
+   *  the greeting (so connect-time line noise can't barge in and cut it) and
+   *  restored afterwards. Omit to skip greeting protection. */
+  turnDetection?: unknown;
   /** Overridable for tests. */
   wsFactory?: (url: string, apiKey: string) => WebSocket;
 };
@@ -71,11 +75,32 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     let settled = false;
     let startedAt = 0;
     const usage: CallUsage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0 };
+
+    // Greeting protection (telephony only). The SIP leg carries connect-time
+    // line noise that semantic VAD mistakes for the caller speaking; with
+    // interrupt_response on, that truncates the greeting mid-sentence. So we
+    // disable turn detection for the greeting and restore it once the greeting
+    // finishes — the browser doesn't need this (echo-cancelled mic, no line
+    // noise), so it's gated on turnDetection being supplied.
+    let greetingDone = opts.turnDetection === undefined;
+    let greetingGuard: NodeJS.Timeout | null = null;
+    const restoreVad = () => {
+      if (greetingDone) return;
+      greetingDone = true;
+      if (greetingGuard) {
+        clearTimeout(greetingGuard);
+        greetingGuard = null;
+      }
+      send({ type: "session.update", session: { audio: { input: { turn_detection: opts.turnDetection } } } });
+      log("greeting done — barge-in restored");
+    };
+
     const finish = () => {
       if (settled) return;
       settled = true;
       watchdog.dispose();
       clearHangupTimer();
+      if (greetingGuard) clearTimeout(greetingGuard);
       try {
         ws.close();
       } catch {
@@ -160,6 +185,15 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     ws.on("open", () => {
       startedAt = Date.now();
       log("call ws open", { callId });
+      // Disable VAD + clear connect-noise, THEN greet, so the opening plays in
+      // full. VAD is restored on the greeting's response.done (below).
+      if (opts.turnDetection !== undefined) {
+        send({ type: "session.update", session: { audio: { input: { turn_detection: null } } } });
+        send({ type: "input_audio_buffer.clear" });
+        // Safety net: restore VAD even if the greeting never completes, so a
+        // stalled greeting can't leave the caller permanently unheard.
+        greetingGuard = setTimeout(restoreVad, 10_000);
+      }
       // Greet first — the caller expects the receptionist to speak.
       send({ type: "response.create" });
       watchdog.expectReply();
@@ -211,6 +245,9 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
         }
 
         case "response.done": {
+          // The greeting just finished — turn barge-in back on for the rest of
+          // the call (idempotent; only the first response.done matters here).
+          restoreVad();
           // Bare finish_session (tool call, no closing spoken): answer it with
           // say-your-closing-now so the model doesn't improvise confusion.
           const response = ev.response as

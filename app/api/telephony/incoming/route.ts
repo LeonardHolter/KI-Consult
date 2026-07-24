@@ -83,6 +83,8 @@ export async function POST(req: Request) {
       clientId: PHONE_CLIENT_ID,
       scope: agent.scope,
       withTools: true,
+      // Protect the greeting from connect-time line noise barging in.
+      turnDetection: agent.session.audio.input.turn_detection,
       log: (note, detail) => console.info(`[phone ${callId.slice(0, 8)}] ${note}`, detail ?? ""),
       onComplete: (summary) => {
         console.info(`[phone ${callId.slice(0, 8)}] ended`, {

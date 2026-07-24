@@ -73,6 +73,45 @@ describe("runCallSession", () => {
     expect(fake.typesSent()).toContain("response.create");
   });
 
+  it("protects the greeting: disables VAD + clears noise on open, restores VAD after the greeting", async () => {
+    const td = { type: "semantic_vad", eagerness: "medium", interrupt_response: true };
+    fake = new FakeWs();
+    void runCallSession({
+      callId: "rtc_test",
+      apiKey: "sk-test",
+      clientId: "client-1",
+      scope: "sandbox",
+      withTools: true,
+      turnDetection: td,
+      wsFactory: () => fake as unknown as WsType,
+    });
+    fake.emit("open");
+
+    // On open: VAD off + buffer cleared, in that order, before the greeting.
+    const openMsgs = fake.parsed;
+    const vadOff = openMsgs.find(
+      (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection === null,
+    );
+    expect(vadOff).toBeTruthy();
+    expect(fake.typesSent()).toContain("input_audio_buffer.clear");
+
+    // Greeting finishes -> VAD restored to the original config.
+    fake.emit(
+      "message",
+      JSON.stringify({
+        type: "response.done",
+        response: { output: [{ type: "message", content: [{ type: "output_audio" }] }] },
+      }),
+    );
+    await vi.runAllTimersAsync();
+    const restored = fake.parsed.find(
+      (m) =>
+        m.type === "session.update" &&
+        m.session?.audio?.input?.turn_detection?.interrupt_response === true,
+    );
+    expect(restored).toBeTruthy();
+  });
+
   it("routes a booking tool call through execBookingTool and posts the result", async () => {
     start();
     fake.emit("message", JSON.stringify(funcCallDone("get_available_demo_slots", "{}")));
