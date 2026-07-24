@@ -229,6 +229,32 @@ function renderBlock(block: Block, i: number): ReactNode {
           ))}
         </div>
       );
+    case "figure":
+      return (
+        <figure key={i} style={{ margin: "6px 0 30px" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- static
+              first-party SVG diagrams; next/image adds nothing for these */}
+          <img
+            src={block.src}
+            alt={block.alt}
+            loading="lazy"
+            style={{
+              width: "100%",
+              height: "auto",
+              display: "block",
+              borderRadius: 16,
+              border: "1px solid #E6E0D0",
+            }}
+          />
+          {block.caption && (
+            <figcaption
+              style={{ marginTop: 10, fontSize: 14, lineHeight: 1.5, color: "#8A8B7C" }}
+            >
+              {block.caption}
+            </figcaption>
+          )}
+        </figure>
+      );
     case "table":
       return (
         <div key={i} style={{ overflowX: "auto", margin: "0 0 28px" }}>
@@ -299,7 +325,14 @@ export default async function BlogPostPage({
       dateModified: post.dateModified,
       mainEntityOfPage: { "@type": "WebPage", "@id": url },
       url,
-      image: `${siteConfig.url}/opengraph-image.png`,
+      // Per-post OG card (app/blog/[slug]/opengraph-image.tsx) + any figures
+      // used in the article, so Google's rich results get real media.
+      image: [
+        `${url}/opengraph-image`,
+        ...post.body
+          .filter((b): b is Extract<Block, { type: "figure" }> => b.type === "figure")
+          .map((b) => `${siteConfig.url}${b.src}`),
+      ],
       author: { "@type": "Organization", name: post.author, url: siteConfig.url },
       publisher: {
         "@type": "Organization",

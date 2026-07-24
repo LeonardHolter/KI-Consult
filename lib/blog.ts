@@ -20,7 +20,10 @@ export type Block =
   | { type: "quote"; text: string; cite?: string }
   | { type: "callout"; title?: string; text: string }
   | { type: "stats"; items: { value: string; label: string }[] }
-  | { type: "table"; headers: string[]; rows: string[][] };
+  | { type: "table"; headers: string[]; rows: string[][] }
+  /** Illustrasjon/diagram. `src` peker til /public (f.eks. /blog/x.svg);
+   *  `alt` bør beskrive innholdet MED søkeordet - det indekseres. */
+  | { type: "figure"; src: string; alt: string; caption?: string };
 
 export interface BlogPost {
   /** URL-slug: /blog/<slug>. Kun små bokstaver, tall og bindestrek. */
@@ -76,6 +79,8 @@ export function readingTimeMinutes(post: BlogPost): number {
           return [...b.headers, ...b.rows.flat()].join(" ");
         case "stats":
           return b.items.map((i) => `${i.value} ${i.label}`).join(" ");
+        case "figure":
+          return b.caption ?? "";
       }
     })
     .join(" ")
@@ -144,6 +149,12 @@ export const posts: BlogPost[] = [
           "**På nettsiden**: en chat som svarer besøkende og booker timer direkte, uten skjemaer og ventetid.",
           "**I bakgrunnen**: skriver bookinger i kalenderen, noterer tilleggsønsker og gir de ansatte oppsummeringer av hver henvendelse.",
         ],
+      },
+      {
+        type: "figure",
+        src: "/blog/ai-resepsjonist-kundemottak.svg",
+        alt: "Diagram av en AI-resepsjonist som ett digitalt kundemottak: den svarer telefon 24/7 med tale, betjener nettside-chat, booker i kalenderen i sanntid og gir de ansatte oppsummeringer og eskaleringer",
+        caption: "AI-resepsjonisten samler kundemottaket: telefon, nettside-chat og kalender i ett - med de ansatte i loopen for alt som krever et menneske.",
       },
       { type: "h2", text: "AI-resepsjonist, KI-resepsjonist, chatbot - hva er forskjellen?" },
       {
@@ -340,6 +351,12 @@ export const posts: BlogPost[] = [
       {
         type: "p",
         text: "Moderne AI-telefonsvarere bygger på såkalte **tale-til-tale-modeller** (speech-to-speech). Den gamle generasjonen kjedet sammen tre steg - tale til tekst, tekstsvar fra en språkmodell, tekst til syntetisk tale - og hvert steg la på ventetid. Resultatet føltes som å snakke med en walkietalkie. De nye modellene lytter og snakker i samme prosess, med responstid på under ett sekund. Det er forskjellen på en samtale og et avhør.",
+      },
+      {
+        type: "figure",
+        src: "/blog/ai-telefonsvarer-samtaleflyt.svg",
+        alt: "Diagram som viser hvordan en AI-telefonsvarer fungerer: innringeren snakker naturlig med tale-til-tale-modellen, som svarer på under ett sekund, booker i kalenderen i sanntid og gir de ansatte notat og opptak",
+        caption: "Slik flyter en samtale med en AI-telefonsvarer: naturlig tale inn, svar på under ett sekund ut - og booking, notat og opptak i bakgrunnen.",
       },
       {
         type: "p",

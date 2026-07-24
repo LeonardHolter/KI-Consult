@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <rect width="1200" height="630" fill="#0B2118"/>
+  <ellipse cx="340" cy="680" rx="620" ry="300" fill="#15C07C" opacity="0.10"/>
+
+  <text x="60" y="70" font-size="20" letter-spacing="4" fill="#3FE0A0" font-weight="700">AI-RESEPSJONISTEN: ETT DIGITALT KUNDEMOTTAK, ALLE KANALER</text>
+
+  <!-- Senter -->
+  <g>
+    <circle cx="600" cy="340" r="130" fill="#123324" stroke="#15C07C" stroke-width="3"/>
+    <text x="600" y="325" font-size="28" fill="#EFEDE2" font-weight="800" text-anchor="middle">AI-</text>
+    <text x="600" y="360" font-size="28" fill="#EFEDE2" font-weight="800" text-anchor="middle">resepsjonisten</text>
+    <text x="600" y="395" font-size="17" fill="#3FE0A0" text-anchor="middle">svarer · booker · noterer</text>
+  </g>
+
+  <!-- Forbindelser -->
+  <g stroke="#2A4A38" stroke-width="3">
+    <line x1="600" y1="210" x2="600" y2="150"/>
+    <line x1="470" y1="330" x2="330" y2="300"/>
+    <line x1="730" y1="330" x2="870" y2="300"/>
+    <line x1="600" y1="470" x2="600" y2="510"/>
+  </g>
+
+  <!-- Telefon -->
+  <g>
+    <rect x="450" y="90" width="300" height="66" rx="16" fill="#EFEDE2"/>
+    <text x="600" y="120" font-size="21" fill="#08231A" font-weight="800" text-anchor="middle">📞 Telefon</text>
+    <text x="600" y="144" font-size="16" fill="#4A4D40" text-anchor="middle">svarer anrop 24/7 med tale</text>
+  </g>
+
+  <!-- Chat -->
+  <g>
+    <rect x="60" y="250" width="280" height="96" rx="16" fill="#EFEDE2"/>
+    <text x="200" y="288" font-size="21" fill="#08231A" font-weight="800" text-anchor="middle">💬 Nettside-chat</text>
+    <text x="200" y="316" font-size="16" fill="#4A4D40" text-anchor="middle">svarer besøkende og booker</text>
+  </g>
+
+  <!-- Kalender -->
+  <g>
+    <rect x="860" y="250" width="280" height="96" rx="16" fill="#EFEDE2"/>
+    <text x="1000" y="288" font-size="21" fill="#08231A" font-weight="800" text-anchor="middle">📅 Kalenderen</text>
+    <text x="1000" y="316" font-size="16" fill="#4A4D40" text-anchor="middle">booking i sanntid, aldri dobbelt</text>
+  </g>
+
+  <!-- Ansatte -->
+  <g>
+    <rect x="420" y="510" width="360" height="86" rx="16" fill="#123324" stroke="#2A4A38" stroke-width="2"/>
+    <text x="600" y="546" font-size="21" fill="#EFEDE2" font-weight="800" text-anchor="middle">De ansatte</text>
+    <text x="600" y="574" font-size="16" fill="#AFC0B5" text-anchor="middle">får oppsummeringer - og alt som krever et menneske</text>
+  </g>
+
+  <text x="60" y="594" font-size="18" fill="#5F7A6B">kiconsult.no</text>
+</svg>

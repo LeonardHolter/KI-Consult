@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <rect width="1200" height="630" rx="0" fill="#0B2118"/>
+  <ellipse cx="860" cy="-40" rx="560" ry="280" fill="#15C07C" opacity="0.12"/>
+
+  <text x="60" y="70" font-size="20" letter-spacing="4" fill="#3FE0A0" font-weight="700">SLIK FLYTER EN SAMTALE MED EN AI-TELEFONSVARER</text>
+
+  <!-- Innringer -->
+  <g>
+    <circle cx="170" cy="290" r="64" fill="#EFEDE2"/>
+    <circle cx="170" cy="268" r="22" fill="#0B2118"/>
+    <path d="M 128 322 a 42 34 0 0 1 84 0 z" fill="#0B2118"/>
+    <text x="170" y="400" font-size="26" fill="#EFEDE2" font-weight="700" text-anchor="middle">Innringeren</text>
+    <text x="170" y="432" font-size="19" fill="#AFC0B5" text-anchor="middle">«Hei, jeg vil booke en time»</text>
+  </g>
+
+  <!-- Pil tale frem/tilbake -->
+  <g stroke="#3FE0A0" stroke-width="4" fill="none">
+    <path d="M 268 270 H 388"/>
+    <path d="M 388 310 H 268"/>
+    <path d="M 376 258 L 392 270 L 376 282" fill="#3FE0A0" stroke="none"/>
+    <path d="M 280 298 L 264 310 L 280 322" fill="#3FE0A0" stroke="none"/>
+  </g>
+  <text x="328" y="248" font-size="17" fill="#7FD4AC" text-anchor="middle">naturlig tale</text>
+  <text x="328" y="345" font-size="17" fill="#7FD4AC" text-anchor="middle">svar på under 1 sek</text>
+
+  <!-- AI-boksen -->
+  <g>
+    <rect x="400" y="170" width="380" height="270" rx="22" fill="#123324" stroke="#15C07C" stroke-width="2"/>
+    <text x="590" y="222" font-size="30" fill="#EFEDE2" font-weight="800" text-anchor="middle">AI-telefonsvarer</text>
+    <text x="590" y="252" font-size="17" fill="#3FE0A0" text-anchor="middle" letter-spacing="2">TALE-TIL-TALE-MODELL</text>
+    <g font-size="19" fill="#D8E4DC">
+      <text x="436" y="300">✓ Forstår norsk tale</text>
+      <text x="436" y="336">✓ Tåler avbrytelser</text>
+      <text x="436" y="372">✓ Svarer kun fra bedriftens fakta</text>
+      <text x="436" y="408">✓ Leser nummer tilbake siffer for siffer</text>
+    </g>
+  </g>
+
+  <!-- Piler ut -->
+  <g stroke="#3FE0A0" stroke-width="4" fill="none">
+    <path d="M 780 240 H 880"/>
+    <path d="M 868 228 L 884 240 L 868 252" fill="#3FE0A0" stroke="none"/>
+    <path d="M 780 380 H 880"/>
+    <path d="M 868 368 L 884 380 L 868 392" fill="#3FE0A0" stroke="none"/>
+  </g>
+  <text x="830" y="222" font-size="17" fill="#7FD4AC" text-anchor="middle">booker</text>
+  <text x="830" y="418" font-size="17" fill="#7FD4AC" text-anchor="middle">notat + opptak</text>
+
+  <!-- Kalender -->
+  <g>
+    <rect x="890" y="170" width="250" height="140" rx="18" fill="#EFEDE2"/>
+    <rect x="890" y="170" width="250" height="42" rx="18" fill="#15C07C"/>
+    <rect x="890" y="194" width="250" height="18" fill="#15C07C"/>
+    <text x="1015" y="199" font-size="20" fill="#08231A" font-weight="800" text-anchor="middle">Kalenderen</text>
+    <text x="1015" y="248" font-size="19" fill="#16190F" text-anchor="middle" font-weight="700">Booket i sanntid</text>
+    <text x="1015" y="280" font-size="18" fill="#4A4D40" text-anchor="middle">tirsdag · klokken 10:30</text>
+  </g>
+
+  <!-- Ansatte -->
+  <g>
+    <rect x="890" y="330" width="250" height="110" rx="18" fill="#123324" stroke="#2A4A38" stroke-width="2"/>
+    <text x="1015" y="376" font-size="20" fill="#EFEDE2" font-weight="800" text-anchor="middle">De ansatte</text>
+    <text x="1015" y="408" font-size="17" fill="#AFC0B5" text-anchor="middle">ser notatene, hører opptak</text>
+  </g>
+
+  <text x="60" y="560" font-size="22" fill="#AFC0B5">Hele samtalen skjer i sanntid - ingen tastevalg, ingen kø, ingen «etter pipetonen».</text>
+  <text x="60" y="594" font-size="18" fill="#5F7A6B">kiconsult.no</text>
+</svg>
