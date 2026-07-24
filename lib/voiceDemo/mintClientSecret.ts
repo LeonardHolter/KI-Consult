@@ -57,26 +57,20 @@ function dateContext(): string {
   ].join("\n");
 }
 
-export async function mintRealtimeClientSecret(
-  settings: VoiceDemoSettings & { instructions: string },
-  {
-    withTools = false,
-    withHangupTool = false,
-  }: { withTools?: boolean; withHangupTool?: boolean } = {},
-): Promise<
-  | { ok: true; clientSecret: string; model: string }
-  | { ok: false; status: number; body: Record<string, unknown> }
-> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return {
-      ok: false,
-      status: 503,
-      body: { error: "not_configured", message: "OPENAI_API_KEY mangler." },
-    };
-  }
+export type BuildSessionOpts = { withTools?: boolean; withHangupTool?: boolean };
 
-  const session = {
+/**
+ * The OpenAI Realtime session object — the single source of truth for how an
+ * agent is configured, shared by EVERY surface: the WebRTC secret mint
+ * (browser demo / dashboard / tuner) and the SIP phone bridge
+ * (lib/telephony). Building it once means the phone agent and the browser
+ * agent can never drift on voice, VAD, tools, or the date-context prefix.
+ */
+export function buildRealtimeSession(
+  settings: VoiceDemoSettings & { instructions: string },
+  { withTools = false, withHangupTool = false }: BuildSessionOpts = {},
+) {
+  return {
     type: "realtime",
     model: settings.model,
     output_modalities: ["audio"],
@@ -100,6 +94,25 @@ export async function mintRealtimeClientSecret(
         ? { tools: [finishSessionToolDef()], tool_choice: "auto" }
         : {}),
   };
+}
+
+export async function mintRealtimeClientSecret(
+  settings: VoiceDemoSettings & { instructions: string },
+  opts: BuildSessionOpts = {},
+): Promise<
+  | { ok: true; clientSecret: string; model: string }
+  | { ok: false; status: number; body: Record<string, unknown> }
+> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return {
+      ok: false,
+      status: 503,
+      body: { error: "not_configured", message: "OPENAI_API_KEY mangler." },
+    };
+  }
+
+  const session = buildRealtimeSession(settings, opts);
 
   const res = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
     method: "POST",
