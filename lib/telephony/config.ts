@@ -61,7 +61,19 @@ export async function loadPhoneAgent(clientId: string): Promise<{
   // booked when it only landed in the sandbox, so this is server-decided.
   const scope = (await loadSettings(clientId)).voiceBookingMode;
 
-  return { session: buildRealtimeSession(settings, { withTools: true }), scope };
+  const session = buildRealtimeSession(settings, { withTools: true });
+  // PHONE-ONLY: disable barge-in. Confirmed in call logs that the agent's own
+  // audio echoes back over the SIP leg (no line-side echo cancellation, unlike
+  // the browser's mic) and semantic VAD cancels the response mid-sentence
+  // (response.done status:cancelled, reason:turn_detected). Letting the agent
+  // finish each turn is the correct telephony behavior; the browser keeps
+  // interruption since its mic is echo-cancelled and it works there.
+  const input = session.audio.input as { turn_detection?: Record<string, unknown> | null };
+  if (input.turn_detection && typeof input.turn_detection === "object") {
+    input.turn_detection = { ...input.turn_detection, interrupt_response: false };
+  }
+
+  return { session, scope };
 }
 
 /** Records a finished phone call's duration + token usage into voice_usage —
