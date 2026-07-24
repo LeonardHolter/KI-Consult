@@ -1,4 +1,4 @@
-import { realtimeToolDefs } from "@/lib/bookingTools";
+import { finishSessionToolDef, realtimeToolDefs } from "@/lib/bookingTools";
 import type { VoiceDemoSettings } from "./types";
 
 /**
@@ -12,6 +12,10 @@ import type { VoiceDemoSettings } from "./types";
  * marketing demo is unauthenticated and must not advertise tools it cannot
  * run — OpenAI's realtime prompting guide is explicit that naming absent
  * tools degrades responses.
+ *
+ * `withHangupTool` attaches ONLY finish_session — for the public demo,
+ * whose graceful hangup needs no server executor (the browser intercepts
+ * the call), and which must not get the booking tools it can't run.
  */
 /**
  * The voice prompt is stored statically in Supabase, so unlike the chat bot
@@ -55,7 +59,10 @@ function dateContext(): string {
 
 export async function mintRealtimeClientSecret(
   settings: VoiceDemoSettings & { instructions: string },
-  { withTools = false }: { withTools?: boolean } = {},
+  {
+    withTools = false,
+    withHangupTool = false,
+  }: { withTools?: boolean; withHangupTool?: boolean } = {},
 ): Promise<
   | { ok: true; clientSecret: string; model: string }
   | { ok: false; status: number; body: Record<string, unknown> }
@@ -87,7 +94,11 @@ export async function mintRealtimeClientSecret(
       },
       output: { voice: settings.voice, speed: settings.speed },
     },
-    ...(withTools ? { tools: realtimeToolDefs(), tool_choice: "auto" } : {}),
+    ...(withTools
+      ? { tools: realtimeToolDefs(), tool_choice: "auto" }
+      : withHangupTool
+        ? { tools: [finishSessionToolDef()], tool_choice: "auto" }
+        : {}),
   };
 
   const res = await fetch("https://api.openai.com/v1/realtime/client_secrets", {

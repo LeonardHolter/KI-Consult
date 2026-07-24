@@ -2,11 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { ReplyWatchdog } from "@/lib/voiceDemo/replyWatchdog";
 
-// WebRTC client for the OpenAI Realtime API — same connection architecture as
-// the handzon-voice-lab tuning lab: mint ephemeral secret server-side, then
-// RTCPeerConnection with mic track + "oai-events" data channel, SDP exchange
-// with /v1/realtime/calls. https://developers.openai.com/api/docs/guides/realtime
+// WebRTC client for the OpenAI Realtime API — same connection architecture
+// and the same reliability layers as the Handz On production agent
+// (VoiceAgentCard.tsx), where every piece of this logic was debugged
+// against live calls and is pinned by the test suite:
+//  - ReplyWatchdog: the agent must never leave the caller in silence.
+//  - finish_session hangup: waits for the closing audio to DRAIN, then a
+//    5s grace window (the closing line promises the caller five seconds);
+//    caller speech aborts the shutdown and tells the model to re-close.
+//  - Bare finish_session (no closing spoken) gets answered with
+//    say-your-closing-now instructions instead of a context-free nudge.
 
 const mono = "var(--font-space-mono), monospace";
 
@@ -24,8 +31,25 @@ export default function VoiceDemo() {
   const micRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const assistantTextRef = useRef<string>("");
+  const watchdogRef = useRef<ReplyWatchdog | null>(null);
+
+  // Model-initiated hangup (finish_session): the disconnect waits for
+  // output_audio_buffer.stopped so the closing line finishes PLAYING, then
+  // a 5s grace window. Timers: 12s while no audio has come, swapped for a
+  // generous 60s stuck-stream fallback once audio starts.
+  const hangupPendingRef = useRef(false);
+  const hangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hangupCallIdRef = useRef<string | null>(null);
+  const hangupRecoveriesRef = useRef(0);
 
   const cleanup = useCallback(() => {
+    watchdogRef.current?.dispose();
+    hangupPendingRef.current = false;
+    hangupCallIdRef.current = null;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
     dcRef.current?.close();
     pcRef.current?.close();
     micRef.current?.getTracks().forEach((t) => t.stop());
@@ -37,41 +61,164 @@ export default function VoiceDemo() {
 
   useEffect(() => () => cleanup(), [cleanup]);
 
-  const handleServerEvent = useCallback((ev: Record<string, unknown>) => {
-    switch (ev.type) {
-      case "input_audio_buffer.speech_started":
-        setAgentState("listening");
-        break;
-      case "response.output_audio_transcript.delta": {
-        assistantTextRef.current += String(ev.delta ?? "");
-        setLastMessage(assistantTextRef.current);
-        break;
-      }
-      case "response.output_audio_transcript.done": {
-        assistantTextRef.current = String(ev.transcript ?? assistantTextRef.current);
-        setLastMessage(assistantTextRef.current);
-        break;
-      }
-      case "response.output_item.added":
-        assistantTextRef.current = "";
-        break;
-      case "output_audio_buffer.started":
-        setAgentState("speaking");
-        break;
-      case "output_audio_buffer.stopped":
-      case "output_audio_buffer.cleared":
-        setAgentState("idle");
-        break;
-      case "error":
-        setErrorMsg(
-          typeof (ev.error as { message?: string })?.message === "string"
-            ? (ev.error as { message: string }).message
-            : "Noe gikk galt.",
-        );
-        setUiState("error");
-        break;
+  // The model hung up: end the call the same way the stop button does.
+  const completeHangup = useCallback(() => {
+    if (!hangupPendingRef.current) return;
+    hangupPendingRef.current = false;
+    cleanup();
+    setUiState("idle");
+    setAgentState("idle");
+  }, [cleanup]);
+
+  // The caller barged in on the closing: the call is NOT over. Report the
+  // aborted hangup back as the tool result so the model knows it must
+  // re-close — without this it believes it already hung up and the call
+  // dangles forever after a reciprocal "takk, i like måte".
+  const cancelHangup = useCallback(() => {
+    if (!hangupPendingRef.current) return;
+    hangupPendingRef.current = false;
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+      hangupTimerRef.current = null;
+    }
+    const callId = hangupCallIdRef.current;
+    hangupCallIdRef.current = null;
+    const dc = dcRef.current;
+    if (callId && dc && dc.readyState === "open") {
+      dc.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "function_call_output",
+            call_id: callId,
+            output: JSON.stringify({
+              success: false,
+              reason:
+                "Kunden fortsatte samtalen, så det ble ikke lagt på. Svar kunden, og kall finish_session på nytt i samme replikk som din neste avslutning.",
+            }),
+          },
+        }),
+      );
     }
   }, []);
+
+  const handleServerEvent = useCallback(
+    (ev: Record<string, unknown>) => {
+      // The watchdog sees every event, before any case can break early.
+      watchdogRef.current?.handle(ev);
+      switch (ev.type) {
+        case "response.output_item.done": {
+          const item = ev.item as
+            | { type?: string; call_id?: string; name?: string }
+            | undefined;
+          if (item?.type === "function_call" && item.call_id && item.name === "finish_session") {
+            hangupPendingRef.current = true;
+            hangupCallIdRef.current = item.call_id;
+            if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
+            hangupTimerRef.current = setTimeout(completeHangup, 12000);
+          }
+          break;
+        }
+        case "response.done": {
+          // Bare finish_session — tool call with no closing spoken. Left
+          // unanswered, the next context-free nudge makes the model
+          // improvise confusion instead of the closing line. Answer it with
+          // explicit instructions and ask for the closing NOW.
+          const response = ev.response as
+            | { output?: Array<{ type?: string; name?: string; content?: Array<{ type?: string }> }> }
+            | undefined;
+          const output = response?.output ?? [];
+          const hasAudio = output.some(
+            (i) => i.type === "message" && i.content?.some((c) => c.type === "output_audio"),
+          );
+          const calledFinish = output.some(
+            (i) => i.type === "function_call" && i.name === "finish_session",
+          );
+          if (
+            hangupPendingRef.current &&
+            calledFinish &&
+            !hasAudio &&
+            hangupRecoveriesRef.current < 3
+          ) {
+            hangupRecoveriesRef.current += 1;
+            const callId = hangupCallIdRef.current;
+            const dc = dcRef.current;
+            if (callId && dc && dc.readyState === "open") {
+              dc.send(
+                JSON.stringify({
+                  type: "conversation.item.create",
+                  item: {
+                    type: "function_call_output",
+                    call_id: callId,
+                    output: JSON.stringify({
+                      success: true,
+                      note: "Opphenget er klart og skjer automatisk når avslutningsreplikken din er ferdig spilt. Si avslutningsreplikken NÅ, og ikke kall finish_session på nytt.",
+                    }),
+                  },
+                }),
+              );
+              dc.send(JSON.stringify({ type: "response.create" }));
+              watchdogRef.current?.expectReply();
+            }
+          }
+          break;
+        }
+        case "input_audio_buffer.speech_started":
+          setAgentState("listening");
+          // Caller speech during the shutdown sequence (closing playing, or
+          // the 5s grace window after it) aborts the hangup.
+          cancelHangup();
+          break;
+        case "response.output_audio_transcript.delta": {
+          assistantTextRef.current += String(ev.delta ?? "");
+          setLastMessage(assistantTextRef.current);
+          break;
+        }
+        case "response.output_audio_transcript.done": {
+          assistantTextRef.current = String(ev.transcript ?? assistantTextRef.current);
+          setLastMessage(assistantTextRef.current);
+          break;
+        }
+        case "response.output_item.added":
+          assistantTextRef.current = "";
+          break;
+        case "output_audio_buffer.started":
+          setAgentState("speaking");
+          // The closing audio is actually playing — the short "audio never
+          // came" safety timer must not kill it mid-sentence. From here the
+          // stopped event owns the hangup; keep a stuck-stream fallback.
+          if (hangupPendingRef.current) {
+            if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
+            hangupTimerRef.current = setTimeout(completeHangup, 60000);
+          }
+          break;
+        case "output_audio_buffer.stopped":
+          setAgentState("idle");
+          // The closing has finished playing — hang up after the 5s grace
+          // window the closing line promises the caller.
+          if (hangupPendingRef.current) {
+            if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
+            hangupTimerRef.current = setTimeout(completeHangup, 5000);
+          }
+          break;
+        case "output_audio_buffer.cleared":
+          setAgentState("idle");
+          // cleared = the caller interrupted the closing — they have more
+          // to say, so the call continues instead of hanging up on them.
+          cancelHangup();
+          break;
+        case "error":
+          setErrorMsg(
+            typeof (ev.error as { message?: string })?.message === "string"
+              ? (ev.error as { message: string }).message
+              : "Noe gikk galt.",
+          );
+          setUiState("error");
+          break;
+      }
+    },
+    [completeHangup, cancelHangup],
+  );
 
   const start = useCallback(async () => {
     setErrorMsg(null);
@@ -79,6 +226,21 @@ export default function VoiceDemo() {
     assistantTextRef.current = "";
     setUiState("connecting");
     setAgentState("idle");
+    hangupRecoveriesRef.current = 0;
+
+    // Owns the "agent must never leave the caller in silence" contract —
+    // same watchdog as the production agent; full history and every
+    // scenario live in lib/voiceDemo/replyWatchdog.ts and its eval suite.
+    watchdogRef.current?.dispose();
+    watchdogRef.current = new ReplyWatchdog({
+      send: () => {
+        const dc = dcRef.current;
+        if (dc && dc.readyState === "open") {
+          dc.send(JSON.stringify({ type: "response.create" }));
+        }
+      },
+      log: (note, detail) => console.warn(`[voice-watchdog] ${note}`, detail ?? ""),
+    });
 
     try {
       const res = await fetch("/api/voice/session", { method: "POST" });
@@ -130,6 +292,7 @@ export default function VoiceDemo() {
       dc.onopen = () => {
         setUiState("active");
         dc.send(JSON.stringify({ type: "response.create" }));
+        watchdogRef.current?.expectReply();
       };
 
       const offer = await pc.createOffer();

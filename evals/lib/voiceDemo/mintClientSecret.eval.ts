@@ -105,6 +105,24 @@ describe("mintRealtimeClientSecret", () => {
     expect(result).toEqual({ ok: true, clientSecret: "ek_tools", model: "gpt-realtime" });
   });
 
+  it("attaches ONLY finish_session with withHangupTool — the public demo's shape", async () => {
+    const fetchSpy = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      // The demo has no booking executor: the hangup tool must come alone,
+      // or the model would call calendar tools that leave the call hanging.
+      expect(body.session.tools.map((t: { name: string }) => t.name)).toEqual([
+        "finish_session",
+      ]);
+      expect(body.session.tool_choice).toBe("auto");
+      return new Response(JSON.stringify({ value: "ek_hangup" }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await mintRealtimeClientSecret(settings, { withHangupTool: true });
+
+    expect(result).toEqual({ ok: true, clientSecret: "ek_hangup", model: "gpt-realtime" });
+  });
+
   it("omits noise_reduction entirely when set to off", async () => {
     const fetchSpy = vi.fn(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string);

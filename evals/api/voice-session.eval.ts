@@ -50,7 +50,10 @@ describe("POST /api/voice/session (public, no auth — anyone on the marketing s
 
     await POST();
 
-    expect(mintRealtimeClientSecret).toHaveBeenCalledWith(SETTINGS);
+    // withHangupTool: the demo registers ONLY finish_session — a graceful
+    // hangup needs no server executor, and booking tools would leave calls
+    // hanging on a surface with nowhere to run them.
+    expect(mintRealtimeClientSecret).toHaveBeenCalledWith(SETTINGS, { withHangupTool: true });
   });
 
   it("returns clientSecret + model on success", async () => {

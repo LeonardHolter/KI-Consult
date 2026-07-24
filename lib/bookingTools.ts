@@ -123,6 +123,20 @@ export const BOOKING_TOOL_SCHEMAS = {
  */
 export const FINISH_SESSION_TOOL = "finish_session";
 
+/** The hangup tool's Realtime definition, exported separately so surfaces
+ *  WITHOUT a booking executor (the public marketing demo) can register it
+ *  alone — a graceful hangup needs no server side, the browser intercepts
+ *  it, and registering the booking tools there would leave calls hanging. */
+export function finishSessionToolDef() {
+  return {
+    type: "function" as const,
+    name: FINISH_SESSION_TOOL,
+    description:
+      "Avslutter telefonsamtalen (legger på). Kall den i SAMME replikk som avslutningen. Blir du avbrutt mens du sier avslutningen, fortsetter samtalen automatisk og du kan kalle verktøyet igjen senere. Legg aldri på uten å si en avslutning først.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  };
+}
+
 /** OpenAI Realtime session tool definitions, derived from the shared schemas. */
 export function realtimeToolDefs() {
   return [
@@ -132,13 +146,7 @@ export function realtimeToolDefs() {
       description: spec.description,
       parameters: spec.parameters,
     })),
-    {
-      type: "function" as const,
-      name: FINISH_SESSION_TOOL,
-      description:
-        "Avslutter telefonsamtalen (legger på). Kall den i SAMME replikk som avslutningen — normalt bookingbekreftelsen der du ønsker kunden en god dag videre, ellers en kort avskjed når kunden er ferdig. Blir du avbrutt mens du sier avslutningen, fortsetter samtalen automatisk og du kan kalle verktøyet igjen senere. Legg aldri på uten å si en avslutning først.",
-      parameters: { type: "object", properties: {}, additionalProperties: false },
-    },
+    finishSessionToolDef(),
   ];
 }
 

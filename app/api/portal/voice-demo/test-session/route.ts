@@ -43,7 +43,10 @@ export async function POST(req: Request) {
       transcriptionLanguage: body.transcriptionLanguage ?? DEFAULT_SETTINGS.transcriptionLanguage,
       instructions: body.instructions,
     },
-    { withTools: Boolean(clientId) },
+    // Client agents get the full toolset; the default marketing demo gets
+    // only the hangup tool — mirroring exactly what each public surface
+    // registers, so the tuner tests what actually runs.
+    { withTools: Boolean(clientId), withHangupTool: !clientId },
   );
 
   if (!result.ok) return Response.json(result.body, { status: result.status });

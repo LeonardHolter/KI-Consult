@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   const settings = await getVoiceDemoSettingsPublic();
-  const result = await mintRealtimeClientSecret(settings);
+  // finish_session only: the browser intercepts it to hang up gracefully;
+  // the demo has no booking executor, so no other tools are registered.
+  const result = await mintRealtimeClientSecret(settings, { withHangupTool: true });
   if (!result.ok) return Response.json(result.body, { status: result.status });
   return Response.json({ clientSecret: result.clientSecret, model: result.model });
 }
