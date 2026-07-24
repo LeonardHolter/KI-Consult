@@ -62,16 +62,26 @@ export async function loadPhoneAgent(clientId: string): Promise<{
   const scope = (await loadSettings(clientId)).voiceBookingMode;
 
   const session = buildRealtimeSession(settings, { withTools: true });
-  // PHONE-ONLY: disable barge-in. Confirmed in call logs that the agent's own
-  // audio echoes back over the SIP leg (no line-side echo cancellation, unlike
-  // the browser's mic) and semantic VAD cancels the response mid-sentence
-  // (response.done status:cancelled, reason:turn_detected). Letting the agent
-  // finish each turn is the correct telephony behavior; the browser keeps
-  // interruption since its mic is echo-cancelled and it works there.
-  const input = session.audio.input as { turn_detection?: Record<string, unknown> | null };
-  if (input.turn_detection && typeof input.turn_detection === "object") {
-    input.turn_detection = { ...input.turn_detection, interrupt_response: false };
-  }
+  // PHONE-ONLY turn detection. Call logs confirmed the agent's own audio
+  // echoes back over the SIP leg (no line-side echo cancellation, unlike the
+  // browser mic) and gets heard as the caller, cancelling the response
+  // mid-sentence (response.done status:cancelled, reason:turn_detected). And
+  // interrupt_response:false is NOT reliably honored by semantic_vad — the
+  // greeting still got cut on ~1/3 of calls, then the truncation raced the
+  // auto-response into a conversation_already_has_active_response error.
+  //
+  // server_vad is the telephony-standard fix: a higher energy threshold
+  // rejects the attenuated echo, and interrupt_response:false IS honored here,
+  // so the agent finishes each turn. The browser keeps its own semantic_vad
+  // (echo-cancelled mic, barge-in works there) — this override is phone-only.
+  const input = session.audio.input as { turn_detection?: unknown };
+  input.turn_detection = {
+    type: "server_vad",
+    threshold: 0.65, // above the echo level, below full-volume caller speech
+    prefix_padding_ms: 300,
+    silence_duration_ms: 700,
+    interrupt_response: false, // never cut the agent mid-turn
+  };
 
   return { session, scope };
 }
