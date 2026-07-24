@@ -255,7 +255,7 @@ export default function Home() {
               }}
             >
               KI-resepsjonisten som tar telefonen, chatten og webhenvendelsene dine automatisk.
-              30 dagers pengene-tilbake-garanti. Null risiko.
+              30 dagers pengene-tilbake-garanti.
             </p>
             <div style={{ display: "flex", gap: 14, marginTop: 32, flexWrap: "wrap" }}>
               <a
