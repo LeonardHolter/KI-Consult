@@ -112,6 +112,72 @@ export async function getVoiceUsageStats(): Promise<Map<string, VoiceUsageStats>
   return map;
 }
 
+/** One bucket in the admin activity charts — a single Oslo calendar day. */
+export type DayActivity = {
+  date: string; // YYYY-MM-DD (Oslo)
+  label: string; // short axis label, e.g. "15.7"
+  chat: number; // chat conversations started that day
+  voice: number; // voice calls that day
+  voiceMinutes: number;
+  booked: number; // chat conversations that ended in a booking
+};
+
+function osloDay(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+/** Daily totals across ALL clients for the last `days` days, oldest first.
+ *  Buckets by Oslo calendar day so "i dag" matches what the admin means. */
+export async function getDailyActivity(days = 14): Promise<DayActivity[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+
+  const [conv, voice] = await Promise.all([
+    supabase
+      .from("conversations")
+      .select("started_at, booked")
+      .gte("started_at", since)
+      .limit(5000),
+    supabase
+      .from("voice_usage")
+      .select("started_at, duration_seconds")
+      .gte("started_at", since)
+      .limit(5000),
+  ]);
+
+  const buckets = new Map<string, DayActivity>();
+  for (let i = days - 1; i >= 0; i--) {
+    const date = osloDay(new Date(Date.now() - i * 24 * 3600 * 1000).toISOString());
+    const [, m, d] = date.split("-");
+    buckets.set(date, {
+      date,
+      label: `${Number(d)}.${Number(m)}`,
+      chat: 0,
+      voice: 0,
+      voiceMinutes: 0,
+      booked: 0,
+    });
+  }
+  for (const row of conv.data ?? []) {
+    const b = buckets.get(osloDay(row.started_at));
+    if (!b) continue;
+    b.chat += 1;
+    if (row.booked) b.booked += 1;
+  }
+  for (const row of voice.data ?? []) {
+    const b = buckets.get(osloDay(row.started_at));
+    if (!b) continue;
+    b.voice += 1;
+    b.voiceMinutes += (row.duration_seconds ?? 0) / 60;
+  }
+  return [...buckets.values()];
+}
+
 export type ClientBilling = {
   plan: string | null;
   monthlyPriceNok: number | null;

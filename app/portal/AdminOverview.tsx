@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import type { Client, ConversationRow, UsageStats } from "@/lib/portal/data";
-import type { ClientHealth, EventCounts24h, VoiceUsageStats } from "@/lib/admin/data";
+import type { ClientHealth, DayActivity, EventCounts24h, VoiceUsageStats } from "@/lib/admin/data";
 import ClientBillingForm from "./ClientBillingForm";
 import OnboardingPanel from "./OnboardingPanel";
+import ActivityCharts from "./ActivityCharts";
 
 const CREAM = "#f3efe4";
 const INK = "#16190f";
@@ -125,6 +126,7 @@ export default function AdminOverview({
   eventCounts,
   voiceUsage,
   loggingEnabled,
+  activity,
 }: {
   clients: Client[];
   conversations: ConversationRow[];
@@ -133,6 +135,7 @@ export default function AdminOverview({
   eventCounts: Map<string, EventCounts24h>;
   voiceUsage: Map<string, VoiceUsageStats>;
   loggingEnabled: boolean;
+  activity?: DayActivity[];
 }) {
   const statsByClient = new Map<string, Stats>();
   for (const c of conversations) {
@@ -218,6 +221,8 @@ export default function AdminOverview({
         )}
 
         <OnboardingPanel clients={clients} />
+
+        {activity && <ActivityCharts days={activity} />}
 
         <h1 style={{ fontSize: 26, letterSpacing: "-0.02em", margin: "0 0 4px" }}>
           Kunder

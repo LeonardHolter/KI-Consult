@@ -1,5 +1,5 @@
 import { getClients, getConversations, getProfile, getUsageStats } from "@/lib/portal/data";
-import { getClientHealth, getEventCounts24h, getVoiceUsageStats } from "@/lib/admin/data";
+import { getClientHealth, getDailyActivity, getEventCounts24h, getVoiceUsageStats } from "@/lib/admin/data";
 import { loggingEnabled } from "@/lib/portal-log";
 import { signOut } from "@/app/login/actions";
 import DashboardView from "./DashboardView";
@@ -69,12 +69,13 @@ export default async function PortalPage({
     );
   }
 
-  const [conversations, usage, eventCounts, voiceUsage, healthEntries] = await Promise.all([
+  const [conversations, usage, eventCounts, voiceUsage, healthEntries, activity] = await Promise.all([
     getConversations(),
     getUsageStats(),
     getEventCounts24h(),
     getVoiceUsageStats(),
     Promise.all(clients.map(async (c) => [c.id, await getClientHealth(c.id)] as const)),
+    getDailyActivity(),
   ]);
   const health = new Map(healthEntries);
 
@@ -87,6 +88,7 @@ export default async function PortalPage({
       eventCounts={eventCounts}
       voiceUsage={voiceUsage}
       loggingEnabled={loggingEnabled}
+      activity={activity}
     />
   );
 }
