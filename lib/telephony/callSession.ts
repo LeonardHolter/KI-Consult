@@ -4,22 +4,18 @@ import { execBookingTool } from "@/lib/bookingTools";
 import type { BookingScope } from "@/lib/slots";
 
 // Server-side runner for ONE inbound phone call, once OpenAI has accepted the
-// SIP call. It connects to the call's Realtime control channel and re-hosts,
-// server-side, exactly the reliability logic the browser agent
-// (VoiceAgentCard.tsx) proved out over dozens of live calls:
-//   - greet first (a phone caller expects the receptionist to speak),
-//   - ReplyWatchdog so the agent never leaves the caller in silence,
-//   - booking tools executed via the shared execBookingTool (same code the
-//     dashboard agent uses — sandbox/live decided by the caller's settings),
-//   - graceful finish_session hangup that waits for the closing line to
-//     finish, with a grace window a caller can interrupt, and the
-//     bare-finish_session recovery (say-your-closing-now).
+// SIP call. Re-hosts the browser agent's reliability logic (ReplyWatchdog,
+// shared booking tools, graceful finish_session hangup) over the call's
+// Realtime control channel.
 //
-// Host-agnostic on purpose: it's just an awaitable that lives for the call.
-// On Vercel it runs inside Next's `after()` (fine for a low-volume pilot on
-// Fluid Compute); if call volume or length grows, the same function can be
-// lifted verbatim into a small always-on worker. Nothing in here is
-// Vercel-specific.
+// DIAGNOSTIC BUILD: every server event and every control message we send is
+// traced to the log, so a single real test call reveals exactly why the
+// greeting truncates (echo? line noise? a competing response? a server
+// failure?) instead of us guessing. High-frequency audio/transcript deltas
+// are skipped so the trace stays readable.
+//
+// Host-agnostic: it's an awaitable that lives for the call. On Vercel it runs
+// inside Next's after().
 
 type Logger = (note: string, detail?: Record<string, unknown>) => void;
 
@@ -30,35 +26,36 @@ export type CallUsage = {
 };
 
 export type CallSummary = {
-  startedAt: number; // epoch ms of ws open
+  startedAt: number;
   endedAt: number;
   durationSeconds: number;
   usage: CallUsage;
 };
 
-const GRACE_MS = 5000; // caller can still speak in this window after the close
-const HANGUP_SAFETY_MS = 12_000; // if the closing audio never comes
+const GRACE_MS = 5000;
+const HANGUP_SAFETY_MS = 12_000;
 const MAX_HANGUP_RECOVERIES = 3;
-// Deaf-and-silent settle window at the start of a phone call: VAD is off and
-// Hanz stays quiet while the SIP leg's connect-noise passes, THEN he greets.
-export const GREETING_DELAY_MS = 2000;
+
+// Event types that fire many times per second — logging them would drown the
+// trace. Everything else is logged.
+const NOISY = new Set([
+  "response.output_audio.delta",
+  "response.output_audio_transcript.delta",
+  "response.audio.delta",
+  "response.audio_transcript.delta",
+  "response.function_call_arguments.delta",
+  "output_audio_buffer.append",
+  "rate_limits.updated",
+]);
 
 export type RunCallOptions = {
   callId: string;
   apiKey: string;
   clientId: string;
   scope: BookingScope;
-  /** Attach the booking tools, or run a conversation-only agent. */
   withTools: boolean;
   log?: Logger;
-  /** Called once when the call ends, with duration + token usage — the phone
-   *  equivalent of the browser agent's reportUsage(). Best-effort. */
   onComplete?: (summary: CallSummary) => void;
-  /** The session's turn-detection config. On a phone call it's disabled for
-   *  the greeting (so connect-time line noise can't barge in and cut it) and
-   *  restored afterwards. Omit to skip greeting protection. */
-  turnDetection?: unknown;
-  /** Overridable for tests. */
   wsFactory?: (url: string, apiKey: string) => WebSocket;
 };
 
@@ -79,40 +76,16 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     let startedAt = 0;
     const usage: CallUsage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0 };
 
-    // Greeting protection (telephony only). The SIP leg carries connect-time
-    // line noise that semantic VAD mistakes for the caller speaking; with
-    // interrupt_response on, that truncates the greeting mid-sentence. So we
-    // disable turn detection for the greeting and restore it once the greeting
-    // finishes — the browser doesn't need this (echo-cancelled mic, no line
-    // noise), so it's gated on turnDetection being supplied.
-    let greetingDone = opts.turnDetection === undefined;
-    let greetingGuard: NodeJS.Timeout | null = null;
-    let settleTimer: NodeJS.Timeout | null = null;
-    const restoreVad = () => {
-      if (greetingDone) return;
-      greetingDone = true;
-      if (greetingGuard) {
-        clearTimeout(greetingGuard);
-        greetingGuard = null;
-      }
-      send({ type: "session.update", session: { audio: { input: { turn_detection: opts.turnDetection } } } });
-      log("greeting done — barge-in restored");
-    };
-
     const finish = () => {
       if (settled) return;
       settled = true;
       watchdog.dispose();
       clearHangupTimer();
-      if (greetingGuard) clearTimeout(greetingGuard);
-      if (settleTimer) clearTimeout(settleTimer);
       try {
         ws.close();
       } catch {
         /* already closing */
       }
-      // Report duration + usage so phone calls land in the same voice_usage
-      // table (and admin cost/graphs) as the dashboard agent.
       if (startedAt && opts.onComplete) {
         const endedAt = Date.now();
         try {
@@ -123,14 +96,17 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
             usage,
           });
         } catch {
-          /* best-effort — the call already ended */
+          /* best-effort */
         }
       }
       resolve();
     };
 
+    // Trace + send every control message so the log shows exactly what we do.
     const send = (obj: unknown) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+      if (ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify(obj));
+      log(`OUT ${(obj as { type?: string }).type ?? "?"}`);
     };
 
     const watchdog = new ReplyWatchdog({
@@ -138,8 +114,6 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       log: (note, detail) => log(`watchdog: ${note}`, detail),
     });
 
-    // Hang up the SIP leg. Closing the WS alone doesn't drop the phone call;
-    // OpenAI's hangup endpoint does.
     const hangup = async () => {
       try {
         await fetch(`https://api.openai.com/v1/realtime/calls/${encodeURIComponent(callId)}/hangup`, {
@@ -169,8 +143,6 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       clearHangupTimer();
       const cid = hangupCallId;
       hangupCallId = null;
-      // Tell the model it did NOT hang up, so it re-closes instead of going
-      // silent after a reciprocal "ha det".
       if (cid) {
         send({
           type: "conversation.item.create",
@@ -190,28 +162,37 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     ws.on("open", () => {
       startedAt = Date.now();
       log("call ws open", { callId });
-
-      const greet = () => {
-        if (settled) return;
-        // Drop line noise captured during the settle window, then speak.
-        if (opts.turnDetection !== undefined) send({ type: "input_audio_buffer.clear" });
-        send({ type: "response.create" });
-        watchdog.expectReply();
-        // Safety net: restore VAD even if the greeting never completes.
-        if (opts.turnDetection !== undefined) greetingGuard = setTimeout(restoreVad, 10_000);
-      };
-
-      if (opts.turnDetection !== undefined) {
-        // Phone: go deaf (VAD off) immediately and stay quiet for the settle
-        // window so connect-noise passes, THEN greet. VAD is restored on the
-        // greeting's response.done.
-        send({ type: "session.update", session: { audio: { input: { turn_detection: null } } } });
-        send({ type: "input_audio_buffer.clear" });
-        settleTimer = setTimeout(greet, GREETING_DELAY_MS);
-      } else {
-        greet();
-      }
+      // Baseline: greet immediately, exactly like the browser does. No VAD
+      // tricks, no settle window — we're diagnosing, not patching.
+      send({ type: "response.create" });
+      watchdog.expectReply();
     });
+
+    // Diagnostic trace of every inbound event (minus the noisy deltas), with
+    // the fields that tell us WHY the greeting cuts: response.done status
+    // (cancelled = truncated), what the agent "heard" (echo of its own voice?
+    // line noise? real speech?), what it "said", and any error.
+    const traceIn = (ev: Record<string, unknown>) => {
+      const t = String(ev.type ?? "?");
+      if (NOISY.has(t)) return;
+      const r = ev.response as
+        | { status?: string; status_details?: unknown; output?: Array<{ type?: string; name?: string }> }
+        | undefined;
+      const detail: Record<string, unknown> = {};
+      if (t === "response.done" || t === "response.created") {
+        if (r?.status) detail.status = r.status;
+        if (r?.status_details) detail.statusDetails = r.status_details;
+        if (r?.output?.length) detail.output = r.output.map((i) => i.type + (i.name ? `:${i.name}` : ""));
+      }
+      if (t === "conversation.item.input_audio_transcription.completed") {
+        detail.heard = String(ev.transcript ?? "").slice(0, 140);
+      }
+      if (t === "response.output_audio_transcript.done") {
+        detail.said = String(ev.transcript ?? "").slice(0, 140);
+      }
+      if (t === "error") detail.error = ev.error;
+      log(`IN ${t}`, Object.keys(detail).length ? detail : undefined);
+    };
 
     ws.on("message", (raw: WebSocket.RawData) => {
       let ev: Record<string, unknown>;
@@ -220,6 +201,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       } catch {
         return;
       }
+      traceIn(ev);
       watchdog.handle(ev as never);
 
       switch (ev.type) {
@@ -236,8 +218,6 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
             hangupTimer = setTimeout(() => void hangup(), HANGUP_SAFETY_MS);
             break;
           }
-          // Booking tools — executed by the SAME shared code the dashboard
-          // agent uses; scope (sandbox/live) decided server-side from settings.
           void (async () => {
             let output: unknown;
             try {
@@ -259,11 +239,6 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
         }
 
         case "response.done": {
-          // The greeting just finished — turn barge-in back on for the rest of
-          // the call (idempotent; only the first response.done matters here).
-          restoreVad();
-          // Bare finish_session (tool call, no closing spoken): answer it with
-          // say-your-closing-now so the model doesn't improvise confusion.
           const response = ev.response as
             | {
                 usage?: {
@@ -306,13 +281,10 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
         }
 
         case "input_audio_buffer.speech_started":
-          // Caller spoke during the shutdown sequence — call continues.
           cancelHangup();
           break;
 
         case "output_audio_buffer.started":
-          // Closing audio is playing; swap the "audio never came" timer for a
-          // generous stuck-stream fallback so it can't cut the sentence.
           if (hangupPending) {
             clearHangupTimer();
             hangupTimer = setTimeout(() => void hangup(), 60_000);
@@ -320,16 +292,10 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
           break;
 
         case "output_audio_buffer.stopped":
-          // Closing finished playing — hang up after the grace window the
-          // closing line promises the caller.
           if (hangupPending) {
             clearHangupTimer();
             hangupTimer = setTimeout(() => void hangup(), GRACE_MS);
           }
-          break;
-
-        case "error":
-          log("realtime error", { error: ev.error });
           break;
       }
     });
@@ -343,12 +309,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       finish();
     });
 
-    // Absolute ceiling: no phone call runs longer than this. Protects the
-    // host from a wedged connection that never emits close.
     setTimeout(finish, 15 * 60 * 1000);
-
-    // Keep the type checker aware withTools is intentionally read by the
-    // webhook (it decides the session config), not here.
     void withTools;
   });
 }

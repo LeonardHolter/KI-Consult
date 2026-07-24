@@ -36,11 +36,9 @@ class FakeWs {
   }
 }
 
-import { GREETING_DELAY_MS, runCallSession } from "@/lib/telephony/callSession";
+import { runCallSession } from "@/lib/telephony/callSession";
 
 let fake: FakeWs;
-// Browser-style start (no turnDetection): greets immediately, no settle window
-// — keeps the existing tool/hangup tests simple.
 function start() {
   fake = new FakeWs();
   void runCallSession({
@@ -73,50 +71,6 @@ describe("runCallSession", () => {
   it("greets first — sends response.create on open", () => {
     start();
     expect(fake.typesSent()).toContain("response.create");
-  });
-
-  it("protects the greeting: disables VAD + clears noise on open, restores VAD after the greeting", async () => {
-    const td = { type: "semantic_vad", eagerness: "medium", interrupt_response: true };
-    fake = new FakeWs();
-    void runCallSession({
-      callId: "rtc_test",
-      apiKey: "sk-test",
-      clientId: "client-1",
-      scope: "sandbox",
-      withTools: true,
-      turnDetection: td,
-      wsFactory: () => fake as unknown as WsType,
-    });
-    fake.emit("open");
-
-    // On open: VAD off + buffer cleared immediately — and NO greeting yet
-    // (the settle window is still running).
-    const vadOff = fake.parsed.find(
-      (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection === null,
-    );
-    expect(vadOff).toBeTruthy();
-    expect(fake.typesSent()).toContain("input_audio_buffer.clear");
-    expect(fake.typesSent()).not.toContain("response.create"); // deaf & silent
-
-    // After the settle window, Hanz greets.
-    await vi.advanceTimersByTimeAsync(GREETING_DELAY_MS);
-    expect(fake.typesSent()).toContain("response.create");
-
-    // Greeting finishes -> VAD restored to the original config.
-    fake.emit(
-      "message",
-      JSON.stringify({
-        type: "response.done",
-        response: { output: [{ type: "message", content: [{ type: "output_audio" }] }] },
-      }),
-    );
-    await vi.runAllTimersAsync();
-    const restored = fake.parsed.find(
-      (m) =>
-        m.type === "session.update" &&
-        m.session?.audio?.input?.turn_detection?.interrupt_response === true,
-    );
-    expect(restored).toBeTruthy();
   });
 
   it("routes a booking tool call through execBookingTool and posts the result", async () => {
