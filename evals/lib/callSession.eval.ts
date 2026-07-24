@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type WsType from "ws";
 
 // Drives runCallSession with a fake WebSocket to prove the server-side phone
 // agent behaves like the browser agent: greets first, routes booking tool
@@ -46,7 +47,7 @@ function start() {
     clientId: "client-1",
     scope: "sandbox",
     withTools: true,
-    wsFactory: () => fake as unknown as import("ws"),
+    wsFactory: () => fake as unknown as WsType,
   });
   fake.emit("open");
 }

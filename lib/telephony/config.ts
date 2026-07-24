@@ -10,6 +10,15 @@ import type { VoiceDemoSettings } from "@/lib/voiceDemo/types";
 // headers, surfaced on the realtime.call.incoming event).
 export const PHONE_CLIENT_ID = "ad19951e-00e1-4293-8975-6c6bb1dbdad7"; // Handz On Strømmen
 
+// OpenAI Realtime SIP endpoint. The user part is the OpenAI PROJECT id — that
+// is how OpenAI routes an inbound INVITE to the right project + webhook.
+// Not a secret (it's an identifier, like a bucket name); overridable by env
+// if the project ever changes. `sip.api.openai.com` over TLS per OpenAI's SIP
+// guide — NOT sip.openai.com.
+export const OPENAI_SIP_URI =
+  process.env.OPENAI_SIP_URI ??
+  "sip:proj_Acg1pm1jVY2qiqEWf01Al8S3@sip.api.openai.com;transport=tls";
+
 type SettingsRow = {
   model: string;
   voice: string;
