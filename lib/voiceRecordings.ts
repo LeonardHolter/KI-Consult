@@ -26,7 +26,10 @@ export type RecordingMeta = {
   mimeType: string;
   /** Who made the call. Admin test calls are hidden from the client's
    *  dashboard; missing (pre-field recordings) is treated as "admin". */
-  recordedBy?: "admin" | "client";
+  /** admin/client = browser test calls; phone = a real inbound phone call
+   *  captured by Telnyx. Both client and phone are customer-facing and show
+   *  on the client dashboard; admin (test) calls stay admin-only. */
+  recordedBy?: "admin" | "client" | "phone";
 };
 
 /** Newest first; the panel never renders more than this. */

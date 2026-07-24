@@ -127,6 +127,37 @@ describe("runCallSession", () => {
     expect(JSON.parse(reClose.item.output).reason).toMatch(/fortsatte samtalen/i);
   });
 
+  it("reports duration + accumulated token usage on completion", async () => {
+    const onComplete = vi.fn();
+    fake = new FakeWs();
+    void runCallSession({
+      callId: "rtc_test",
+      apiKey: "sk-test",
+      clientId: "client-1",
+      scope: "sandbox",
+      withTools: true,
+      onComplete,
+      wsFactory: () => fake as unknown as WsType,
+    });
+    fake.emit("open");
+    fake.emit(
+      "message",
+      JSON.stringify({
+        type: "response.done",
+        response: {
+          usage: { input_tokens: 100, output_tokens: 40, input_token_details: { cached_tokens: 10 } },
+          output: [{ type: "message", content: [{ type: "output_audio" }] }],
+        },
+      }),
+    );
+    fake.emit("close");
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const s = onComplete.mock.calls[0][0];
+    expect(s.usage).toEqual({ inputTokens: 100, outputTokens: 40, cacheReadInputTokens: 10 });
+    expect(s.durationSeconds).toBeGreaterThanOrEqual(0);
+  });
+
   it("answers a bare finish_session (no closing spoken) with say-your-closing-now", async () => {
     start();
     fake.emit("message", JSON.stringify(funcCallDone("finish_session", "{}")));

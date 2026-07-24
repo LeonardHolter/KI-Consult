@@ -23,6 +23,19 @@ import type { BookingScope } from "@/lib/slots";
 
 type Logger = (note: string, detail?: Record<string, unknown>) => void;
 
+export type CallUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+};
+
+export type CallSummary = {
+  startedAt: number; // epoch ms of ws open
+  endedAt: number;
+  durationSeconds: number;
+  usage: CallUsage;
+};
+
 const GRACE_MS = 5000; // caller can still speak in this window after the close
 const HANGUP_SAFETY_MS = 12_000; // if the closing audio never comes
 const MAX_HANGUP_RECOVERIES = 3;
@@ -35,6 +48,9 @@ export type RunCallOptions = {
   /** Attach the booking tools, or run a conversation-only agent. */
   withTools: boolean;
   log?: Logger;
+  /** Called once when the call ends, with duration + token usage — the phone
+   *  equivalent of the browser agent's reportUsage(). Best-effort. */
+  onComplete?: (summary: CallSummary) => void;
   /** Overridable for tests. */
   wsFactory?: (url: string, apiKey: string) => WebSocket;
 };
@@ -53,6 +69,8 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
 
   return new Promise<void>((resolve) => {
     let settled = false;
+    let startedAt = 0;
+    const usage: CallUsage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0 };
     const finish = () => {
       if (settled) return;
       settled = true;
@@ -62,6 +80,21 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
         ws.close();
       } catch {
         /* already closing */
+      }
+      // Report duration + usage so phone calls land in the same voice_usage
+      // table (and admin cost/graphs) as the dashboard agent.
+      if (startedAt && opts.onComplete) {
+        const endedAt = Date.now();
+        try {
+          opts.onComplete({
+            startedAt,
+            endedAt,
+            durationSeconds: Math.max(0, (endedAt - startedAt) / 1000),
+            usage,
+          });
+        } catch {
+          /* best-effort — the call already ended */
+        }
       }
       resolve();
     };
@@ -125,6 +158,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     };
 
     ws.on("open", () => {
+      startedAt = Date.now();
       log("call ws open", { callId });
       // Greet first — the caller expects the receptionist to speak.
       send({ type: "response.create" });
@@ -180,8 +214,20 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
           // Bare finish_session (tool call, no closing spoken): answer it with
           // say-your-closing-now so the model doesn't improvise confusion.
           const response = ev.response as
-            | { output?: Array<{ type?: string; name?: string; content?: Array<{ type?: string }> }> }
+            | {
+                usage?: {
+                  input_tokens?: number;
+                  output_tokens?: number;
+                  input_token_details?: { cached_tokens?: number };
+                };
+                output?: Array<{ type?: string; name?: string; content?: Array<{ type?: string }> }>;
+              }
             | undefined;
+          if (response?.usage) {
+            usage.inputTokens += response.usage.input_tokens ?? 0;
+            usage.outputTokens += response.usage.output_tokens ?? 0;
+            usage.cacheReadInputTokens += response.usage.input_token_details?.cached_tokens ?? 0;
+          }
           const output = response?.output ?? [];
           const hasAudio = output.some(
             (i) => i.type === "message" && i.content?.some((c) => c.type === "output_audio"),

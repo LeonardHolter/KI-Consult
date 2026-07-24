@@ -30,7 +30,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!rec) return Response.json({ error: "not_found" }, { status: 404 });
   // Same visibility rule as the listing: a client can only play their own
   // calls — admin test recordings (incl. pre-recordedBy ones) 404 for them.
-  if (profile.role !== "admin" && rec.meta.recordedBy !== "client") {
+  if (profile.role !== "admin" && rec.meta.recordedBy !== "client" && rec.meta.recordedBy !== "phone") {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 

@@ -10,7 +10,7 @@
 
 import { after } from "next/server";
 import { verifyOpenAIWebhook } from "@/lib/telephony/verifyWebhook";
-import { loadPhoneAgent, PHONE_CLIENT_ID } from "@/lib/telephony/config";
+import { loadPhoneAgent, PHONE_CLIENT_ID, recordPhoneUsage } from "@/lib/telephony/config";
 import { runCallSession } from "@/lib/telephony/callSession";
 
 export const dynamic = "force-dynamic";
@@ -84,6 +84,12 @@ export async function POST(req: Request) {
       scope: agent.scope,
       withTools: true,
       log: (note, detail) => console.info(`[phone ${callId.slice(0, 8)}] ${note}`, detail ?? ""),
+      onComplete: (summary) => {
+        console.info(`[phone ${callId.slice(0, 8)}] ended`, {
+          seconds: Math.round(summary.durationSeconds),
+        });
+        void recordPhoneUsage(PHONE_CLIENT_ID, summary);
+      },
     }),
   );
 

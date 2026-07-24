@@ -71,6 +71,8 @@ export async function GET(req: Request) {
   // admin's test call never shows on the client dashboard. Recordings from
   // before recordedBy existed were all admin tests, so missing = admin.
   const visible =
-    profile.role === "admin" ? all : all.filter((r) => r.recordedBy === "client");
+    profile.role === "admin"
+      ? all
+      : all.filter((r) => r.recordedBy === "client" || r.recordedBy === "phone");
   return Response.json({ recordings: visible });
 }

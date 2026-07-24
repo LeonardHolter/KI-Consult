@@ -63,3 +63,33 @@ export async function loadPhoneAgent(clientId: string): Promise<{
 
   return { session: buildRealtimeSession(settings, { withTools: true }), scope };
 }
+
+/** Records a finished phone call's duration + token usage into voice_usage —
+ *  the same table the dashboard agent writes to, so phone calls show up in
+ *  the admin cost figures and activity graphs. Service role: a webhook has no
+ *  portal session. Best-effort; a failed insert must not affect the call. */
+export async function recordPhoneUsage(
+  clientId: string,
+  summary: {
+    startedAt: number;
+    endedAt: number;
+    durationSeconds: number;
+    usage: { inputTokens: number; outputTokens: number; cacheReadInputTokens: number };
+  },
+): Promise<void> {
+  try {
+    const supabase = createServiceClient();
+    await supabase.from("voice_usage").insert({
+      client_id: clientId,
+      started_at: new Date(summary.startedAt).toISOString(),
+      ended_at: new Date(summary.endedAt).toISOString(),
+      duration_seconds: Math.max(0, Math.round(summary.durationSeconds)),
+      input_tokens: summary.usage.inputTokens,
+      output_tokens: summary.usage.outputTokens,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: summary.usage.cacheReadInputTokens,
+    });
+  } catch {
+    /* best-effort */
+  }
+}
