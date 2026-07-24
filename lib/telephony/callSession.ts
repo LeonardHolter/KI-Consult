@@ -35,6 +35,11 @@ export type CallSummary = {
 const GRACE_MS = 5000;
 const HANGUP_SAFETY_MS = 12_000;
 const MAX_HANGUP_RECOVERIES = 3;
+// Half-duplex echo gate: while the agent speaks we disable input turn
+// detection (the control-channel equivalent of muting the caller's RTP —
+// we don't sit in the media path), and re-enable it this long after the
+// agent stops, to let the echo tail pass before we listen again.
+const ECHO_TAIL_MS = 600;
 
 // Event types that fire many times per second — logging them would drown the
 // trace. Everything else is logged.
@@ -56,6 +61,9 @@ export type RunCallOptions = {
   withTools: boolean;
   log?: Logger;
   onComplete?: (summary: CallSummary) => void;
+  /** The session's turn-detection config, restored when the half-duplex gate
+   *  re-enables listening. Omit to disable the gate (e.g. tests). */
+  turnDetection?: unknown;
   wsFactory?: (url: string, apiKey: string) => WebSocket;
 };
 
@@ -81,6 +89,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       settled = true;
       watchdog.dispose();
       clearHangupTimer();
+      clearUnmuteTimer();
       try {
         ws.close();
       } catch {
@@ -113,6 +122,39 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       send: () => send({ type: "response.create" }),
       log: (note, detail) => log(`watchdog: ${note}`, detail),
     });
+
+    // --- half-duplex echo gate ---
+    // While the agent speaks, turn detection is off so the agent's own audio
+    // echoing back over the SIP leg can't be heard as the caller and cut it
+    // off. After it stops, wait out the echo tail, drop whatever the buffer
+    // caught, and turn listening back on.
+    const gateOn = opts.turnDetection !== undefined;
+    let inputMuted = false;
+    let unmuteTimer: NodeJS.Timeout | null = null;
+    const clearUnmuteTimer = () => {
+      if (unmuteTimer) {
+        clearTimeout(unmuteTimer);
+        unmuteTimer = null;
+      }
+    };
+    const muteInput = () => {
+      if (!gateOn) return;
+      clearUnmuteTimer(); // agent (re)started speaking — cancel any pending unmute
+      if (inputMuted) return;
+      inputMuted = true;
+      send({ type: "session.update", session: { audio: { input: { turn_detection: null } } } });
+      log("half-duplex: muted (agent speaking)");
+    };
+    const scheduleUnmute = () => {
+      if (!gateOn || !inputMuted) return;
+      clearUnmuteTimer();
+      unmuteTimer = setTimeout(() => {
+        inputMuted = false;
+        send({ type: "input_audio_buffer.clear" });
+        send({ type: "session.update", session: { audio: { input: { turn_detection: opts.turnDetection } } } });
+        log("half-duplex: listening");
+      }, ECHO_TAIL_MS);
+    };
 
     const hangup = async () => {
       try {
@@ -162,8 +204,9 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     ws.on("open", () => {
       startedAt = Date.now();
       log("call ws open", { callId });
-      // Baseline: greet immediately, exactly like the browser does. No VAD
-      // tricks, no settle window — we're diagnosing, not patching.
+      // Mute before greeting so connect-noise and the greeting's own echo are
+      // ignored; the gate re-enables listening after the greeting stops.
+      muteInput();
       send({ type: "response.create" });
       watchdog.expectReply();
     });
@@ -285,6 +328,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
           break;
 
         case "output_audio_buffer.started":
+          muteInput(); // agent is speaking — stop listening (echo gate)
           if (hangupPending) {
             clearHangupTimer();
             hangupTimer = setTimeout(() => void hangup(), 60_000);
@@ -292,6 +336,8 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
           break;
 
         case "output_audio_buffer.stopped":
+        case "output_audio_buffer.cleared":
+          scheduleUnmute(); // agent done — listen again after the echo tail
           if (hangupPending) {
             clearHangupTimer();
             hangupTimer = setTimeout(() => void hangup(), GRACE_MS);

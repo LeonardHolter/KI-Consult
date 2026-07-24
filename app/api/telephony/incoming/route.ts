@@ -83,6 +83,8 @@ export async function POST(req: Request) {
       clientId: PHONE_CLIENT_ID,
       scope: agent.scope,
       withTools: true,
+      // Restored by the half-duplex gate each time the agent finishes speaking.
+      turnDetection: agent.session.audio.input.turn_detection,
       log: (note, detail) => console.info(`[phone ${callId.slice(0, 8)}] ${note}`, detail ?? ""),
       onComplete: (summary) => {
         console.info(`[phone ${callId.slice(0, 8)}] ended`, {

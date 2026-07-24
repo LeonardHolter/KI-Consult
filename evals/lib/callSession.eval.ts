@@ -127,6 +127,37 @@ describe("runCallSession", () => {
     expect(JSON.parse(reClose.item.output).reason).toMatch(/fortsatte samtalen/i);
   });
 
+  it("half-duplex gate: mutes input while the agent speaks, re-listens after the echo tail", async () => {
+    const td = { type: "server_vad", threshold: 0.65, interrupt_response: false };
+    fake = new FakeWs();
+    void runCallSession({
+      callId: "rtc_test",
+      apiKey: "sk-test",
+      clientId: "client-1",
+      scope: "sandbox",
+      withTools: true,
+      turnDetection: td,
+      wsFactory: () => fake as unknown as WsType,
+    });
+    fake.emit("open");
+
+    // On open (before the greeting) input is muted: turn_detection -> null.
+    const muted = fake.parsed.find(
+      (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection === null,
+    );
+    expect(muted).toBeTruthy();
+
+    // Agent finishes speaking -> after the echo tail, buffer cleared + VAD
+    // restored to the original server_vad config.
+    fake.emit("message", JSON.stringify({ type: "output_audio_buffer.stopped" }));
+    await vi.advanceTimersByTimeAsync(700);
+    expect(fake.typesSent()).toContain("input_audio_buffer.clear");
+    const relistened = fake.parsed.find(
+      (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection?.type === "server_vad",
+    );
+    expect(relistened).toBeTruthy();
+  });
+
   it("reports duration + accumulated token usage on completion", async () => {
     const onComplete = vi.fn();
     fake = new FakeWs();
