@@ -18,15 +18,37 @@ import { listRecordings, saveRecording } from "@/lib/voiceRecordings";
 
 export const dynamic = "force-dynamic";
 
-// Only ever download from Telnyx's own hosts — the URL comes from the request
-// body, so without this an attacker could POST any URL and make us fetch it.
-function isTelnyxUrl(url: string): boolean {
+// Telnyx does NOT serve recordings from a telnyx.com host. It hands out
+// PRE-SIGNED S3 links on the shared s3.amazonaws.com host — documented
+// example bucket `telephony-recorder-prod`, signature in the query string,
+// valid 10 minutes. The first version of this guard allowed only *.telnyx.com
+// and therefore threw away the first real recording we ever received
+// (2026-07-25 14:14 UTC, "rejected non-Telnyx URL host { host:
+// 's3.amazonaws.com' }"). So: allow Telnyx's own hosts, plus S3 URLs whose
+// BUCKET is Telnyx's. Allowing bare s3.amazonaws.com would let any bucket in,
+// which is the SSRF hole this guard exists to close.
+const TELNYX_BUCKET = /^telephony-recorder(-[a-z0-9]+)*$/;
+const S3_PATH_STYLE = /^s3([.-][a-z0-9-]+)*\.amazonaws\.com$/;
+const S3_VHOST_STYLE = /^([a-z0-9.-]+)\.s3([.-][a-z0-9-]+)*\.amazonaws\.com$/;
+
+function isTelnyxApiHost(host: string): boolean {
+  return host === "telnyx.com" || host.endsWith(".telnyx.com");
+}
+
+function isTelnyxRecordingUrl(raw: string): boolean {
+  let url: URL;
   try {
-    const host = new URL(url).hostname;
-    return host === "telnyx.com" || host.endsWith(".telnyx.com");
+    url = new URL(raw);
   } catch {
     return false;
   }
+  if (url.protocol !== "https:") return false;
+  if (isTelnyxApiHost(url.hostname)) return true;
+  if (S3_PATH_STYLE.test(url.hostname)) {
+    return TELNYX_BUCKET.test(url.pathname.split("/")[1] ?? "");
+  }
+  const vhost = S3_VHOST_STYLE.exec(url.hostname);
+  return vhost ? TELNYX_BUCKET.test(vhost[1]) : false;
 }
 
 async function parseBody(req: Request): Promise<Record<string, unknown> | null> {
@@ -103,11 +125,15 @@ export async function POST(req: Request) {
   // Telnyx stops retrying.
   if (!rec) return Response.json({ ok: true });
 
-  if (!isTelnyxUrl(rec.url)) {
-    console.warn("[telnyx-recording] rejected non-Telnyx URL host", {
-      host: (() => {
+  if (!isTelnyxRecordingUrl(rec.url)) {
+    // Log host AND path (never the query string — that's the S3 signature).
+    // Host alone was not enough to tell "wrong bucket" from "wrong provider"
+    // the first time this fired.
+    console.warn("[telnyx-recording] rejected recording URL", {
+      target: (() => {
         try {
-          return new URL(rec.url).hostname;
+          const u = new URL(rec.url);
+          return `${u.hostname}${u.pathname}`;
         } catch {
           return rec.url.slice(0, 60);
         }
@@ -123,11 +149,15 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, duplicate: true });
   }
 
-  // Telnyx recording URLs are authenticated with the API key; harmless to
-  // send on public variants.
+  // The API key goes ONLY to telnyx.com endpoints. A pre-signed S3 link
+  // carries its credentials in the query string, and S3 rejects any request
+  // that also sends an Authorization header ("only one auth mechanism
+  // allowed") — so sending the key there would turn a working download into a
+  // 400. It is also a needless place to leak the key.
   const telnyxKey = process.env.TELNYX_API_KEY;
+  const useApiKey = telnyxKey && isTelnyxApiHost(new URL(rec.url).hostname);
   const audioRes = await fetch(rec.url, {
-    headers: telnyxKey ? { Authorization: `Bearer ${telnyxKey}` } : {},
+    headers: useApiKey ? { Authorization: `Bearer ${telnyxKey}` } : {},
   });
   if (!audioRes.ok) {
     console.warn("[telnyx-recording] download failed", { status: audioRes.status });
