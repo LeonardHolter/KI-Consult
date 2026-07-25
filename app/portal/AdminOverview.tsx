@@ -195,6 +195,15 @@ export default function AdminOverview({
         >
           Hendelser
         </Link>
+        <Link
+          href="/portal/status"
+          style={{
+            padding: "7px 12px", borderRadius: 8, border: `1px solid ${MUTED}66`,
+            background: CREAM, color: INK, textDecoration: "none", fontSize: 14, fontWeight: 600,
+          }}
+        >
+          Systemstatus
+        </Link>
         <form action={signOut} style={{ marginLeft: "auto" }}>
           <button
             style={{

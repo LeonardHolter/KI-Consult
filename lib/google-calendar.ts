@@ -34,7 +34,10 @@ function b64url(input: Buffer | string): string {
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
-async function getAccessToken(): Promise<string> {
+/** Exported so the status page can probe Google auth without touching a
+ *  calendar: minting the token exercises the whole chain (key parses, JWT
+ *  signs, Google accepts the service account) and is the part that breaks. */
+export async function getAccessToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
     return cachedToken.token;
   }
