@@ -108,13 +108,19 @@ export async function POST(req: Request) {
       },
       { onConflict: "client_id", ignoreDuplicates: true },
     );
+    // Conflict target is the PRIMARY KEY (id = slug), NOT client_id: the
+    // client_id unique index is partial (WHERE client_id IS NOT NULL, see
+    // 005), and Postgres refuses partial indexes as ON CONFLICT targets
+    // (42P10). With client_id here, the upsert 400s and voice seeding
+    // silently never happens — which is exactly what hit the first client
+    // created through this flow.
     const voiceSeed = await supabase.from("voice_demo_settings").upsert(
       {
         id: slug,
         client_id: client.id,
         instructions: voiceStarterInstructions(name),
       },
-      { onConflict: "client_id", ignoreDuplicates: true },
+      { onConflict: "id", ignoreDuplicates: true },
     );
     if (chatSeed.error || voiceSeed.error) {
       return Response.json(

@@ -40,6 +40,24 @@ function fakeFrom(table: string) {
     upsert: async (row: Row, opts: Row) => {
       upsertCalls.push({ table, row, opts });
       const conflictKey = String(opts?.onConflict ?? "id");
+      // Mirror the REAL schema's usable ON CONFLICT targets. Postgres only
+      // accepts full unique constraints — voice_demo_settings.client_id has
+      // just a PARTIAL unique index (005), which 42P10s. The first version
+      // of this mock accepted any key, so the suite was green while prod
+      // silently skipped voice seeding. Keep this in sync with supabase/.
+      const VALID_CONFLICT_TARGETS: Record<string, string[]> = {
+        chat_bot_settings: ["client_id"], // primary key
+        voice_demo_settings: ["id"], // primary key; client_id index is partial
+      };
+      const valid = VALID_CONFLICT_TARGETS[table];
+      if (valid && !valid.includes(conflictKey)) {
+        return {
+          error: {
+            code: "42P10",
+            message: "there is no unique or exclusion constraint matching the ON CONFLICT specification",
+          },
+        };
+      }
       const existing = rows().find((r) => r[conflictKey] === row[conflictKey]);
       if (existing) {
         if (!opts?.ignoreDuplicates) Object.assign(existing, row);
