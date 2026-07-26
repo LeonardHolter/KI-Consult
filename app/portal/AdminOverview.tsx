@@ -5,6 +5,7 @@ import type { ClientHealth, DayActivity, EventCounts24h, VoiceUsageStats } from 
 import ClientBillingForm from "./ClientBillingForm";
 import OnboardingPanel from "./OnboardingPanel";
 import ActivityCharts from "./ActivityCharts";
+import { estimateChatCostUsd, estimateVoiceCostUsd } from "@/lib/usagePricing";
 
 const CREAM = "#f3efe4";
 const INK = "#16190f";
@@ -21,47 +22,6 @@ function timeAgo(iso: string | null): string {
   if (h < 24) return `${h} t siden`;
   const d = Math.floor(h / 24);
   return d === 1 ? "i går" : `${d} dager siden`;
-}
-
-// Claude Opus 4.8 pricing, per million tokens — the bot's chat route
-// hardcodes model: "claude-opus-4-8". Update these if that ever changes.
-// Cache write reflects the route's default 5-minute ephemeral TTL, cache
-// read is ~0.1x input.
-const CHAT_PRICE_PER_MILLION = {
-  input: 5.0,
-  output: 25.0,
-  cacheWrite: 5.0 * 1.25,
-  cacheRead: 5.0 * 0.1,
-};
-
-// gpt-realtime pricing, per million tokens — approximate, blended
-// text+audio rate. OpenAI prices audio and text tokens separately and this
-// doesn't distinguish them (the Realtime usage event doesn't cleanly split
-// them either), so treat this as directional, not exact — verify against
-// platform.openai.com/docs/pricing before using it for real billing.
-const VOICE_PRICE_PER_MILLION = {
-  input: 32.0,
-  output: 64.0,
-  cacheRead: 32.0 * 0.1,
-};
-
-function estimateChatCostUsd(u: UsageStats): number {
-  return (
-    (u.input_tokens * CHAT_PRICE_PER_MILLION.input +
-      u.output_tokens * CHAT_PRICE_PER_MILLION.output +
-      u.cache_creation_input_tokens * CHAT_PRICE_PER_MILLION.cacheWrite +
-      u.cache_read_input_tokens * CHAT_PRICE_PER_MILLION.cacheRead) /
-    1_000_000
-  );
-}
-
-function estimateVoiceCostUsd(v: VoiceUsageStats): number {
-  return (
-    (v.inputTokens * VOICE_PRICE_PER_MILLION.input +
-      v.outputTokens * VOICE_PRICE_PER_MILLION.output +
-      v.cacheReadInputTokens * VOICE_PRICE_PER_MILLION.cacheRead) /
-    1_000_000
-  );
 }
 
 function fmtTokens(n: number): string {
