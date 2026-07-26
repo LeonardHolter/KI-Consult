@@ -88,6 +88,7 @@ export default function PortalDashboard({
   clientLabel,
   samtalerHref = "/portal/samtaler",
   overviewHref,
+  phoneNumber,
 }: {
   /** Set only when an admin is viewing a specific client; omitted for a client
    *  account, which the /api/bot proxy pins to its own client regardless. */
@@ -97,6 +98,11 @@ export default function PortalDashboard({
   samtalerHref?: string;
   /** Present only for the admin drill-down — link back to the client list. */
   overviewHref?: string;
+  /** The client's live phone line, display-formatted. When set, the card
+   *  shows the REAL number instead of the browser caller — calling it
+   *  exercises the actual pipeline customers hit (Telnyx -> SIP -> agent),
+   *  which the WebRTC demo never did. */
+  phoneNumber?: string | null;
 }) {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [calConnected, setCalConnected] = useState(false);
@@ -472,10 +478,33 @@ export default function PortalDashboard({
           høyre — det er nøyaktig samme bot som kundene dine snakker med.
         </p>
 
-        {/* Admin gets the full card (status + live transcript); a client
-            account gets the minimal one — a pulsing circle, no transcript.
-            The conversation is heard, and reviewed via the recordings. */}
-        <VoiceAgentCard clientId={clientId} variant={overviewHref ? "full" : "minimal"} />
+        {/* With a phone line connected, the browser caller is retired: the
+            real number IS the demo, and a call to it runs the exact pipeline
+            customers hit (Telnyx -> SIP -> agent -> recording). Clients
+            without a number keep the WebRTC caller — they have nothing to
+            dial yet. */}
+        {phoneNumber ? (
+          <div className="ctp-card" style={{ textAlign: "center", padding: "30px 20px 26px" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".08em", color: "#9a9a8c", textTransform: "uppercase" }}>
+              Ring agenten
+            </div>
+            <a
+              href={`tel:${phoneNumber.replace(/\s/g, "")}`}
+              style={{
+                display: "inline-block", margin: "10px 0 8px", fontSize: 36, fontWeight: 800,
+                letterSpacing: "-0.02em", color: "#16190f", textDecoration: "none",
+              }}
+            >
+              {phoneNumber}
+            </a>
+            <p style={{ margin: 0, fontSize: 13.5, color: "#5c5f52", lineHeight: 1.5 }}>
+              Taleagenten svarer — nøyaktig det kundene dine opplever. Samtalen tas opp og
+              dukker opp under Samtaleopptak et halvt minutt etter at du legger på.
+            </p>
+          </div>
+        ) : (
+          <VoiceAgentCard clientId={clientId} variant={overviewHref ? "full" : "minimal"} />
+        )}
         {clientId && (
           <VoiceRecordingsPanel clientId={clientId} showOrigin={Boolean(overviewHref)} />
         )}

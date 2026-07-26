@@ -26,6 +26,17 @@ export function normalizeNumber(raw: string): string {
   return raw.replace(/\D/g, "");
 }
 
+/** Display form: "4732994223" -> "+47 32 99 42 23". Non-Norwegian or odd
+ *  lengths fall back to "+<digits>". */
+export function formatNumber(raw: string): string {
+  const digits = normalizeNumber(raw);
+  if (digits.length === 10 && digits.startsWith("47")) {
+    const n = digits.slice(2);
+    return `+47 ${n.slice(0, 2)} ${n.slice(2, 4)} ${n.slice(4, 6)} ${n.slice(6)}`;
+  }
+  return `+${digits}`;
+}
+
 /** Pulls the dialed number out of a SIP URI ("sip:+4732994223@host;tag=x").
  *  Returns null when there is no number to find. */
 export function numberFromSipUri(uri: string | undefined | null): string | null {

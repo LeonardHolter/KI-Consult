@@ -3,6 +3,8 @@ import { getClientHealth, getDailyActivity, getEventCounts24h, getVoiceUsageStat
 import { loggingEnabled } from "@/lib/portal-log";
 import { signOut } from "@/app/login/actions";
 import DashboardView from "./DashboardView";
+import { DEFAULT_PHONE_NUMBER, PHONE_CLIENT_ID } from "@/lib/telephony/config";
+import { formatNumber, numberForClient } from "@/lib/telephony/numbers";
 import AdminOverview from "./AdminOverview";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,15 @@ const MUTED = "#9a9a8c";
  * overview of every client with usage stats, and can drill into any one of
  * them via ?client=<id>, which renders the same dashboard the client sees.
  */
+/** The client's live phone line, display-formatted — the mapped number, or
+ *  the default line for its client. Null = no phone, dashboard shows the
+ *  browser caller instead. */
+async function clientPhoneNumber(clientId: string): Promise<string | null> {
+  const mapped = await numberForClient(clientId);
+  if (mapped) return formatNumber(mapped);
+  return clientId === PHONE_CLIENT_ID ? DEFAULT_PHONE_NUMBER : null;
+}
+
 export default async function PortalPage({
   searchParams,
 }: {
@@ -51,7 +62,12 @@ export default async function PortalPage({
     // client_id is always set for the "client" role (DB constraint), but
     // pass it explicitly rather than relying on DashboardView inferring it —
     // the embed script and voice-agent button both need the id directly.
-    return <DashboardView clientId={profile.client_id ?? undefined} />;
+    return (
+      <DashboardView
+        clientId={profile.client_id ?? undefined}
+        phoneNumber={profile.client_id ? await clientPhoneNumber(profile.client_id) : null}
+      />
+    );
   }
 
   const clients = await getClients();
@@ -65,6 +81,7 @@ export default async function PortalPage({
         clientLabel={selectedClient.name}
         samtalerHref={`/portal/samtaler?client=${selectedClient.id}`}
         overviewHref="/portal"
+        phoneNumber={await clientPhoneNumber(selectedClient.id)}
       />
     );
   }
