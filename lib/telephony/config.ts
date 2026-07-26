@@ -10,6 +10,12 @@ import type { VoiceDemoSettings } from "@/lib/voiceDemo/types";
 // headers, surfaced on the realtime.call.incoming event).
 export const PHONE_CLIENT_ID = "ad19951e-00e1-4293-8975-6c6bb1dbdad7"; // Handz On Strømmen
 
+// The original line, wired before the number->client map existed. Calls to a
+// number with no assignment fall back to PHONE_CLIENT_ID, which keeps this
+// number working without a mapping row. Display + "already taken" logic on
+// the Integrasjoner page also use it.
+export const DEFAULT_PHONE_NUMBER = "+47 32 99 42 23";
+
 // OpenAI Realtime SIP endpoint. The user part is the OpenAI PROJECT id — that
 // is how OpenAI routes an inbound INVITE to the right project + webhook.
 // Not a secret (it's an identifier, like a bucket name); overridable by env

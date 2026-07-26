@@ -11,6 +11,7 @@
 import { after } from "next/server";
 import { verifyOpenAIWebhook } from "@/lib/telephony/verifyWebhook";
 import { loadPhoneAgent, PHONE_CLIENT_ID, recordPhoneUsage } from "@/lib/telephony/config";
+import { clientForNumber, numberFromSipUri } from "@/lib/telephony/numbers";
 import { runCallSession } from "@/lib/telephony/callSession";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
 
   const event = verified.payload as {
     type?: string;
-    data?: { call_id?: string };
+    data?: { call_id?: string; sip_headers?: { name?: string; value?: string }[] };
   };
 
   // Only inbound calls matter here; ack everything else so OpenAI stops
@@ -54,12 +55,25 @@ export async function POST(req: Request) {
   }
   const callId = event.data.call_id;
 
-  const agent = await loadPhoneAgent(PHONE_CLIENT_ID);
+  // Route by the DIALED number (SIP To-header) via the number->client map
+  // from the Integrasjoner page. No match (or no To-header) falls back to
+  // PHONE_CLIENT_ID — the original line keeps working with an empty map.
+  const toHeader = event.data.sip_headers?.find((h) => h.name?.toLowerCase() === "to")?.value;
+  const dialed = numberFromSipUri(toHeader);
+  const mappedClient = dialed ? await clientForNumber(dialed) : null;
+  const clientId = mappedClient ?? PHONE_CLIENT_ID;
+  console.info(`[phone ${callId.slice(0, 8)}] routing`, {
+    dialed: dialed ?? "unknown",
+    client: clientId,
+    via: mappedClient ? "number-map" : "default",
+  });
+
+  const agent = await loadPhoneAgent(clientId);
   if (!agent) {
     return Response.json({ error: "no_agent_config" }, { status: 500 });
   }
 
-  // Accept the call with the full Handz On session (prompt + booking tools).
+  // Accept the call with the routed client's full session (prompt + tools).
   const acceptRes = await fetch(
     `https://api.openai.com/v1/realtime/calls/${encodeURIComponent(callId)}/accept`,
     {
@@ -80,7 +94,7 @@ export async function POST(req: Request) {
     runCallSession({
       callId,
       apiKey,
-      clientId: PHONE_CLIENT_ID,
+      clientId,
       scope: agent.scope,
       withTools: true,
       // Restored by the half-duplex gate each time the agent finishes speaking.
@@ -90,7 +104,7 @@ export async function POST(req: Request) {
         console.info(`[phone ${callId.slice(0, 8)}] ended`, {
           seconds: Math.round(summary.durationSeconds),
         });
-        void recordPhoneUsage(PHONE_CLIENT_ID, summary);
+        void recordPhoneUsage(clientId, summary);
       },
     }),
   );
