@@ -4,7 +4,7 @@
 // instead of one global settings row.
 
 import { getProfile } from "@/lib/portal/data";
-import { getServiceAccount, testCalendarAccess } from "@/lib/google-calendar";
+import { calendarConfigured, getCalendarProvider } from "@/lib/calendar/provider";
 import { loadSettings, saveSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -22,14 +22,16 @@ export async function GET(req: Request) {
   const clientId = new URL(req.url).searchParams.get("client");
   if (!clientId) return Response.json({ error: "missing_client" }, { status: 400 });
 
-  const sa = getServiceAccount();
   const settings = await loadSettings(clientId);
+  const provider = getCalendarProvider(settings);
   return Response.json({
-    serviceAccountEmail: sa?.client_email ?? null,
+    provider: provider.id,
+    providerLabel: provider.label,
+    serviceAccountEmail: provider.connectionHint(),
     calendarId: settings.calendarId ?? null,
     calendarName: settings.calendarName ?? null,
     locationName: settings.locationName,
-    connected: Boolean(settings.calendarId && sa),
+    connected: calendarConfigured(settings),
     voiceBookingMode: settings.voiceBookingMode ?? "sandbox",
   });
 }
@@ -58,10 +60,12 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, voiceBookingMode: settings.voiceBookingMode });
   }
 
-  // Everything past here talks to Google, so the credential is required.
-  if (!getServiceAccount()) {
+  // Everything past here talks to the calendar provider, so its credentials
+  // are required. Provider comes from saved settings (google when unset).
+  const provider = getCalendarProvider(await loadSettings(body.clientId));
+  if (!provider.configured()) {
     return Response.json(
-      { error: "GOOGLE_SERVICE_ACCOUNT_KEY er ikke satt på serveren." },
+      { error: `${provider.label} er ikke konfigurert på serveren.` },
       { status: 500 },
     );
   }
@@ -82,7 +86,7 @@ export async function POST(req: Request) {
   // Verify we can actually read the calendar before saving.
   let calendarName: string;
   try {
-    calendarName = await testCalendarAccess(calendarId);
+    calendarName = await provider.testAccess(calendarId);
   } catch (err) {
     return Response.json(
       {

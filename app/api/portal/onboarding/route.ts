@@ -13,7 +13,7 @@ import crypto from "crypto";
 import { getProfile } from "@/lib/portal/data";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadSettings } from "@/lib/settings";
-import { getServiceAccount } from "@/lib/google-calendar";
+import { calendarConfigured } from "@/lib/calendar/provider";
 import {
   chatStarterInstructions,
   chatStarterKnowledge,
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
       chatCustomized: Boolean(chat.data) && !needsFilling(chat.data?.instructions) && !needsFilling(chat.data?.knowledge_base),
       voiceSeeded: Boolean(voice.data),
       voiceCustomized: Boolean(voice.data) && !needsFilling(voice.data?.instructions),
-      calendarConnected: Boolean(settings.calendarId && getServiceAccount()),
+      calendarConnected: calendarConfigured(settings),
       voiceBookingMode: settings.voiceBookingMode,
       userCount: users.data?.length ?? 0,
     },

@@ -2,18 +2,8 @@ import fs from "fs";
 import path from "path";
 import { get, put } from "@vercel/blob";
 import crypto from "crypto";
-import {
-  deleteEvent,
-  getEvent,
-  getServiceAccount,
-  insertEvent,
-  listEvents,
-  patchEvent,
-  osloParts,
-  osloToUTC,
-  osloToday,
-  type GcalEvent,
-} from "@/lib/google-calendar";
+import { osloParts, osloToUTC, osloToday, type GcalEvent } from "@/lib/google-calendar";
+import { calendarConfigured, getCalendarProvider } from "@/lib/calendar/provider";
 import { loadSettings, type Settings } from "@/lib/settings";
 
 /* ------------------------------------------------------------------ */
@@ -87,7 +77,7 @@ function upcomingDates(daysAhead: number): string[] {
 }
 
 export function calendarConnected(settings: Settings): boolean {
-  return Boolean(settings.calendarId && getServiceAccount());
+  return calendarConfigured(settings);
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,7 +151,7 @@ async function fetchCalendarEvents(
 ): Promise<GcalEvent[]> {
   const timeMin = osloToUTC(dates[0], "00:00").toISOString();
   const timeMax = osloToUTC(dates[dates.length - 1], "23:59").toISOString();
-  return (await listEvents(settings.calendarId!, timeMin, timeMax)).filter(
+  return (await getCalendarProvider(settings).listEvents(settings.calendarId!, timeMin, timeMax)).filter(
     (e) =>
       e.status !== "cancelled" &&
       e.transparency !== "transparent" &&
@@ -239,7 +229,7 @@ async function calendarBook(
   }
 
   const bookedAt = new Date().toISOString();
-  const event = await insertEvent(settings.calendarId!, {
+  const event = await getCalendarProvider(settings).insertEvent(settings.calendarId!, {
     summary: `${service} – ${customerName}`,
     description: `Booket av AI-chatbot.\nKunde: ${customerName}\nTelefon: ${customerPhone}\nTjeneste: ${service}`,
     start: { dateTime: `${slot.date}T${slot.time}:00`, timeZone: "Europe/Oslo" },
@@ -271,7 +261,7 @@ async function calendarCancel(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   let event: GcalEvent;
   try {
-    event = await getEvent(settings.calendarId!, bookingId);
+    event = await getCalendarProvider(settings).getEvent(settings.calendarId!, bookingId);
   } catch {
     return { ok: false, error: "Fant ikke denne avtalen." };
   }
@@ -285,7 +275,7 @@ async function calendarCancel(
       error: "Denne avtalen er ikke laget av boten og kan ikke slettes herfra.",
     };
   }
-  await deleteEvent(settings.calendarId!, bookingId);
+  await getCalendarProvider(settings).deleteEvent(settings.calendarId!, bookingId);
   return { ok: true };
 }
 
@@ -532,7 +522,7 @@ export async function appendBookingNote(
   if (scope === "live" && calendarConnected(settings)) {
     const startUTC = osloToUTC(date, "00:00");
     const endUTC = new Date(startUTC.getTime() + 24 * 3600 * 1000);
-    const events = await listEvents(settings.calendarId!, startUTC.toISOString(), endUTC.toISOString());
+    const events = await getCalendarProvider(settings).listEvents(settings.calendarId!, startUTC.toISOString(), endUTC.toISOString());
     const match = events.find((e) => {
       const priv = e.extendedProperties?.private;
       if (priv?.hzAgent !== "1" || !e.start?.dateTime) return false;
@@ -548,7 +538,7 @@ export async function appendBookingNote(
     const service = priv.service ?? match.summary ?? "";
     if (service.includes(trimmedNote)) return { ok: true, service };
     const newService = service ? `${service} + ${trimmedNote}` : trimmedNote;
-    await patchEvent(settings.calendarId!, match.id, {
+    await getCalendarProvider(settings).patchEvent(settings.calendarId!, match.id, {
       summary: `${newService} – ${priv.customerName ?? ""}`.trim(),
       extendedProperties: { private: { ...priv, service: newService } },
     });

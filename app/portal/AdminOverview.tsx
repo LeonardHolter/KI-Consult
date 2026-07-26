@@ -196,6 +196,15 @@ export default function AdminOverview({
           Hendelser
         </Link>
         <Link
+          href="/portal/integrasjoner"
+          style={{
+            padding: "7px 12px", borderRadius: 8, border: `1px solid ${MUTED}66`,
+            background: CREAM, color: INK, textDecoration: "none", fontSize: 14, fontWeight: 600,
+          }}
+        >
+          Integrasjoner
+        </Link>
+        <Link
           href="/portal/status"
           style={{
             padding: "7px 12px", borderRadius: 8, border: `1px solid ${MUTED}66`,

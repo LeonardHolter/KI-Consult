@@ -3,7 +3,11 @@ import path from "path";
 import { get, put } from "@vercel/blob";
 
 export type Settings = {
-  /** Google Calendar ID the store shared with the service account. */
+  /** Which calendar system this client's bookings live in. Absent = google:
+   *  every client that predates the field is on Google. */
+  calendarProvider?: "google" | "outlook";
+  /** Calendar ID in the chosen provider — for Google, the ID the store shared
+   *  with the service account. */
   calendarId?: string;
   /** Human-readable calendar name (from the connection test). */
   calendarName?: string;
