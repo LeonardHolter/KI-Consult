@@ -127,7 +127,7 @@ describe("runCallSession", () => {
     expect(JSON.parse(reClose.item.output).reason).toMatch(/fortsatte samtalen/i);
   });
 
-  it("half-duplex gate: mutes input while the agent speaks, re-listens after the echo tail", async () => {
+  it("half-duplex gate: mutes for the greeting, re-listens after the echo tail, then stays disarmed", async () => {
     const td = { type: "server_vad", threshold: 0.65, interrupt_response: false };
     fake = new FakeWs();
     void runCallSession({
@@ -162,6 +162,21 @@ describe("runCallSession", () => {
       (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection?.type === "server_vad",
     );
     expect(relistened).toBeTruthy();
+
+    // EXPERIMENT: after the greeting the gate is disarmed — the agent speaking
+    // again must NOT mute. Exactly one mute for the whole call; server_vad
+    // alone guards the rest.
+    const mutesBefore = fake.parsed.filter(
+      (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection === null,
+    ).length;
+    fake.emit("message", JSON.stringify({ type: "output_audio_buffer.started" }));
+    fake.emit("message", JSON.stringify({ type: "output_audio_buffer.stopped" }));
+    await vi.advanceTimersByTimeAsync(700);
+    const mutesAfter = fake.parsed.filter(
+      (m) => m.type === "session.update" && m.session?.audio?.input?.turn_detection === null,
+    ).length;
+    expect(mutesBefore).toBe(1);
+    expect(mutesAfter).toBe(1);
   });
 
   it("reports duration + accumulated token usage on completion", async () => {

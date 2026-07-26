@@ -39,6 +39,17 @@ const MAX_HANGUP_RECOVERIES = 3;
 // detection (the control-channel equivalent of muting the caller's RTP —
 // we don't sit in the media path), and re-enable it this long after the
 // agent stops, to let the echo tail pass before we listen again.
+//
+// EXPERIMENT (2026-07-26): the gate now guards ONLY the greeting, then
+// disarms for the rest of the call. Rationale: line-side echo cancellers
+// (G.168) are adaptive and need the first seconds of a call to converge, so
+// the greeting faces the loudest echo — and the mid-call truncations we saw
+// on 2026-07-24 were all on the baseline build, BEFORE server_vad@0.65 +
+// interrupt_response:false went in. Hypothesis: that threshold is enough
+// once the line has settled, and disarming restores mid-call input (echo
+// permitting). Judge by call logs: garbled `heard:` transcripts of Hanz's
+// own words mid-call, or replies to nobody, mean the hypothesis failed —
+// re-arm the gate for the whole call.
 const ECHO_TAIL_MS = 600;
 
 // Event types that fire many times per second — logging them would drown the
@@ -129,6 +140,10 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
     // off. After it stops, wait out the echo tail, drop whatever the buffer
     // caught, and turn listening back on.
     const gateOn = opts.turnDetection !== undefined;
+    // Armed until the first unmute completes — i.e. for the greeting only
+    // (see the EXPERIMENT note on ECHO_TAIL_MS). After that the gate stays
+    // out of the way and server_vad alone carries the echo protection.
+    let gateArmed = gateOn;
     let inputMuted = false;
     let unmuteTimer: NodeJS.Timeout | null = null;
     const clearUnmuteTimer = () => {
@@ -138,7 +153,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       }
     };
     const muteInput = () => {
-      if (!gateOn) return;
+      if (!gateArmed) return;
       clearUnmuteTimer(); // agent (re)started speaking — cancel any pending unmute
       if (inputMuted) return;
       inputMuted = true;
@@ -146,19 +161,22 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
         type: "session.update",
         session: { type: "realtime", audio: { input: { turn_detection: null } } },
       });
-      log("half-duplex: muted (agent speaking)");
+      log("half-duplex: muted (greeting)");
     };
     const scheduleUnmute = () => {
-      if (!gateOn || !inputMuted) return;
+      if (!gateArmed || !inputMuted) return;
       clearUnmuteTimer();
       unmuteTimer = setTimeout(() => {
         inputMuted = false;
+        // Greeting done — disarm. From here on the caller is heard even while
+        // the agent speaks, and server_vad's threshold is the only echo guard.
+        gateArmed = false;
         send({ type: "input_audio_buffer.clear" });
         send({
           type: "session.update",
           session: { type: "realtime", audio: { input: { turn_detection: opts.turnDetection } } },
         });
-        log("half-duplex: listening");
+        log("half-duplex: listening (gate disarmed for the rest of the call)");
       }, ECHO_TAIL_MS);
     };
 
