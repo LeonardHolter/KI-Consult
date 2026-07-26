@@ -39,23 +39,31 @@ export default function TelnyxNumberConnect({ clientId }: { clientId: string }) 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const fetchInfo = useCallback(async (): Promise<NumbersInfo> => {
     try {
       const res = await fetch(`/api/portal/telephony/numbers?client=${clientId}`, { cache: "no-store" });
       const d = (await res.json()) as NumbersInfo;
-      setInfo(
-        res.ok
-          ? d
-          : { configured: true, assignedNumber: null, numbers: [], error: d.error ?? "Kunne ikke hente numre." },
-      );
+      if (res.ok) return d;
+      return { configured: true, assignedNumber: null, numbers: [], error: d.error ?? "Kunne ikke hente numre." };
     } catch {
-      setInfo({ configured: true, assignedNumber: null, numbers: [], error: "Kunne ikke hente numre." });
+      return { configured: true, assignedNumber: null, numbers: [], error: "Kunne ikke hente numre." };
     }
   }, [clientId]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    // Async fetch->setState (never synchronous in the effect body); the
+    // cancelled flag keeps a stale client's response from overwriting the
+    // newly selected client's list.
+    let cancelled = false;
+    fetchInfo().then((d) => {
+      if (!cancelled) setInfo(d);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchInfo]);
+
+  const refresh = useCallback(async () => setInfo(await fetchInfo()), [fetchInfo]);
 
   async function connect() {
     setBusy(true);
