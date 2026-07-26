@@ -2,11 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-// The Google Calendar connect flow, extracted from CalendarConnectModal so
-// the Integrasjoner page and the dashboard modal share ONE implementation —
-// connect/disconnect/voice-mode logic in two places would drift.
-// Styles use the ccm-* namespace; rendering the block twice is harmless
-// (identical rules), and only one surface mounts at a time in practice.
+// The Google Calendar connect flow, used by /portal/integrasjoner (its only
+// home — the old dashboard modal is gone, the dashboard links here instead).
 
 type CalInfo = {
   provider: "google" | "outlook";

@@ -2,7 +2,13 @@ import Link from "next/link";
 import { getClients, getProfile } from "@/lib/portal/data";
 import { loadSettings } from "@/lib/settings";
 import { calendarConfigured } from "@/lib/calendar/provider";
+import { PHONE_CLIENT_ID } from "@/lib/telephony/config";
 import GoogleCalendarConnect from "../GoogleCalendarConnect";
+
+/** The one Telnyx number in service. Display-only; the actual routing is the
+ *  TeXML app on Telnyx's side + PHONE_CLIENT_ID. When a second number
+ *  arrives, both this and PHONE_CLIENT_ID become a number->client lookup. */
+const PHONE_NUMBER = "+47 32 99 42 23";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +65,7 @@ export default async function IntegrasjonerPage({
 
   const settings = await loadSettings(activeClientId);
   const googleConnected = calendarConfigured(settings);
+  const phoneConnected = activeClientId === PHONE_CLIENT_ID;
 
   return (
     <main style={{ minHeight: "100vh", background: CREAM, color: INK }}>
@@ -145,6 +152,35 @@ export default async function IntegrasjonerPage({
               Agentene leser ledige timer fra og booker rett i kundens kalender.
             </p>
             <GoogleCalendarConnect clientId={activeClientId} />
+          </section>
+
+          {/* Telefonnummer — read-only status. Wiring a number is Telnyx-side
+              config + code (PHONE_CLIENT_ID), not something a dashboard
+              button can do yet, so the card reports rather than configures. */}
+          <section
+            style={{
+              background: "#fff", border: `1px solid ${MUTED}44`, borderRadius: 12,
+              padding: "20px 22px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 11, height: 11, borderRadius: "50%",
+                  background: phoneConnected ? GREEN : MUTED, flexShrink: 0,
+                }}
+              />
+              <h2 style={{ fontSize: 17, margin: 0 }}>📞 Telefonnummer</h2>
+              <span style={{ fontSize: 13, color: phoneConnected ? "#0d6b47" : MUTED, fontWeight: 600 }}>
+                {phoneConnected ? `Tilkoblet ${PHONE_NUMBER}` : "Ikke tilkoblet"}
+              </span>
+            </div>
+            <p style={{ fontSize: 13.5, color: MUTED, margin: 0, lineHeight: 1.5 }}>
+              {phoneConnected
+                ? "Innkommende samtaler besvares av taleagenten, tas opp (dual channel) og dukker opp i Samtaleopptak-panelet."
+                : "Denne kunden har ikke eget telefonnummer ennå. Et nytt nummer settes opp i Telnyx og kobles til taleagenten — si fra, så ordnes det."}
+            </p>
           </section>
 
           {/* Outlook — announced, not built. The provider seam is ready. */}
