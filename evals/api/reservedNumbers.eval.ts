@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The reserved-numbers endpoint is the outreach dialer's ONLY defense
-// against cold-calling from a customer's line. The promises: fails closed
-// without configuration, rejects wrong secrets, and always includes both
-// the mapped numbers and the default line.
+// against cold-calling from a customer's line. It is deliberately public
+// (owner's decision — digits of published business numbers only); what
+// these tests pin is the CONTENT contract: every mapped customer number
+// plus the default line, normalized, always.
 
 const { loadAssignments } = vi.hoisted(() => ({
   loadAssignments: vi.fn(async (): Promise<Record<string, string>> => ({})),
@@ -18,37 +19,27 @@ vi.mock("@/lib/telephony/config", () => ({
 
 import { GET } from "@/app/api/telephony/reserved-numbers/route";
 
-const get = (secret?: string) =>
-  GET(new Request("http://test/api/telephony/reserved-numbers", {
-    headers: secret ? { "X-Outreach-Secret": secret } : {},
-  }));
-
 beforeEach(() => {
   loadAssignments.mockResolvedValue({});
-  delete process.env.OUTREACH_SHARED_SECRET;
 });
 
 describe("reserved-numbers endpoint", () => {
-  it("fails closed (503) when no shared secret is configured", async () => {
-    expect((await get("anything")).status).toBe(503);
-  });
-
-  it("rejects a missing or wrong secret", async () => {
-    process.env.OUTREACH_SHARED_SECRET = "s3cret";
-    expect((await get()).status).toBe(403);
-    expect((await get("wrong")).status).toBe(403);
-  });
-
   it("returns the default line even with an empty assignment map", async () => {
-    process.env.OUTREACH_SHARED_SECRET = "s3cret";
-    const body = await (await get("s3cret")).json();
-    expect(body.reserved).toEqual(["4732994223"]);
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect((await res.json()).reserved).toEqual(["4732994223"]);
   });
 
-  it("includes every mapped customer number, normalized", async () => {
-    process.env.OUTREACH_SHARED_SECRET = "s3cret";
-    loadAssignments.mockResolvedValue({ "4740000000": "client-b", "4741111111": "client-c" });
-    const body = await (await get("s3cret")).json();
+  it("includes every mapped customer number, normalized and sorted", async () => {
+    loadAssignments.mockResolvedValue({ "4741111111": "client-c", "4740000000": "client-b" });
+    const body = await (await GET()).json();
     expect(body.reserved).toEqual(["4732994223", "4740000000", "4741111111"]);
+  });
+
+  it("exposes ONLY digits — no client ids or names to enrich", async () => {
+    loadAssignments.mockResolvedValue({ "4740000000": "client-b" });
+    const body = await (await GET()).json();
+    expect(Object.keys(body)).toEqual(["reserved"]);
+    expect(JSON.stringify(body)).not.toContain("client-b");
   });
 });
