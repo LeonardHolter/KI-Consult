@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <rect width="1200" height="630" fill="#0B2118"/>
+  <ellipse cx="880" cy="700" rx="620" ry="300" fill="#15C07C" opacity="0.10"/>
+
+  <text x="60" y="70" font-size="20" letter-spacing="4" fill="#3FE0A0" font-weight="700">TAPTE ANROP: SLIK LEKKER OMSETNINGEN UT AV TELEFONEN</text>
+
+  <!-- Steg 1: alle anrop -->
+  <g>
+    <rect x="60" y="130" width="250" height="330" rx="16" fill="#123324" stroke="#15C07C" stroke-width="3"/>
+    <text x="185" y="190" font-size="56" fill="#EFEDE2" font-weight="800" text-anchor="middle">100</text>
+    <text x="185" y="222" font-size="18" fill="#3FE0A0" text-anchor="middle">anrop til bedriften</text>
+    <!-- 10x10 dot grid: alle anrop -->
+    <g fill="#15C07C">
+      <circle cx="110" cy="270" r="7"/><circle cx="140" cy="270" r="7"/><circle cx="170" cy="270" r="7"/><circle cx="200" cy="270" r="7"/><circle cx="230" cy="270" r="7"/><circle cx="260" cy="270" r="7"/>
+      <circle cx="110" cy="300" r="7"/><circle cx="140" cy="300" r="7"/><circle cx="170" cy="300" r="7"/><circle cx="200" cy="300" r="7"/><circle cx="230" cy="300" r="7"/><circle cx="260" cy="300" r="7"/>
+      <circle cx="110" cy="330" r="7"/><circle cx="140" cy="330" r="7"/><circle cx="170" cy="330" r="7"/><circle cx="200" cy="330" r="7"/><circle cx="230" cy="330" r="7"/><circle cx="260" cy="330" r="7"/>
+      <circle cx="110" cy="360" r="7"/><circle cx="140" cy="360" r="7"/><circle cx="170" cy="360" r="7"/><circle cx="200" cy="360" r="7"/>
+    </g>
+    <g fill="#E0A92B">
+      <circle cx="230" cy="360" r="7"/><circle cx="260" cy="360" r="7"/>
+      <circle cx="110" cy="390" r="7"/><circle cx="140" cy="390" r="7"/><circle cx="170" cy="390" r="7"/><circle cx="200" cy="390" r="7"/>
+    </g>
+    <text x="185" y="435" font-size="15" fill="#9BB3A4" text-anchor="middle">grønn = besvart · gul = ubesvart</text>
+  </g>
+
+  <path d="M330 295 L400 295" stroke="#2A4A38" stroke-width="4" marker-end="none"/>
+  <path d="M392 285 L410 295 L392 305 Z" fill="#2A4A38"/>
+
+  <!-- Steg 2: ubesvarte -->
+  <g>
+    <rect x="430" y="130" width="250" height="330" rx="16" fill="#123324" stroke="#E0A92B" stroke-width="3"/>
+    <text x="555" y="190" font-size="56" fill="#EFEDE2" font-weight="800" text-anchor="middle">~20</text>
+    <text x="555" y="222" font-size="18" fill="#E0A92B" text-anchor="middle">går ubesvart</text>
+    <text x="480" y="280" font-size="16" fill="#EFEDE2">Utenfor åpningstid</text>
+    <text x="480" y="310" font-size="16" fill="#EFEDE2">Opptatt i kundemøte</text>
+    <text x="480" y="340" font-size="16" fill="#EFEDE2">Lunsj og ferie</text>
+    <text x="480" y="370" font-size="16" fill="#EFEDE2">To ringer samtidig</text>
+    <text x="555" y="430" font-size="15" fill="#9BB3A4" text-anchor="middle">de fleste legger ikke igjen</text>
+    <text x="555" y="450" font-size="15" fill="#9BB3A4" text-anchor="middle">beskjed - de ringer nestemann</text>
+  </g>
+
+  <path d="M700 295 L770 295" stroke="#2A4A38" stroke-width="4"/>
+  <path d="M762 285 L780 295 L762 305 Z" fill="#2A4A38"/>
+
+  <!-- Steg 3: tapt omsetning -->
+  <g>
+    <rect x="800" y="130" width="340" height="330" rx="16" fill="#123324" stroke="#D9534F" stroke-width="3"/>
+    <text x="970" y="196" font-size="44" fill="#EFEDE2" font-weight="800" text-anchor="middle">10 000 kr+</text>
+    <text x="970" y="228" font-size="18" fill="#D9534F" text-anchor="middle">tapt per uke (eksempel)</text>
+    <text x="830" y="284" font-size="16" fill="#EFEDE2">20 ubesvarte anrop i uken</text>
+    <text x="830" y="314" font-size="16" fill="#EFEDE2">x 1 av 5 var en ny kunde</text>
+    <text x="830" y="344" font-size="16" fill="#EFEDE2">x 2 500 kr i snittordre</text>
+    <line x1="830" y1="362" x2="1110" y2="362" stroke="#2A4A38" stroke-width="2"/>
+    <text x="830" y="392" font-size="17" fill="#EFEDE2" font-weight="700">= over en halv million i året</text>
+    <text x="970" y="425" font-size="15" fill="#9BB3A4" text-anchor="middle">sett inn egne tall - lekkasjen er</text>
+    <text x="970" y="445" font-size="15" fill="#9BB3A4" text-anchor="middle">større enn de fleste tror</text>
+  </g>
+
+  <!-- Bunnlinje -->
+  <rect x="60" y="510" width="1080" height="70" rx="14" fill="#15C07C"/>
+  <text x="600" y="552" font-size="19" fill="#08231A" font-weight="800" text-anchor="middle">AI-resepsjonisten svarer hvert anrop - dag, kveld og helg - og booker timen mens kunden er på tråden</text>
+</svg>
