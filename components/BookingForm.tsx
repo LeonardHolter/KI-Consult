@@ -75,59 +75,34 @@ export default function BookingForm() {
   };
 
   return (
+    // 1A treatment: mono uppercase labels + underline-only inputs. Same
+    // fields, same validation, same endpoint as before.
     <form onSubmit={handleSubmit}>
-      <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Bedrift</label>
+      <label style={labelStyle}>Bedrift</label>
       <input
         type="text"
         placeholder="Bedriftsnavn"
         value={company}
         onChange={(e) => handleCompanyChange(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "14px 16px",
-          borderRadius: 11,
-          border: "1px solid #E2DCCB",
-          background: "#FFFFFF",
-          fontSize: 15,
-          fontFamily: "inherit",
-          margin: "6px 0 14px",
-        }}
+        style={inputStyle}
       />
-      <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Telefon</label>
+      <label style={labelStyle}>Telefon</label>
       <input
         type="tel"
         placeholder="+47 000 00 000"
         value={phone}
         onChange={(e) => handlePhoneChange(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "14px 16px",
-          borderRadius: 11,
-          border: "1px solid #E2DCCB",
-          background: "#FFFFFF",
-          fontSize: 15,
-          fontFamily: "inherit",
-          margin: "6px 0 14px",
-        }}
+        style={inputStyle}
       />
       {showTimeInput && (
         <>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "#3A3D31" }}>Tidspunkt for demo</label>
+          <label style={labelStyle}>Tidspunkt for demo</label>
           <input
             type="datetime-local"
             value={dateTime}
             onChange={(e) => setDateTime(e.target.value)}
             min={getMinDateTime()}
-            style={{
-              width: "100%",
-              padding: "14px 16px",
-              borderRadius: 11,
-              border: "1px solid #E2DCCB",
-              background: "#FFFFFF",
-              fontSize: 15,
-              fontFamily: "inherit",
-              margin: "6px 0 18px",
-            }}
+            style={{ ...inputStyle, marginBottom: 26 }}
           />
         </>
       )}
@@ -140,20 +115,19 @@ export default function BookingForm() {
       <button
         type="submit"
         disabled={loading}
-        className="btn-primary"
+        className="btn-green"
         style={{
           display: "block",
           width: "100%",
           textAlign: "center",
-          color: "#08231A",
           fontWeight: 700,
           fontSize: 16,
-          padding: 16,
-          borderRadius: 12,
-          textDecoration: "none",
+          padding: 17,
+          borderRadius: 4,
           border: "none",
           cursor: loading ? "default" : "pointer",
           opacity: loading ? 0.7 : 1,
+          fontFamily: "inherit",
         }}
       >
         {loading ? "Sender..." : "Book demoen min →"}
@@ -162,16 +136,40 @@ export default function BookingForm() {
         style={{
           display: "flex",
           flexWrap: "wrap",
-          gap: 14,
-          marginTop: 16,
-          fontSize: 13,
-          color: "#5C5F52",
+          gap: "10px 16px",
+          marginTop: 20,
+          fontSize: 12.5,
+          color: "#6E6B5C",
+          fontFamily: "var(--font-space-mono), monospace",
         }}
       >
-        <span style={{ color: "#15A06A" }}>✓</span>GDPR <span style={{ color: "#15A06A" }}>✓</span>
-        Hostet i Norge <span style={{ color: "#15A06A" }}>✓</span>BankID{" "}
-        <span style={{ color: "#15A06A" }}>✓</span>Ingen lock-in
+        <span><span style={{ color: "#15A06A" }}>✓</span> GDPR</span>
+        <span><span style={{ color: "#15A06A" }}>✓</span> Hostet i Norge</span>
+        <span><span style={{ color: "#15A06A" }}>✓</span> BankID</span>
+        <span><span style={{ color: "#15A06A" }}>✓</span> Ingen lock-in</span>
       </div>
     </form>
   );
 }
+
+const labelStyle = {
+  fontFamily: "var(--font-space-mono), monospace",
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: "#6E6B5C",
+} as const;
+
+const inputStyle = {
+  width: "100%",
+  padding: "14px 0",
+  border: "none",
+  borderBottom: "1px solid #DCD6C6",
+  background: "transparent",
+  fontSize: 16,
+  fontFamily: "inherit",
+  margin: "4px 0 22px",
+  outline: "none",
+  borderRadius: 0,
+} as const;

@@ -8,9 +8,12 @@ body {
   padding: 0;
 }
 
+/* 1A «Nordisk institusjonell» palette (claude.ai/design: Website redesign
+   direction). Cream #F5F2E9, band #EEEADD, hairlines #DCD6C6/#D3CCB9, ink
+   #0B2118, greens #15A06A/#15C07C/#3FE0A0, rust #C2562C for cost stats. */
 body {
   font-family: var(--font-schibsted), system-ui, sans-serif;
-  background: #f3efe4;
+  background: #f5f2e9;
   color: #16190f;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
@@ -48,29 +51,67 @@ html {
   }
 }
 
-/* --- Interactive hover states (originally `style-hover` in the design) --- */
+/* --- 1A button system (hover states from the design's style-hover) ------ */
+/* Ink rectangle -> green on hover. The design's primary action. */
+.btn-ink {
+  background: #0b2118;
+  color: #f5f2e9;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-ink:hover {
+  background: #15a06a;
+  color: #08231a;
+}
+
+/* Green solid (form submit) -> brighter green. */
+.btn-green {
+  background: #15a06a;
+  color: #08231a;
+  transition: background 0.15s ease;
+}
+.btn-green:hover {
+  background: #15c07c;
+}
+
+/* Bright green (dark CTA band) -> mint. */
+.btn-cta {
+  background: #15c07c;
+  color: #08231a;
+  transition: background 0.15s ease;
+}
+.btn-cta:hover {
+  background: #3fe0a0;
+}
+
+/* Hairline outline on light background -> green. */
+.btn-line {
+  border: 1px solid #c7c0ac;
+  color: #16190f;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.btn-line:hover {
+  border-color: #15a06a;
+  color: #15a06a;
+}
+
+/* Hairline outline on dark background -> mint. */
+.btn-line-dark {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #f5f2e9;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.btn-line-dark:hover {
+  border-color: #3fe0a0;
+  color: #3fe0a0;
+}
+
+/* Kept for compatibility with older surfaces (VoiceDemo fallback, blog). */
 .btn-primary {
   background: #15c07c;
   transition: background 0.15s ease;
 }
 .btn-primary:hover {
-  background: #1ace87;
-}
-
-.btn-dark {
-  background: #16190f;
-  transition: background 0.15s ease;
-}
-.btn-dark:hover {
-  background: #000;
-}
-
-.btn-outline {
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  transition: border-color 0.15s ease;
-}
-.btn-outline:hover {
-  border-color: rgba(255, 255, 255, 0.5);
+  background: #3fe0a0;
 }
 
 .nav-link {
@@ -84,14 +125,42 @@ html {
   transition: color 0.15s ease;
 }
 .footer-link:hover {
-  color: #efede2;
+  color: #f5f2e9;
+}
+
+/* --- 1A section scaffolding ------------------------------------------- */
+/* Numbered section header: mono label column + headline. */
+.sec-head {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 48px;
+  align-items: start;
+}
+.sec-label {
+  font-family: var(--font-space-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #15a06a;
+  font-weight: 700;
+  padding-top: 10px;
+}
+.sec-h2 {
+  font-size: clamp(32px, 4vw, 46px);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+  margin: 0;
+  text-wrap: balance;
 }
 
 /* --- Responsive: collapse the multi-column grids on smaller screens --- */
 @media (max-width: 920px) {
   .hero-grid,
-  .offer-grid,
-  .integ-grid {
+  .integ-grid,
+  .sec-head,
+  .faq-row,
+  .demo-panel {
     grid-template-columns: 1fr !important;
   }
   .hero-grid {
@@ -100,16 +169,18 @@ html {
   .integ-grid {
     gap: 44px !important;
   }
+  .sec-head {
+    gap: 16px !important;
+  }
+  .faq-row {
+    gap: 10px !important;
+  }
   .grid-3,
   .grid-4,
-  .footer-grid {
+  .plans-grid,
+  .footer-grid,
+  .steps-row {
     grid-template-columns: 1fr 1fr !important;
-  }
-  .trust-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-  .offer-summary {
-    position: static !important;
   }
 }
 
@@ -122,11 +193,20 @@ html {
   }
   .grid-3,
   .grid-4,
-  .footer-grid {
+  .plans-grid,
+  .footer-grid,
+  .stats-grid,
+  .steps-row {
     grid-template-columns: 1fr !important;
   }
-  .trust-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+  .stats-cell,
+  .plans-col {
+    border-right: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .plans-col {
+    padding: 28px 22px !important;
   }
   .section-pad {
     padding-top: 56px !important;
@@ -142,5 +222,9 @@ html {
   }
   .hero-sub {
     font-size: 16px !important;
+  }
+  .steps-row {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
   }
 }

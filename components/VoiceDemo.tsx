@@ -351,55 +351,54 @@ export default function VoiceDemo() {
       style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "stretch" }}
       className="voicedemo-grid"
     >
-      {/* Info panel */}
-      <div
-        style={{
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 18,
-          padding: 28,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-        }}
-      >
+      {/* Info panel — plain copy on the dark wrapper, 1A row rules */}
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "8px 0" }}>
         <div
           style={{
             fontFamily: mono,
-            fontSize: 12,
-            letterSpacing: "0.14em",
+            fontSize: 11,
+            letterSpacing: "0.18em",
             textTransform: "uppercase",
             color: "#3FE0A0",
             fontWeight: 700,
-            marginBottom: 16,
+            marginBottom: 18,
           }}
         >
-          🦷 Demo - Tannlegesenter
+          Demo - Tannlegesenter
         </div>
         <h3
           style={{
-            fontSize: 22,
-            fontWeight: 800,
-            color: "#EFEDE2",
-            letterSpacing: "-0.02em",
-            margin: "0 0 12px",
+            fontSize: 30,
+            fontWeight: 700,
+            color: "#F5F2E9",
+            letterSpacing: "-0.03em",
+            margin: "0 0 14px",
           }}
         >
           Oslo Tannlegesenter
         </h3>
-        <p style={{ fontSize: 15, lineHeight: 1.6, color: "#AFC0B5", margin: "0 0 22px" }}>
+        <p style={{ fontSize: 16, lineHeight: 1.65, color: "#A9BBAF", margin: "0 0 28px", maxWidth: "38ch" }}>
           Snakk med resepsjonisten og bestill time, spør om priser, eller få hjelp med andre
           henvendelser.
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {[
             "Bestille eller endre time",
             "Spørsmål om priser og behandlinger",
             "Akutte henvendelser",
-          ].map((item) => (
+          ].map((item, i, arr) => (
             <div
               key={item}
-              style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#AFC0B5" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                fontSize: 15,
+                color: "#C9D6CE",
+                padding: "13px 0",
+                borderTop: "1px solid rgba(255,255,255,0.1)",
+                borderBottom: i === arr.length - 1 ? "1px solid rgba(255,255,255,0.1)" : undefined,
+              }}
             >
               <span style={{ color: "#3FE0A0", fontSize: 12 }}>✓</span>
               {item}
@@ -411,40 +410,65 @@ export default function VoiceDemo() {
       {/* Call panel */}
       <div
         style={{
-          background: "#FBFAF4",
+          background: "#F5F2E9",
           color: "#16190F",
-          borderRadius: 18,
-          padding: 28,
+          borderRadius: 6,
+          padding: 40,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
-          minHeight: 320,
+          minHeight: 360,
         }}
       >
-        {/* Orb */}
+        {/* Orb — 1A: hairline ring, ink disc, waveform bars */}
         <div
           style={{
-            width: 116,
-            height: 116,
+            width: 132,
+            height: 132,
             borderRadius: "50%",
+            border: "1px solid #15A06A",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background:
-              uiState === "active"
-                ? "radial-gradient(circle at 50% 40%, #1ACE87, #15C07C)"
-                : "#E9E3D4",
             boxShadow:
               uiState === "active"
                 ? "0 0 0 10px rgba(21,192,124,0.16), 0 0 0 22px rgba(21,192,124,0.08)"
                 : "none",
             transition: "all 0.25s ease",
-            animation: isSpeaking ? "voicedemo-pulse 1.1s ease-in-out infinite" : undefined,
           }}
         >
-          <span style={{ fontSize: 44 }}>{uiState === "active" ? "🎙️" : "🦷"}</span>
+          <div
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: "50%",
+              background: uiState === "active" ? "#15A06A" : "#0B2118",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.25s ease",
+              animation: isSpeaking ? "voicedemo-pulse 1.1s ease-in-out infinite" : undefined,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 34 }}>
+              {[12, 26, 34, 20, 9].map((h, i) => (
+                <span
+                  key={i}
+                  style={{
+                    width: 4,
+                    height: h,
+                    background: "#3FE0A0",
+                    borderRadius: 2,
+                    animation: isSpeaking
+                      ? `voicedemo-bar 0.9s ease-in-out ${i * 0.12}s infinite`
+                      : undefined,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
         <div
@@ -485,12 +509,12 @@ export default function VoiceDemo() {
             Avslutt samtale
           </button>
         ) : (
-          <button type="button" onClick={start} className="btn-primary" style={{ ...btnBase, color: "#08231A" }}>
+          <button type="button" onClick={start} className="btn-ink" style={btnBase}>
             Snakk med agenten →
           </button>
         )}
 
-        <div style={{ fontSize: 12, color: "#9A9A8C", marginTop: 14 }}>
+        <div style={{ fontFamily: mono, fontSize: 11.5, color: "#9A9A8C", marginTop: 18 }}>
           Krever mikrofon · WebRTC · norsk stemme
         </div>
       </div>
@@ -499,6 +523,10 @@ export default function VoiceDemo() {
         @keyframes voicedemo-pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.06); }
+        }
+        @keyframes voicedemo-bar {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(0.45); }
         }
         @media (max-width: 820px) {
           .voicedemo-grid { grid-template-columns: 1fr !important; }
@@ -509,10 +537,11 @@ export default function VoiceDemo() {
 }
 
 const btnBase: CSSProperties = {
-  fontWeight: 700,
+  fontWeight: 600,
   fontSize: 16,
-  padding: "15px 28px",
-  borderRadius: 12,
+  padding: "16px 30px",
+  borderRadius: 4,
   border: "none",
   cursor: "pointer",
+  fontFamily: "inherit",
 };
