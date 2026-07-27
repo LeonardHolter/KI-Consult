@@ -164,6 +164,19 @@ export default function AdminOverview({
         >
           Integrasjoner
         </Link>
+        {/* Separate deployment with its own database (holter-holdings-
+            outreach) — linked, not merged, precisely so its data stays put. */}
+        <a
+          href="https://holter-holdings-outreach-35mu.vercel.app/call"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            padding: "7px 12px", borderRadius: 8, border: `1px solid ${MUTED}66`,
+            background: CREAM, color: INK, textDecoration: "none", fontSize: 14, fontWeight: 600,
+          }}
+        >
+          Cold outreach ↗
+        </a>
         <Link
           href="/portal/status"
           style={{
