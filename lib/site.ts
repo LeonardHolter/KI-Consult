@@ -8,7 +8,7 @@ export const siteConfig = {
   title: "KI-resepsjonist på norsk – AI-kundeservice for telefon, chat & web | KI Consult",
   description:
     "Norskutviklet KI-resepsjonist som svarer telefonen, chatten og webhenvendelsene dine 24/7. Naturlig norsk stemme, BankID & Vipps, GDPR og hostet i Norge. Prøv gratis demo.",
-  phone: "+47 934 38 816",
+  phone: "+47 484 35 330",
   email: "hei@kiconsult.no",
   locality: "Oslo",
   country: "NO",
