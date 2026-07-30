@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <rect width="1200" height="630" fill="#0B2118"/>
+  <ellipse cx="320" cy="700" rx="620" ry="300" fill="#15C07C" opacity="0.10"/>
+
+  <text x="60" y="70" font-size="20" letter-spacing="4" fill="#3FE0A0" font-weight="700">SENTRALBORD I 2026: TRE MÅTER Å FÅ TELEFONEN BESVART PÅ</text>
+
+  <!-- Kolonne 1: Bemannet sentralbord -->
+  <g>
+    <rect x="60" y="120" width="340" height="360" rx="16" fill="#123324" stroke="#9BB3A4" stroke-width="3"/>
+    <text x="230" y="172" font-size="24" fill="#EFEDE2" font-weight="800" text-anchor="middle">Bemannet sentralbord</text>
+    <text x="230" y="225" font-size="40" fill="#EFEDE2" font-weight="800" text-anchor="middle">30 000 kr+</text>
+    <text x="230" y="253" font-size="16" fill="#9BB3A4" text-anchor="middle">per måned med sosiale kostnader</text>
+    <text x="90" y="300" font-size="17" fill="#EFEDE2">✓ Personlig service</text>
+    <text x="90" y="332" font-size="17" fill="#EFEDE2">✓ Kjenner bedriften godt</text>
+    <text x="90" y="364" font-size="17" fill="#E0A92B">✗ Kun åpningstid</text>
+    <text x="90" y="396" font-size="17" fill="#E0A92B">✗ Ferie, lunsj og sykdom</text>
+    <text x="90" y="428" font-size="17" fill="#E0A92B">✗ Én samtale om gangen</text>
+  </g>
+
+  <!-- Kolonne 2: Svarservice -->
+  <g>
+    <rect x="430" y="120" width="340" height="360" rx="16" fill="#123324" stroke="#E0A92B" stroke-width="3"/>
+    <text x="600" y="172" font-size="24" fill="#EFEDE2" font-weight="800" text-anchor="middle">Svarservice</text>
+    <text x="600" y="225" font-size="40" fill="#EFEDE2" font-weight="800" text-anchor="middle">1 500-3 000 kr</text>
+    <text x="600" y="253" font-size="16" fill="#E0A92B" text-anchor="middle">per måned - ofte betaling per anrop</text>
+    <text x="460" y="300" font-size="17" fill="#EFEDE2">✓ Ekte mennesker svarer</text>
+    <text x="460" y="332" font-size="17" fill="#EFEDE2">✓ Rimelig å komme i gang</text>
+    <text x="460" y="364" font-size="17" fill="#E0A92B">✗ Tar beskjed - løser ikke saken</text>
+    <text x="460" y="396" font-size="17" fill="#E0A92B">✗ Kan sjelden booke timer</text>
+    <text x="460" y="428" font-size="17" fill="#E0A92B">✗ Kjenner ikke prisene dine</text>
+  </g>
+
+  <!-- Kolonne 3: AI-sentralbord -->
+  <g>
+    <rect x="800" y="120" width="340" height="360" rx="16" fill="#123324" stroke="#15C07C" stroke-width="3"/>
+    <text x="970" y="172" font-size="24" fill="#EFEDE2" font-weight="800" text-anchor="middle">AI-sentralbord</text>
+    <text x="970" y="225" font-size="40" fill="#EFEDE2" font-weight="800" text-anchor="middle">fra 2 500 kr</text>
+    <text x="970" y="253" font-size="16" fill="#3FE0A0" text-anchor="middle">fast månedspris - ubegrensede samtaler</text>
+    <text x="830" y="300" font-size="17" fill="#3FE0A0">✓ Svarer 24/7, også helg</text>
+    <text x="830" y="332" font-size="17" fill="#3FE0A0">✓ Booker timer i kalenderen</text>
+    <text x="830" y="364" font-size="17" fill="#3FE0A0">✓ Svarer på pris og tjenester</text>
+    <text x="830" y="396" font-size="17" fill="#3FE0A0">✓ Mange samtaler samtidig</text>
+    <text x="830" y="428" font-size="17" fill="#EFEDE2">→ Eskalerer til menneske ved behov</text>
+  </g>
+
+  <!-- Bunnlinje -->
+  <rect x="60" y="520" width="1080" height="70" rx="14" fill="#15C07C"/>
+  <text x="600" y="562" font-size="19" fill="#08231A" font-weight="800" text-anchor="middle">AI-sentralbordet kombinerer prisen til en svarservice med jobben til en resepsjonist - hele døgnet</text>
+</svg>
