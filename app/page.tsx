@@ -639,7 +639,7 @@ export default function Home() {
               </h2>
               <p style={{ fontSize: 17, color: BODY, margin: "20px 0 0", maxWidth: "58ch", lineHeight: 1.6 }}>
                 Chat er alltid gratis - du betaler kun for taleminutter. Overforbruk faktureres til
-                5 kr/min. Ingen binding, {gDays} dagers pengene-tilbake.
+                6 kr/min. Ingen binding, {gDays} dagers pengene-tilbake.
               </p>
             </div>
           </div>

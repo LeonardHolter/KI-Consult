@@ -92,7 +92,7 @@ const baseFeatures = [
   "Selvbetjeningsplattform",
 ];
 
-/** Customer-facing pricing. Overage billed at 5 kr/min on all plans. */
+/** Customer-facing pricing. Overage billed at 6 kr/min on all plans. */
 export const pricingPlans: PricingPlan[] = [
   {
     name: "Starter",
