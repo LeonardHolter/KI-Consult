@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/telephony/numbers", () => ({ clientForNumber: vi.fn(async () => null) }));
 import { GET, POST } from "@/app/api/telephony/telnyx-inbound/route";
 import { OPENAI_SIP_URI } from "@/lib/telephony/config";
+import { clientForNumber } from "@/lib/telephony/numbers";
 
 // The TeXML the number returns must dial OpenAI's SIP URI with the project id
 // as the user part — that exact string is the whole reason this route exists
@@ -68,5 +71,37 @@ describe("telnyx-inbound TeXML", () => {
       'recordingStatusCallback="https://www.kiconsult.no/api/telephony/telnyx-recording"',
     );
     expect(body).toContain('recordingStatusCallbackMethod="POST"');
+  });
+});
+
+// The recording callback is the only chance to say who the recording belongs
+// to: the callback itself fires after the call and carries nothing about
+// which line rang.
+describe("telnyx-inbound recording callback", () => {
+  it("tags the recording callback with the client the dialed number maps to", async () => {
+    vi.mocked(clientForNumber).mockResolvedValue("fe264dcd-84e0-4e59-8efb-cbb5e39c8125");
+    const res = await GET(
+      new Request("https://www.kiconsult.no/api/telephony/telnyx-inbound?To=%2B4723509651", {
+        headers: { host: "www.kiconsult.no" },
+      }),
+    );
+    expect(await res.text()).toContain(
+      'recordingStatusCallback="https://www.kiconsult.no/api/telephony/telnyx-recording' +
+        '?client=fe264dcd-84e0-4e59-8efb-cbb5e39c8125"',
+    );
+  });
+
+  it("leaves the callback bare for an unmapped number, so it falls back", async () => {
+    vi.mocked(clientForNumber).mockResolvedValue(null);
+    const res = await GET(
+      new Request("https://www.kiconsult.no/api/telephony/telnyx-inbound?To=%2B4799999999", {
+        headers: { host: "www.kiconsult.no" },
+      }),
+    );
+    const body = await res.text();
+    expect(body).toContain(
+      'recordingStatusCallback="https://www.kiconsult.no/api/telephony/telnyx-recording"',
+    );
+    expect(body).not.toContain("?client=");
   });
 });

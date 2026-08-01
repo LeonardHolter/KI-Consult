@@ -23,6 +23,7 @@
 // hitting this for genuine inbound calls to our number.
 
 import { OPENAI_SIP_URI } from "@/lib/telephony/config";
+import { clientForNumber } from "@/lib/telephony/numbers";
 
 export const dynamic = "force-dynamic";
 
@@ -66,12 +67,24 @@ function sipTarget(dialed: string | null): string {
   return `${OPENAI_SIP_URI}?X-Dialed-Number=${encodeURIComponent(dialed)}`;
 }
 
-function texmlDial(req: Request, dialed: string | null): string {
+/**
+ * Where Telnyx posts the finished recording. The client id rides along,
+ * because this route is the only one that can work it out: the recording
+ * callback arrives after the call, carrying nothing that identifies the line
+ * that rang. Without it every phone recording landed in one hardcoded
+ * client's panel — including recordings of another client's customers.
+ */
+function recordingCallback(req: Request, clientId: string | null): string {
+  const base = `${baseUrl(req)}/api/telephony/telnyx-recording`;
+  return clientId ? `${base}?client=${encodeURIComponent(clientId)}` : base;
+}
+
+function texmlDial(req: Request, dialed: string | null, clientId: string | null): string {
   // answerOnBridge: don't answer the PSTN leg (no ringback billing / early
   // media) until OpenAI's SIP leg actually answers.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial answerOnBridge="true" record="record-from-answer" recordingChannels="dual" recordingStatusCallback="${baseUrl(req)}/api/telephony/telnyx-recording" recordingStatusCallbackMethod="POST">
+  <Dial answerOnBridge="true" record="record-from-answer" recordingChannels="dual" recordingStatusCallback="${recordingCallback(req, clientId)}" recordingStatusCallbackMethod="POST">
     <Sip>${sipTarget(dialed)}</Sip>
   </Dial>
 </Response>`;
@@ -79,8 +92,11 @@ function texmlDial(req: Request, dialed: string | null): string {
 
 async function respond(req: Request): Promise<Response> {
   const dialed = await dialedNumber(req);
-  console.info("[telnyx-inbound] dialed", dialed ?? "unknown");
-  return new Response(texmlDial(req, dialed), {
+  // Unmapped (or unknown) numbers resolve to null and the recording falls
+  // back to the default line's client, matching how the call itself routes.
+  const clientId = dialed ? await clientForNumber(dialed) : null;
+  console.info("[telnyx-inbound] dialed", { dialed: dialed ?? "unknown", client: clientId ?? "default" });
+  return new Response(texmlDial(req, dialed, clientId), {
     status: 200,
     headers: { "Content-Type": "application/xml" },
   });

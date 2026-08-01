@@ -116,7 +116,28 @@ function extractRecording(body: Record<string, unknown>): RecordingInfo | null {
   return null;
 }
 
+/**
+ * Which client's panel the recording belongs in. The id is put on the
+ * callback URL by /api/telephony/telnyx-inbound, which is the only place
+ * that knows which line rang — this webhook fires after the call and carries
+ * nothing that identifies it.
+ *
+ * The shape is checked because this route is unauthenticated and the id
+ * becomes a storage path prefix: anything but a plain UUID (a "../", say)
+ * could write outside the client's own folder. Unrecognised input falls back
+ * to the default line rather than failing the call's recording.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function recordingClient(req: Request): string {
+  const raw = new URL(req.url).searchParams.get("client");
+  if (raw && UUID.test(raw)) return raw;
+  if (raw) console.warn("[telnyx-recording] ignoring malformed client id");
+  return PHONE_CLIENT_ID;
+}
+
 export async function POST(req: Request) {
+  const clientId = recordingClient(req);
   const body = await parseBody(req);
   if (!body) return Response.json({ error: "bad_body" }, { status: 400 });
 
@@ -144,7 +165,7 @@ export async function POST(req: Request) {
 
   // Idempotency: Telnyx retries webhooks; a recording we already stored is a
   // success, not a duplicate download.
-  const existing = await listRecordings(PHONE_CLIENT_ID);
+  const existing = await listRecordings(clientId);
   if (existing.some((r) => r.id === rec.id)) {
     return Response.json({ ok: true, duplicate: true });
   }
@@ -168,7 +189,7 @@ export async function POST(req: Request) {
   const mimeType = audioRes.headers.get("content-type")?.split(";")[0] || "audio/mpeg";
 
   await saveRecording(
-    PHONE_CLIENT_ID,
+    clientId,
     {
       id: rec.id,
       startedAt: rec.startedAt,
@@ -178,7 +199,12 @@ export async function POST(req: Request) {
     },
     bytes,
   );
-  console.info("[telnyx-recording] stored", { id: rec.id, seconds: rec.durationSeconds, bytes: bytes.length });
+  console.info("[telnyx-recording] stored", {
+    id: rec.id,
+    client: clientId,
+    seconds: rec.durationSeconds,
+    bytes: bytes.length,
+  });
 
   return Response.json({ ok: true });
 }

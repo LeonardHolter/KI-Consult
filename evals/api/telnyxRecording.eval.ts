@@ -181,3 +181,48 @@ describe("telnyx-recording webhook", () => {
     expect(saveRecording).not.toHaveBeenCalled();
   });
 });
+
+// Recordings used to be stored under one hardcoded client, so a call to a
+// second client's number landed in the first client's «Samtaleopptak» panel —
+// one customer could listen to another customer's callers. The client id now
+// rides on the callback URL, put there by the TeXML route.
+describe("recording ownership", () => {
+  const NAMSOS = "fe264dcd-84e0-4e59-8efb-cbb5e39c8125";
+
+  const postToClient = (client: string) =>
+    POST(
+      new Request(`http://test/api/telephony/telnyx-recording?client=${client}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(texmlCallback(S3_RECORDING)),
+      }),
+    );
+
+  it("stores the recording under the client from the callback URL", async () => {
+    await postToClient(NAMSOS);
+    expect(saveRecording).toHaveBeenCalledWith(
+      NAMSOS,
+      expect.objectContaining({ recordedBy: "phone" }),
+      expect.anything(),
+    );
+  });
+
+  it("checks idempotency against that same client, not the default one", async () => {
+    await postToClient(NAMSOS);
+    expect(listRecordings).toHaveBeenCalledWith(NAMSOS);
+  });
+
+  it("falls back to the default line's client when no id is on the URL", async () => {
+    await postJson(texmlCallback(S3_RECORDING));
+    expect(saveRecording).toHaveBeenCalledWith("handz-on", expect.anything(), expect.anything());
+  });
+
+  // The route is unauthenticated and the id becomes a storage path prefix.
+  it("ignores a client id that is not a plain UUID", async () => {
+    for (const bad of ["../../etc", "handz-on", "..", "%2e%2e"]) {
+      saveRecording.mockClear();
+      await postToClient(encodeURIComponent(bad));
+      expect(saveRecording).toHaveBeenCalledWith("handz-on", expect.anything(), expect.anything());
+    }
+  });
+});
