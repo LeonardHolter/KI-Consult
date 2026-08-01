@@ -28,6 +28,38 @@ describe("telnyx-inbound TeXML", () => {
     }
   });
 
+  // Without this, the dialed number never survives the hop to OpenAI (the
+  // INVITE addresses the project, not the line), every call looks unrouted,
+  // and each new client's number reaches the fallback client's agent.
+  it("passes the dialed number along as an X- SIP header, from the POST body", async () => {
+    const form = new URLSearchParams({ To: "+4723509651", From: "+4791234567" });
+    const res = await POST(
+      new Request("https://www.kiconsult.no/api/telephony/telnyx-inbound", {
+        method: "POST",
+        headers: { host: "www.kiconsult.no", "Content-Type": "application/x-www-form-urlencoded" },
+        body: form,
+      }),
+    );
+    const body = await res.text();
+    expect(body).toContain("X-Dialed-Number=%2B4723509651");
+    expect(body).toContain("proj_"); // the project user part is still intact
+  });
+
+  it("passes the dialed number along from the GET query string too", async () => {
+    const res = await GET(
+      new Request("https://www.kiconsult.no/api/telephony/telnyx-inbound?To=%2B4723509651", {
+        headers: { host: "www.kiconsult.no" },
+      }),
+    );
+    expect(await res.text()).toContain("X-Dialed-Number=%2B4723509651");
+  });
+
+  it("dials the plain URI when the dialed number is missing", async () => {
+    const body = await (await POST(req())).text();
+    expect(body).toContain(`<Sip>${OPENAI_SIP_URI}</Sip>`);
+    expect(body).not.toContain("X-Dialed-Number");
+  });
+
   it("requests dual-channel recording with a callback to our recording webhook", async () => {
     const body = await (await POST(req())).text();
     expect(body).toContain('record="record-from-answer"');

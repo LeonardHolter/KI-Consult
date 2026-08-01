@@ -46,6 +46,25 @@ export function numberFromSipUri(uri: string | undefined | null): string | null 
   return digits.length >= 8 ? digits : null;
 }
 
+/**
+ * Picks the dialed number out of the SIP headers on OpenAI's
+ * realtime.call.incoming event.
+ *
+ * X-Dialed-Number is the one that carries it: /api/telephony/telnyx-inbound
+ * puts it on the INVITE because the To header addresses the OpenAI PROJECT
+ * (sip:proj_…@sip.api.openai.com) and says nothing about which of our lines
+ * rang. To is still tried as a fallback, for a connection that dials us with
+ * a real number in the request URI. Returns null when neither yields one,
+ * which the caller treats as "unrouted" rather than guessing.
+ */
+export function dialedFromSipHeaders(
+  headers: { name?: string; value?: string }[] | undefined | null,
+): string | null {
+  const find = (name: string) =>
+    (headers ?? []).find((h) => h.name?.toLowerCase() === name)?.value;
+  return numberFromSipUri(find("x-dialed-number")) ?? numberFromSipUri(find("to"));
+}
+
 /** number (normalized) -> client UUID */
 export type NumberAssignments = Record<string, string>;
 

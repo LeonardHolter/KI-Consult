@@ -11,7 +11,7 @@
 import { after } from "next/server";
 import { verifyOpenAIWebhook } from "@/lib/telephony/verifyWebhook";
 import { loadPhoneAgent, PHONE_CLIENT_ID, recordPhoneUsage } from "@/lib/telephony/config";
-import { clientForNumber, numberFromSipUri } from "@/lib/telephony/numbers";
+import { clientForNumber, dialedFromSipHeaders } from "@/lib/telephony/numbers";
 import { runCallSession } from "@/lib/telephony/callSession";
 
 export const dynamic = "force-dynamic";
@@ -55,17 +55,25 @@ export async function POST(req: Request) {
   }
   const callId = event.data.call_id;
 
-  // Route by the DIALED number (SIP To-header) via the number->client map
-  // from the Integrasjoner page. No match (or no To-header) falls back to
-  // PHONE_CLIENT_ID — the original line keeps working with an empty map.
-  const toHeader = event.data.sip_headers?.find((h) => h.name?.toLowerCase() === "to")?.value;
-  const dialed = numberFromSipUri(toHeader);
+  // Route by the DIALED number via the number->client map from the
+  // Integrasjoner page. The number comes from X-Dialed-Number, which
+  // /api/telephony/telnyx-inbound puts on the INVITE — the To header is
+  // useless here, because the URI we dial addresses the OpenAI PROJECT
+  // (sip:proj_…@sip.api.openai.com), not the line the caller rang. It is
+  // still read as a fallback in case a future connection dials us directly.
+  // No match falls back to PHONE_CLIENT_ID — the original line has no row.
+  const sipHeaders = event.data.sip_headers ?? [];
+  const dialed = dialedFromSipHeaders(sipHeaders);
   const mappedClient = dialed ? await clientForNumber(dialed) : null;
   const clientId = mappedClient ?? PHONE_CLIENT_ID;
   console.info(`[phone ${callId.slice(0, 8)}] routing`, {
     dialed: dialed ?? "unknown",
     client: clientId,
     via: mappedClient ? "number-map" : "default",
+    // Header NAMES only (values carry the caller's number). Without this,
+    // a header that silently fails to propagate looks exactly like a
+    // mis-typed mapping.
+    sipHeaders: sipHeaders.map((h) => h.name).join(","),
   });
 
   const agent = await loadPhoneAgent(clientId);

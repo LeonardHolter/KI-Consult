@@ -22,6 +22,7 @@ vi.mock("@vercel/blob", () => ({
 import {
   assignNumber,
   clientForNumber,
+  dialedFromSipHeaders,
   normalizeNumber,
   numberForClient,
   numberFromSipUri,
@@ -78,5 +79,41 @@ describe("assignment map", () => {
 
   it("an unmapped number resolves to null (caller falls back to the default line)", async () => {
     expect(await clientForNumber("4799999999")).toBeNull();
+  });
+});
+
+// The routing bug this pins: OpenAI's To header holds the SIP URI we dialed,
+// which addresses the PROJECT (sip:proj_…@sip.api.openai.com). Reading the
+// number from there yields nothing, every call looks unrouted, and each new
+// client's number lands on the fallback client's agent. The dialed number
+// therefore rides along in X-Dialed-Number, set by the TeXML route.
+describe("dialedFromSipHeaders", () => {
+  const projectTo = { name: "To", value: "sip:proj_Acg1pm1jVY2qiqEWf01Al8S3@sip.api.openai.com" };
+
+  it("reads the dialed number from X-Dialed-Number", () => {
+    expect(
+      dialedFromSipHeaders([projectTo, { name: "X-Dialed-Number", value: "+4723509651" }]),
+    ).toBe("4723509651");
+  });
+
+  it("is case-insensitive about the header name", () => {
+    expect(dialedFromSipHeaders([{ name: "x-dialed-number", value: "+4723509651" }])).toBe(
+      "4723509651",
+    );
+  });
+
+  it("returns null for a To header that only addresses the OpenAI project", () => {
+    expect(dialedFromSipHeaders([projectTo])).toBeNull();
+  });
+
+  it("falls back to a To header that does carry a real number", () => {
+    expect(dialedFromSipHeaders([{ name: "To", value: "sip:+4732994223@sip.telnyx.com" }])).toBe(
+      "4732994223",
+    );
+  });
+
+  it("returns null for missing or empty headers", () => {
+    expect(dialedFromSipHeaders(undefined)).toBeNull();
+    expect(dialedFromSipHeaders([])).toBeNull();
   });
 });

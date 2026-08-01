@@ -35,29 +35,63 @@ function baseUrl(req: Request): string {
   return host ? `https://${host}` : FALLBACK_BASE;
 }
 
-function texmlDial(req: Request): string {
+/**
+ * The number the caller dialed, from TeXML's own request parameters (query
+ * string on GET, form body on POST).
+ *
+ * This is the ONLY place in the chain where the dialed number exists. The
+ * INVITE we send onward has the OpenAI PROJECT id as its user part, so by the
+ * time the call surfaces as realtime.call.incoming, nothing in the To header
+ * says which of our lines rang — which is why every call routed to the
+ * fallback client until this was passed through explicitly.
+ */
+async function dialedNumber(req: Request): Promise<string | null> {
+  const fromQuery = new URL(req.url).searchParams.get("To");
+  if (fromQuery) return fromQuery;
+  try {
+    const form = await req.formData();
+    const to = form.get("To");
+    return typeof to === "string" && to ? to : null;
+  } catch {
+    // GET, or a body that isn't form-encoded — nothing to read.
+    return null;
+  }
+}
+
+/** SIP URI headers ride along on the INVITE. Only X--prefixed ones are
+ *  forwarded, and they arrive in OpenAI's `sip_headers`, which is how
+ *  /api/telephony/incoming learns which client the call belongs to. */
+function sipTarget(dialed: string | null): string {
+  if (!dialed) return OPENAI_SIP_URI;
+  return `${OPENAI_SIP_URI}?X-Dialed-Number=${encodeURIComponent(dialed)}`;
+}
+
+function texmlDial(req: Request, dialed: string | null): string {
   // answerOnBridge: don't answer the PSTN leg (no ringback billing / early
   // media) until OpenAI's SIP leg actually answers.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial answerOnBridge="true" record="record-from-answer" recordingChannels="dual" recordingStatusCallback="${baseUrl(req)}/api/telephony/telnyx-recording" recordingStatusCallbackMethod="POST">
-    <Sip>${OPENAI_SIP_URI}</Sip>
+    <Sip>${sipTarget(dialed)}</Sip>
   </Dial>
 </Response>`;
 }
 
-export async function POST(req: Request) {
-  return new Response(texmlDial(req), {
+async function respond(req: Request): Promise<Response> {
+  const dialed = await dialedNumber(req);
+  console.info("[telnyx-inbound] dialed", dialed ?? "unknown");
+  return new Response(texmlDial(req, dialed), {
     status: 200,
     headers: { "Content-Type": "application/xml" },
   });
+}
+
+export async function POST(req: Request) {
+  return respond(req);
 }
 
 // Telnyx can be configured to GET or POST the voice webhook; support both so a
 // misconfigured method doesn't silently drop calls.
 export async function GET(req: Request) {
-  return new Response(texmlDial(req), {
-    status: 200,
-    headers: { "Content-Type": "application/xml" },
-  });
+  return respond(req);
 }
