@@ -28,6 +28,9 @@ export type Settings = {
   lastSlotServiceKeyword: string;
   /** How many business days ahead to offer. */
   daysAhead: number;
+  /** Weekdays the business is closed (0 = Sunday … 6 = Saturday). Absent =
+   *  Sunday only, which is what every client had before the field existed. */
+  closedWeekdays?: number[];
   /**
    * Where the VOICE agent's bookings go.
    *

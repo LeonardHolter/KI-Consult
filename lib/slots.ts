@@ -64,13 +64,20 @@ function matchesServiceKeyword(service: string, keyword?: string): boolean {
 /* Shared helpers                                                      */
 /* ------------------------------------------------------------------ */
 
-function upcomingDates(daysAhead: number): string[] {
+function upcomingDates(settings: Settings): string[] {
+  // Days the business is closed (0 = Sunday … 6 = Saturday). Absent means
+  // Sunday only — every client that predates the field is a shop open six
+  // days a week, and a workshop closed on Saturdays sets [0, 6].
+  const closed = new Set(settings.closedWeekdays ?? [0]);
   const dates: string[] = [];
   const cursor = new Date(`${osloToday()}T12:00:00Z`);
   cursor.setUTCDate(cursor.getUTCDate() - 1); // first increment below lands on today
-  while (dates.length < daysAhead) {
+  // A client closed every day would loop forever; nothing bookable is the
+  // honest answer there.
+  if (closed.size >= 7) return dates;
+  while (dates.length < settings.daysAhead) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
-    if (cursor.getUTCDay() === 0) continue; // Sundays closed
+    if (closed.has(cursor.getUTCDay())) continue;
     dates.push(cursor.toISOString().slice(0, 10));
   }
   return dates;
@@ -192,7 +199,7 @@ function bookingsInWindow(
 }
 
 async function calendarSlotViews(settings: Settings): Promise<SlotView[]> {
-  const dates = upcomingDates(settings.daysAhead);
+  const dates = upcomingDates(settings);
   const events = await fetchCalendarEvents(settings, dates);
   const templates = slotTemplates(settings);
   const views: SlotView[] = [];
@@ -359,7 +366,7 @@ async function demoSlotViews(
   settings: Settings,
   scope: BookingScope,
 ): Promise<SlotView[]> {
-  const dates = upcomingDates(settings.daysAhead);
+  const dates = upcomingDates(settings);
   const templates = slotTemplates(settings);
   const allBookings = await demoReadBookings(clientId, scope);
   const views: SlotView[] = [];
@@ -667,7 +674,7 @@ export async function loadCalendarView(
   if (scope === "sandbox") return demoCalendarView(clientId, settings, scope);
   if (calendarConnected(settings)) {
     try {
-      const dates = upcomingDates(settings.daysAhead);
+      const dates = upcomingDates(settings);
       const [slots, events] = await Promise.all([
         calendarSlotViews(settings),
         calendarEvents(settings, dates),
