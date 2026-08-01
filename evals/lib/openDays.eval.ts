@@ -19,13 +19,20 @@ vi.mock("@vercel/blob", () => ({
   }),
 }));
 
+vi.mock("@/lib/google-calendar", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/google-calendar")>(
+    "@/lib/google-calendar",
+  );
+  return { ...actual, getServiceAccount: vi.fn(() => ({ client_email: "sa@test", private_key: "k" })) };
+});
+
 vi.mock("@/lib/settings", async () => {
   const actual = await vi.importActual<typeof import("@/lib/settings")>("@/lib/settings");
   return { ...actual, loadSettings: vi.fn(async () => ({ ...actual.DEFAULT_SETTINGS })) };
 });
 
 import { DEFAULT_SETTINGS, loadSettings, type Settings } from "@/lib/settings";
-import { loadSlots } from "@/lib/slots";
+import { dashboardScope, loadSlots } from "@/lib/slots";
 
 const CLIENT = "66666666-7777-8888-9999-000000000000";
 
@@ -70,5 +77,27 @@ describe("closedWeekdays", () => {
     });
     const dates = new Set((await loadSlots(CLIENT, "sandbox")).map((s) => s.date));
     expect(dates.size).toBe(10);
+  });
+});
+
+// Which calendar the dashboard opens on. Namsos has no calendar connected, so
+// its only bookings are the voice agent's in the sandbox — opening on the real
+// grid showed nothing at all and made a working agent look broken. The rule
+// only ever downgrades: no existing client is moved ONTO the real calendar.
+describe("dashboardScope", () => {
+  const noCalendar = { ...DEFAULT_SETTINGS, calendarId: undefined };
+  const connected = { ...DEFAULT_SETTINGS, calendarId: "shop@example.com" };
+
+  it("downgrades to the sandbox when no calendar is connected", () => {
+    expect(dashboardScope(noCalendar, "live")).toBe("sandbox");
+  });
+
+  it("keeps the real calendar for a viewer who opens on it and has one", () => {
+    expect(dashboardScope(connected, "live")).toBe("live");
+  });
+
+  it("never upgrades a sandbox viewer onto the real calendar", () => {
+    expect(dashboardScope(connected, "sandbox")).toBe("sandbox");
+    expect(dashboardScope(noCalendar, "sandbox")).toBe("sandbox");
   });
 });

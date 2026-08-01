@@ -6,6 +6,8 @@ import DashboardView from "./DashboardView";
 import { DEFAULT_PHONE_NUMBER, PHONE_CLIENT_ID } from "@/lib/telephony/config";
 import { formatNumber, numberForClient } from "@/lib/telephony/numbers";
 import AdminOverview from "./AdminOverview";
+import { loadSettings } from "@/lib/settings";
+import { dashboardScope } from "@/lib/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,17 @@ async function clientPhoneNumber(clientId: string): Promise<string | null> {
   const mapped = await numberForClient(clientId);
   if (mapped) return formatNumber(mapped);
   return clientId === PHONE_CLIENT_ID ? DEFAULT_PHONE_NUMBER : null;
+}
+
+/** Which calendar the dashboard opens on. The viewer's usual default — the
+ *  real calendar for an admin, the sandbox for a client account — but never
+ *  the real one for a client with no calendar connected, where it is empty by
+ *  construction and hides the voice agent's bookings entirely. */
+async function defaultCalScope(
+  clientId: string,
+  preferred: "live" | "sandbox",
+): Promise<"live" | "sandbox"> {
+  return dashboardScope(await loadSettings(clientId), preferred);
 }
 
 export default async function PortalPage({
@@ -66,6 +79,7 @@ export default async function PortalPage({
       <DashboardView
         clientId={profile.client_id ?? undefined}
         phoneNumber={profile.client_id ? await clientPhoneNumber(profile.client_id) : null}
+        defaultCalScope={profile.client_id ? await defaultCalScope(profile.client_id, "sandbox") : "sandbox"}
       />
     );
   }
@@ -77,11 +91,15 @@ export default async function PortalPage({
   if (selectedClient) {
     return (
       <DashboardView
+        // Remount on client switch: the scope default is per client, and a
+        // kept-alive component would hold the previous client's choice.
+        key={selectedClient.id}
         clientId={selectedClient.id}
         clientLabel={selectedClient.name}
         samtalerHref={`/portal/samtaler?client=${selectedClient.id}`}
         overviewHref="/portal"
         phoneNumber={await clientPhoneNumber(selectedClient.id)}
+        defaultCalScope={await defaultCalScope(selectedClient.id, "live")}
       />
     );
   }

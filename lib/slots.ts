@@ -87,6 +87,23 @@ export function calendarConnected(settings: Settings): boolean {
   return calendarConfigured(settings);
 }
 
+/**
+ * Which booking store the dashboard should OPEN on.
+ *
+ * `preferred` is what the viewer would otherwise get (admins open on the real
+ * calendar, a client account on the sandbox). This only ever DOWNGRADES it:
+ * without a connected calendar there is no real store to look at — the only
+ * bookings that exist are the voice agent's, in the sandbox — so opening on
+ * "live" there shows an empty grid and makes a working agent look broken.
+ *
+ * Downgrade-only on purpose: a client whose calendar IS connected keeps
+ * exactly the view it had, rather than being moved onto the real calendar as
+ * a side effect. The switch is still there either way.
+ */
+export function dashboardScope(settings: Settings, preferred: BookingScope): BookingScope {
+  return preferred === "live" && calendarConnected(settings) ? "live" : "sandbox";
+}
+
 /* ------------------------------------------------------------------ */
 /* Public types                                                        */
 /* ------------------------------------------------------------------ */

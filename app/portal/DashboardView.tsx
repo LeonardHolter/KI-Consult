@@ -89,6 +89,7 @@ export default function PortalDashboard({
   samtalerHref = "/portal/samtaler",
   overviewHref,
   phoneNumber,
+  defaultCalScope = "sandbox",
 }: {
   /** Set only when an admin is viewing a specific client; omitted for a client
    *  account, which the /api/bot proxy pins to its own client regardless. */
@@ -103,6 +104,10 @@ export default function PortalDashboard({
    *  exercises the actual pipeline customers hit (Telnyx -> SIP -> agent),
    *  which the WebRTC demo never did. */
   phoneNumber?: string | null;
+  /** Which booking store the grid opens on, decided server-side from whether
+   *  this client has a calendar connected. Only the connection can answer it,
+   *  and the browser can't see settings. */
+  defaultCalScope?: "live" | "sandbox";
 }) {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [calConnected, setCalConnected] = useState(false);
@@ -116,12 +121,11 @@ export default function PortalDashboard({
   const [clearingSandbox, setClearingSandbox] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // Which booking store the grid is showing: the real one, or the isolated
-  // sandbox the voice agent books into while it's being tested. A client
-  // account (no overviewHref) defaults to the sandbox so it sees its voice
-  // agent's test bookings out of the box; admin keeps the live view.
-  const [calScope, setCalScope] = useState<"live" | "sandbox">(
-    overviewHref ? "live" : "sandbox",
-  );
+  // sandbox the voice agent books into while it's being tested. The default
+  // follows the calendar connection (see defaultCalScope) — a client with no
+  // calendar connected has no real bookings to show, only test ones, and
+  // opening on an empty "Ekte" grid made a working agent look broken.
+  const [calScope, setCalScope] = useState<"live" | "sandbox">(defaultCalScope);
 
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
