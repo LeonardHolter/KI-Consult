@@ -47,7 +47,16 @@ function isAllowed(path: string): boolean {
 
 type Target = { baseUrl: string; adminSecret: string | null; clientId: string };
 
-/** Resolves the caller's bot target, or null if they may not reach one. */
+/**
+ * Resolves the caller's bot target, or null if they may not reach one.
+ *
+ * A client with no client_secrets row is NOT an error: this app serves the
+ * multi-tenant endpoints itself, and only the original Handz On deployment
+ * ever had a separate origin (its row points back at this very app). So a
+ * missing row falls back to our own origin. It used to return null, which
+ * became a 401 and an empty calendar on every newly onboarded client's
+ * dashboard — onboarding creates no secrets row.
+ */
 async function resolveTarget(req: NextRequest): Promise<Target | null> {
   const supabase = await createSessionClient();
   const {
@@ -78,11 +87,14 @@ async function resolveTarget(req: NextRequest): Promise<Target | null> {
       cache: "no-store",
     }
   );
-  if (!res.ok) return null;
-  const rows = (await res.json()) as
-    | { bot_base_url: string; admin_secret: string | null }[]
-    | null;
-  if (!rows?.length) return null;
+  const rows = res.ok
+    ? ((await res.json()) as { bot_base_url: string; admin_secret: string | null }[] | null)
+    : null;
+
+  // No dedicated deployment for this client — serve it from here.
+  if (!rows?.length) {
+    return { baseUrl: req.nextUrl.origin, adminSecret: null, clientId };
+  }
 
   return {
     baseUrl: rows[0].bot_base_url.replace(/\/$/, ""),
