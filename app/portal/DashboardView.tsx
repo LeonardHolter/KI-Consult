@@ -120,6 +120,8 @@ export default function PortalDashboard({
   const [confirmingClearSandbox, setConfirmingClearSandbox] = useState(false);
   const [clearingSandbox, setClearingSandbox] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  /** Set when a calendar fetch fails, so an empty grid can say WHY it is empty. */
+  const [calError, setCalError] = useState(false);
   // Which booking store the grid is showing: the real one, or the isolated
   // sandbox the voice agent books into while it's being tested. The default
   // follows the calendar connection (see defaultCalScope) — a client with no
@@ -185,7 +187,12 @@ export default function PortalDashboard({
     let cancelled = false;
     async function poll() {
       const d = await fetchCalendarView();
-      if (!d || cancelled) return;
+      if (cancelled) return;
+      if (!d) {
+        setCalError(true);
+        return;
+      }
+      setCalError(false);
       setSlots(d.slots ?? []);
       setCalConnected(Boolean(d.connected));
       setCalName(d.calendarName);
@@ -208,6 +215,7 @@ export default function PortalDashboard({
     setRefreshing(true);
     try {
       const d = await fetchCalendarView();
+      setCalError(!d);
       if (d) {
         setSlots(d.slots ?? []);
         setCalConnected(Boolean(d.connected));
@@ -256,6 +264,7 @@ export default function PortalDashboard({
       setSelected(null);
       setConfirmingCancel(false);
       const d = await fetchCalendarView();
+      setCalError(!d);
       if (d) {
         setSlots(d.slots ?? []);
         setCalConnected(Boolean(d.connected));
@@ -518,7 +527,7 @@ export default function PortalDashboard({
           <div className="ctp-card-head">
             <h2>Ledige tider</h2>
             <div className="ctp-meta">
-              <span>{slots[0]?.location ?? "Strømmen Senter"}</span>
+              <span>{slots[0]?.location ?? clientLabel ?? ""}</span>
               {/* Clients get the switch too: their voice agent books in the
                   sandbox while it's being tested, and those bookings are
                   invisible without the test calendar. */}
@@ -606,7 +615,17 @@ export default function PortalDashboard({
           </div>
 
           {days.length === 0 ? (
-            <p className="ctp-loading">Laster kalender…</p>
+            // A failed load used to look exactly like a slow one — the panel sat
+            // on "Laster kalender…" forever while the request 401'd every ten
+            // seconds. Say which it is.
+            calError ? (
+              <p className="ctp-loading">
+                Kunne ikke laste kalenderen. Prøver igjen automatisk — hjelper det ikke, gi oss
+                beskjed.
+              </p>
+            ) : (
+              <p className="ctp-loading">Laster kalender…</p>
+            )
           ) : (
             <div className="ctp-scroll">
               <table className="ctp-table">
