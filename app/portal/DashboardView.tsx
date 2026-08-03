@@ -355,7 +355,9 @@ export default function PortalDashboard({
           font-size: .72rem; font-weight: 700; padding: 4px 11px; border-radius: 999px;
         }
         .ctp-scope button.on { background: #fff; color: #16190f; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-        .ctp-legend { display: flex; flex-wrap: wrap; gap: 6px; }
+        /* Kept for the booking modal's service chip — the colour legend that
+           used to sit above the grid is gone, its categories were car-wash
+           specific and meaningless to a workshop. */
         .ctp-legend-item { padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; background: var(--svc-bg); color: var(--svc); }
 
         .ctp-scroll { overflow-x: auto; }
@@ -610,14 +612,6 @@ export default function PortalDashboard({
                     ? `Synkronisert${calName ? `: ${calName.trim()}` : ""}`
                     : "Demo-modus"}
               </span>
-              <div className="ctp-legend">
-                <span className="ctp-legend-item svc-wash">Bilvask</span>
-                <span className="ctp-legend-item svc-polish">Polering</span>
-                <span className="ctp-legend-item svc-tires">Dekk &amp; felg</span>
-                <span className="ctp-legend-item svc-interior">Interiør</span>
-                <span className="ctp-legend-item svc-coating">Lakk &amp; folie</span>
-                <span className="ctp-legend-item svc-other">Annet</span>
-              </div>
             </div>
           </div>
 
