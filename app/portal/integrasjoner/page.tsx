@@ -6,6 +6,7 @@ import { DEFAULT_PHONE_NUMBER, PHONE_CLIENT_ID } from "@/lib/telephony/config";
 import { numberForClient } from "@/lib/telephony/numbers";
 import GoogleCalendarConnect from "../GoogleCalendarConnect";
 import TelnyxNumberConnect from "./TelnyxNumberConnect";
+import ChatWidgetToggle from "./ChatWidgetToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,7 @@ export default async function IntegrasjonerPage({
 
   const settings = await loadSettings(activeClientId);
   const googleConnected = calendarConfigured(settings);
+  const chatWidgetShown = settings.showChatWidget !== false;
   // Connected = a mapped number, or being the default line's client.
   const assignedNumber = await numberForClient(activeClientId);
   const phoneConnected = Boolean(assignedNumber) || activeClientId === PHONE_CLIENT_ID;
@@ -182,6 +184,35 @@ export default async function IntegrasjonerPage({
               opp i Samtaleopptak-panelet.
             </p>
             <TelnyxNumberConnect clientId={activeClientId} />
+          </section>
+
+          {/* Chat-widget — whether the CLIENT's own dashboard loads the chat
+              bubble. Portal-only: the embed on their real website is their
+              own script tag and is untouched by this. */}
+          <section
+            style={{
+              background: "#fff", border: `1px solid ${MUTED}44`, borderRadius: 12,
+              padding: "20px 22px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 11, height: 11, borderRadius: "50%",
+                  background: chatWidgetShown ? GREEN : MUTED, flexShrink: 0,
+                }}
+              />
+              <h2 style={{ fontSize: 17, margin: 0 }}>💬 Chatbot i portalen</h2>
+              <span style={{ fontSize: 13, color: chatWidgetShown ? "#0d6b47" : MUTED, fontWeight: 600 }}>
+                {chatWidgetShown ? "Vises" : "Skjult"}
+              </span>
+            </div>
+            <p style={{ fontSize: 13.5, color: MUTED, margin: "0 0 6px", lineHeight: 1.5 }}>
+              Om kunden ser chatbobla på sitt eget dashbord. Påvirker bare portalen — widgeten
+              på nettsiden deres styres av deres eget embed-script.
+            </p>
+            <ChatWidgetToggle clientId={activeClientId} />
           </section>
 
           {/* Outlook — announced, not built. The provider seam is ready. */}

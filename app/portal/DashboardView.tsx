@@ -90,6 +90,7 @@ export default function PortalDashboard({
   overviewHref,
   phoneNumber,
   defaultCalScope = "sandbox",
+  showChatWidget = true,
 }: {
   /** Set only when an admin is viewing a specific client; omitted for a client
    *  account, which the /api/bot proxy pins to its own client regardless. */
@@ -108,6 +109,10 @@ export default function PortalDashboard({
    *  this client has a calendar connected. Only the connection can answer it,
    *  and the browser can't see settings. */
   defaultCalScope?: "live" | "sandbox";
+  /** Whether to load the chat widget here. Admin-controlled per client from
+   *  the Integrasjoner page; the widget on the client's own website is a
+   *  separate embed and is not affected. */
+  showChatWidget?: boolean;
 }) {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [calConnected, setCalConnected] = useState(false);
@@ -132,7 +137,7 @@ export default function PortalDashboard({
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
   useEffect(() => {
-    if (!clientId) return;
+    if (!clientId || !showChatWidget) return;
     if (document.getElementById("bot-embed")) return;
     const s = document.createElement("script");
     s.id = "bot-embed";
@@ -152,7 +157,7 @@ export default function PortalDashboard({
       // visit to this page within the same tab (e.g. log out, log back in).
       delete (window as unknown as Record<string, unknown>).__kiChatLoaded;
     };
-  }, [clientId]);
+  }, [clientId, showChatWidget]);
 
   useEffect(() => {
     if (!selected) return;
@@ -487,8 +492,10 @@ export default function PortalDashboard({
       <div className="ctp-main">
         <h1 className="ctp-title">Bookingkalender</h1>
         <p className="ctp-sub">
-          Kalenderen speiler Google Calendar i sanntid. Chat med boten nede til
-          høyre — det er nøyaktig samme bot som kundene dine snakker med.
+          Kalenderen speiler Google Calendar i sanntid.
+          {showChatWidget
+            ? " Chat med boten nede til høyre — det er nøyaktig samme bot som kundene dine snakker med."
+            : ""}
         </p>
 
         {/* With a phone line connected, the browser caller is retired: the
@@ -706,10 +713,12 @@ export default function PortalDashboard({
           )}
         </div>
 
-        <p className="ctp-hint">
-          <b>Tips:</b> book en time i chatten, så dukker den opp i kalenderen her
-          i løpet av sekunder — akkurat slik den gjør når en ekte kunde booker.
-        </p>
+        {showChatWidget && (
+          <p className="ctp-hint">
+            <b>Tips:</b> book en time i chatten, så dukker den opp i kalenderen her
+            i løpet av sekunder — akkurat slik den gjør når en ekte kunde booker.
+          </p>
+        )}
       </div>
 
       {selected && (

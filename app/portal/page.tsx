@@ -32,6 +32,13 @@ async function clientPhoneNumber(clientId: string): Promise<string | null> {
   return clientId === PHONE_CLIENT_ID ? DEFAULT_PHONE_NUMBER : null;
 }
 
+/** Whether this client's dashboard loads the chat widget. Absent = shown, so
+ *  no client loses it by default; an admin turns it off per client from the
+ *  Integrasjoner page. */
+async function chatWidgetShown(clientId: string): Promise<boolean> {
+  return (await loadSettings(clientId)).showChatWidget !== false;
+}
+
 /** Which calendar the dashboard opens on. The viewer's usual default — the
  *  real calendar for an admin, the sandbox for a client account — but never
  *  the real one for a client with no calendar connected, where it is empty by
@@ -80,6 +87,7 @@ export default async function PortalPage({
         clientId={profile.client_id ?? undefined}
         phoneNumber={profile.client_id ? await clientPhoneNumber(profile.client_id) : null}
         defaultCalScope={profile.client_id ? await defaultCalScope(profile.client_id, "sandbox") : "sandbox"}
+        showChatWidget={profile.client_id ? await chatWidgetShown(profile.client_id) : true}
       />
     );
   }
@@ -100,6 +108,7 @@ export default async function PortalPage({
         overviewHref="/portal"
         phoneNumber={await clientPhoneNumber(selectedClient.id)}
         defaultCalScope={await defaultCalScope(selectedClient.id, "live")}
+        showChatWidget={await chatWidgetShown(selectedClient.id)}
       />
     );
   }

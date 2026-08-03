@@ -31,6 +31,10 @@ export type Settings = {
   /** Weekdays the business is closed (0 = Sunday … 6 = Saturday). Absent =
    *  Sunday only, which is what every client had before the field existed. */
   closedWeekdays?: number[];
+  /** Whether the client's own dashboard loads the chat widget. Absent = shown,
+   *  so no existing client loses it. Only affects the portal — the widget on
+   *  the client's real website is their own embed and is untouched by this. */
+  showChatWidget?: boolean;
   /**
    * Where the VOICE agent's bookings go.
    *
