@@ -1,0 +1,73 @@
+<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <!-- Background -->
+  <rect width="800" height="420" fill="#0B2118"/>
+
+  <!-- Title -->
+  <text x="40" y="52" fill="#EFEDE2" font-size="24" font-weight="700">AI-resepsjonist for håndverkere</text>
+  <text x="40" y="78" fill="#9FB3A7" font-size="14">Svarer mens du jobber - triagerer, priser grovt og booker befaring 24/7</text>
+
+  <!-- Left: customer calls while håndverker works -->
+  <g>
+    <rect x="40" y="120" width="150" height="180" rx="14" fill="#123024" stroke="#15C07C" stroke-width="1.5"/>
+    <text x="115" y="150" fill="#EFEDE2" font-size="14" font-weight="700" text-anchor="middle">Kunden ringer</text>
+    <!-- ladder icon -->
+    <g stroke="#3FE0A0" stroke-width="3" stroke-linecap="round">
+      <line x1="95" y1="180" x2="95" y2="255"/>
+      <line x1="135" y1="180" x2="135" y2="255"/>
+      <line x1="95" y1="196" x2="135" y2="196"/>
+      <line x1="95" y1="214" x2="135" y2="214"/>
+      <line x1="95" y1="232" x2="135" y2="232"/>
+    </g>
+    <text x="115" y="285" fill="#9FB3A7" font-size="12" text-anchor="middle">Du står i stigen</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <g stroke="#15C07C" stroke-width="2.5" fill="none">
+    <line x1="196" y1="210" x2="238" y2="210"/>
+    <path d="M232 203 L242 210 L232 217" fill="#15C07C" stroke="none"/>
+  </g>
+
+  <!-- Center: AI answers 24/7 -->
+  <g>
+    <rect x="248" y="120" width="180" height="180" rx="14" fill="#15C07C"/>
+    <text x="338" y="152" fill="#0B2118" font-size="16" font-weight="700" text-anchor="middle">AI-resepsjonist</text>
+    <text x="338" y="174" fill="#0B2118" font-size="13" text-anchor="middle">svarer på norsk</text>
+    <!-- 24/7 badge -->
+    <circle cx="338" cy="228" r="42" fill="#0B2118"/>
+    <text x="338" y="222" fill="#3FE0A0" font-size="26" font-weight="700" text-anchor="middle">24/7</text>
+    <text x="338" y="245" fill="#9FB3A7" font-size="11" text-anchor="middle">hele døgnet</text>
+    <text x="338" y="288" fill="#0B2118" font-size="12" text-anchor="middle">Forstår hastegrad</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <g stroke="#15C07C" stroke-width="2.5" fill="none">
+    <line x1="434" y1="210" x2="476" y2="210"/>
+    <path d="M470 203 L480 210 L470 217" fill="#15C07C" stroke="none"/>
+  </g>
+
+  <!-- Right: outcomes stacked -->
+  <g>
+    <!-- Acute -->
+    <rect x="488" y="118" width="272" height="52" rx="10" fill="#123024" stroke="#3FE0A0" stroke-width="1.5"/>
+    <text x="508" y="140" fill="#3FE0A0" font-size="13" font-weight="700">Akutt?</text>
+    <text x="508" y="158" fill="#EFEDE2" font-size="12">Varsler deg eller vakttelefon direkte</text>
+
+    <!-- Estimate -->
+    <rect x="488" y="180" width="272" height="52" rx="10" fill="#123024" stroke="#15C07C" stroke-width="1.5"/>
+    <text x="508" y="202" fill="#3FE0A0" font-size="13" font-weight="700">Kan vente?</text>
+    <text x="508" y="220" fill="#EFEDE2" font-size="12">Grovt prisestimat fra din tjenestemeny</text>
+
+    <!-- Booking -->
+    <rect x="488" y="242" width="272" height="52" rx="10" fill="#123024" stroke="#15C07C" stroke-width="1.5"/>
+    <text x="508" y="264" fill="#3FE0A0" font-size="13" font-weight="700">Booker befaring</text>
+    <text x="508" y="282" fill="#EFEDE2" font-size="12">Rett i kalenderen, i sanntid</text>
+  </g>
+
+  <!-- Bottom summary bar -->
+  <g>
+    <rect x="40" y="330" width="720" height="56" rx="12" fill="#F3EFE4"/>
+    <text x="60" y="356" fill="#16190F" font-size="14" font-weight="700">Du får oppsummeringen etter jobben:</text>
+    <text x="60" y="375" fill="#16190F" font-size="13">adresse, jobbtype og bekreftet telefonnummer - ingenting faller mellom to stoler.</text>
+    <text x="740" y="366" fill="#15A06A" font-size="15" font-weight="700" text-anchor="end">KI Consult</text>
+  </g>
+</svg>
