@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <rect width="1200" height="630" fill="#0B2118"/>
+  <ellipse cx="950" cy="720" rx="650" ry="320" fill="#15C07C" opacity="0.10"/>
+
+  <text x="60" y="70" font-size="20" letter-spacing="4" fill="#3FE0A0" font-weight="700">LOVLIG AI-RESEPSJONIST: DE FEM KRAVENE</text>
+
+  <!-- Checklist card -->
+  <g>
+    <rect x="60" y="110" width="640" height="440" rx="16" fill="#123324" stroke="#15C07C" stroke-width="3"/>
+    <g font-size="21" fill="#EFEDE2">
+      <circle cx="110" cy="172" r="16" fill="#15C07C"/><text x="110" y="179" font-size="19" fill="#08231A" font-weight="800" text-anchor="middle">1</text>
+      <text x="145" y="179" font-weight="700">Si fra at det er KI</text>
+      <text x="145" y="205" font-size="16" fill="#9BB3A4">kunden skal vite at den snakker med en maskin</text>
+
+      <circle cx="110" cy="252" r="16" fill="#15C07C"/><text x="110" y="259" font-size="19" fill="#08231A" font-weight="800" text-anchor="middle">2</text>
+      <text x="145" y="259" font-weight="700">Ha rettslig grunnlag og informer</text>
+      <text x="145" y="285" font-size="16" fill="#9BB3A4">personvernerklæring som dekker samtaledata</text>
+
+      <circle cx="110" cy="332" r="16" fill="#15C07C"/><text x="110" y="339" font-size="19" fill="#08231A" font-weight="800" text-anchor="middle">3</text>
+      <text x="145" y="339" font-weight="700">Tegn databehandleravtale</text>
+      <text x="145" y="365" font-size="16" fill="#9BB3A4">leverandøren behandler data på dine vegne</text>
+
+      <circle cx="110" cy="412" r="16" fill="#15C07C"/><text x="110" y="419" font-size="19" fill="#08231A" font-weight="800" text-anchor="middle">4</text>
+      <text x="145" y="419" font-weight="700">Hold dataene i Norge/EØS</text>
+      <text x="145" y="445" font-size="16" fill="#9BB3A4">unngå overføring til tredjeland</text>
+
+      <circle cx="110" cy="492" r="16" fill="#15C07C"/><text x="110" y="499" font-size="19" fill="#08231A" font-weight="800" text-anchor="middle">5</text>
+      <text x="145" y="499" font-weight="700">Slett og gi innsyn</text>
+      <text x="145" y="525" font-size="16" fill="#9BB3A4">faste sletterutiner, svar på innsynskrav</text>
+    </g>
+  </g>
+
+  <!-- AI Act timeline card -->
+  <g>
+    <rect x="740" y="110" width="400" height="440" rx="16" fill="#123324" stroke="#E0A92B" stroke-width="3"/>
+    <text x="940" y="165" font-size="24" fill="#EFEDE2" font-weight="800" text-anchor="middle">KI-loven (AI Act)</text>
+
+    <line x1="800" y1="200" x2="800" y2="480" stroke="#2A4A38" stroke-width="4"/>
+
+    <circle cx="800" cy="225" r="10" fill="#9BB3A4"/>
+    <text x="830" y="222" font-size="17" fill="#EFEDE2" font-weight="700">2024: vedtatt i EU</text>
+    <text x="830" y="244" font-size="14" fill="#9BB3A4">gradvis innføring starter</text>
+
+    <circle cx="800" cy="300" r="10" fill="#E0A92B"/>
+    <text x="830" y="297" font-size="17" fill="#EFEDE2" font-weight="700">Aug 2026: hovedreglene</text>
+    <text x="830" y="319" font-size="14" fill="#9BB3A4">gjelder i EU - inkl. åpenhetskrav</text>
+    <text x="830" y="337" font-size="14" fill="#9BB3A4">for chatboter og taleagenter</text>
+
+    <circle cx="800" cy="390" r="10" fill="#15C07C"/>
+    <text x="830" y="387" font-size="17" fill="#EFEDE2" font-weight="700">Norge: på vei inn</text>
+    <text x="830" y="409" font-size="14" fill="#9BB3A4">via EØS-avtalen - Nkom blir</text>
+    <text x="830" y="427" font-size="14" fill="#9BB3A4">koordinerende KI-tilsyn</text>
+
+    <text x="940" y="505" font-size="15" fill="#3FE0A0" text-anchor="middle" font-weight="700">AI-resepsjonister = «begrenset risiko»</text>
+    <text x="940" y="527" font-size="14" fill="#9BB3A4" text-anchor="middle">kravet er åpenhet, ikke forbud</text>
+  </g>
+
+  <!-- Bottom bar -->
+  <rect x="60" y="565" width="1080" height="1" fill="#2A4A38"/>
+  <text x="600" y="605" font-size="17" fill="#9BB3A4" text-anchor="middle">Oppfyller du de fem kravene, er en AI-resepsjonist fullt lovlig for norske bedrifter</text>
+</svg>
