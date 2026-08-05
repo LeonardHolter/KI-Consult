@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { siteConfig } from "@/lib/site";
 
 /** Delt bunntekst brukt på undersider (f.eks. bloggen). */
 export default function SiteFooter() {
@@ -46,9 +47,9 @@ export default function SiteFooter() {
         <div>
           <div style={footerHeading}>Kontakt</div>
           <div style={footerCol}>
-            <span>934 38 816</span>
-            <span>hei@kiconsult.no</span>
-            <span>Oslo, Norge</span>
+            <span>{siteConfig.phone}</span>
+            <span>{siteConfig.email}</span>
+            <span>{siteConfig.locality}, Norge</span>
           </div>
         </div>
       </div>

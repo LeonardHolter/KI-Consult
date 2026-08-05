@@ -930,6 +930,7 @@ export default function Home() {
             <div style={footerHeading}>Kontakt</div>
             <div style={footerCol}>
               <span>{siteConfig.phone}</span>
+              <span>{siteConfig.email}</span>
               <span>{siteConfig.locality}, Norge</span>
             </div>
           </div>

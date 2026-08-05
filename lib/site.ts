@@ -9,7 +9,7 @@ export const siteConfig = {
   description:
     "Norskutviklet KI-resepsjonist som svarer telefonen, chatten og webhenvendelsene dine 24/7. Naturlig norsk stemme, BankID & Vipps, GDPR og hostet i Norge. Prøv gratis demo.",
   phone: "+47 484 35 330",
-  email: "hei@kiconsult.no",
+  email: "william@kiconsult.no",
   locality: "Oslo",
   country: "NO",
   keywords: [
