@@ -109,7 +109,7 @@ export const posts: BlogPost[] = [
     slug: "ai-resepsjonist-lovlig-gdpr",
     title: "Er AI-resepsjonist lovlig? GDPR og KI-loven forklart (2026)",
     description:
-      "Er en AI-resepsjonist lovlig i Norge? Ja - hvis du oppfyller fem krav. Se hva GDPR og den nye KI-loven (AI Act) betyr for bedrifter som lar KI svare telefonen.",
+      "Er en AI-resepsjonist lovlig i Norge? Ja. Det som er pålagt, er enklere enn du tror: si fra at det er KI, informer om lagring - og la leverandøren ta resten.",
     keywords: [
       "AI resepsjonist",
       "er AI-resepsjonist lovlig",
@@ -124,7 +124,7 @@ export const posts: BlogPost[] = [
       "chatbot åpenhetskrav",
     ],
     excerpt:
-      "2. august 2026 begynte hovedreglene i EUs KI-lov å gjelde - og mange norske bedrifter lurer på om det i det hele tatt er lov å la KI svare telefonen. Det korte svaret er ja. Her er de fem kravene som må på plass.",
+      "2. august 2026 begynte hovedreglene i EUs KI-lov å gjelde - og mange lurer på om det i det hele tatt er lov å la KI svare telefonen. Det korte svaret er ja. Og det som faktisk er pålagt, får du plass til på en huskelapp.",
     datePublished: "2026-08-05",
     dateModified: "2026-08-05",
     category: "KI & kundeservice",
@@ -132,109 +132,60 @@ export const posts: BlogPost[] = [
     body: [
       {
         type: "p",
-        text: "«Kan vi i det hele tatt bruke KI til å svare telefonen - lovlig?» Det er et av de vanligste spørsmålene vi får fra norske bedrifter som vurderer en **AI-resepsjonist**. Og det er mer aktuelt enn noen gang: 2. august 2026 begynte hovedreglene i EUs KI-forordning (AI Act) å gjelde. Det korte svaret er ja - en AI-resepsjonist er fullt lovlig i Norge, så lenge du oppfyller noen konkrete krav. Her er hele bildet, uten jussens omveier.",
+        text: "«Kan vi i det hele tatt bruke KI til å svare telefonen - lovlig?» Spørsmålet er blitt høyaktuelt etter at hovedreglene i EUs KI-lov (AI Act) begynte å gjelde 2. august 2026. Det korte svaret er ja - en **AI-resepsjonist** er fullt lovlig i Norge. Og det som faktisk er pålagt, er mindre enn mange tror. Her er det som betyr noe.",
       },
-      { type: "h2", text: "Kort svar: lovlig - med fem krav" },
+      { type: "h2", text: "Kort svar: ja, det er lovlig" },
       {
         type: "p",
-        text: "Verken GDPR eller den nye KI-loven forbyr bedrifter å la kunstig intelligens svare telefonen, chatten eller webhenvendelsene. Reglene handler ikke om *om* du kan bruke en AI-resepsjonist, men *hvordan*: kunden skal vite hva den snakker med, dataene skal behandles ryddig, og ansvaret skal være avklart. Alt dette er håndterbart - og de fleste kravene løses i praksis av leverandøren du velger.",
+        text: "KI-loven forbyr ikke AI-resepsjonister. Chatboter og taleagenter regnes som «begrenset risiko» - kravet er **åpenhet**, ikke forbud eller forhåndsgodkjenning. GDPR har gjeldt hele tiden og handler om hvordan du håndterer kundens opplysninger, ikke om du kan bruke KI. I praksis koker alt ned til tre plikter.",
       },
-      { type: "h2", text: "KI-loven (AI Act): hva skjedde i august 2026?" },
+      { type: "h2", text: "De tre tingene du må gjøre" },
       {
-        type: "p",
-        text: "EUs KI-forordning ble vedtatt i 2024 og innføres gradvis. Fra 2. august 2026 gjelder hovedreglene i EU - og loven er på vei inn i norsk rett via EØS-avtalen, med Nasjonal kommunikasjonsmyndighet (Nkom) som koordinerende KI-tilsyn. Loven deler KI-systemer inn i fire risikoklasser:",
-      },
-      {
-        type: "table",
-        headers: ["Risikoklasse", "Eksempler", "Hva gjelder"],
-        rows: [
-          ["Uakseptabel", "Sosial poengscoring, manipulasjon", "Forbudt"],
-          ["Høy risiko", "KI i rekruttering, kredittvurdering", "Strenge krav og tilsyn"],
-          ["Begrenset risiko", "Chatboter og AI-resepsjonister", "Åpenhetskrav: si fra at det er KI"],
-          ["Minimal risiko", "Spamfilter, anbefalinger", "Ingen særskilte krav"],
+        type: "ol",
+        items: [
+          "**Si fra at det er KI.** Kunden skal vite at den snakker med en maskin. En kort setning i starten av samtalen holder: «Hei, du snakker med den digitale resepsjonisten til …». Dette er kjernekravet i KI-loven.",
+          "**Informer om hva som lagres.** Samtaler inneholder navn, nummer og ærend. Nevn det i personvernerklæringen på nettsiden - og tar dere opp samtaler, si det i starten av samtalen.",
+          "**Signer databehandleravtalen.** Leverandøren behandler kundedata på dine vegne, og GDPR krever en skriftlig avtale om det. Seriøse leverandører har den ferdig - du skal bare slippe å mase om den.",
         ],
-      },
-      {
-        type: "p",
-        text: "En AI-resepsjonist havner i klassen *begrenset risiko*. Kravet er ikke forbud eller forhåndsgodkjenning - det er **åpenhet**: kunden skal få vite at den snakker med en maskin. En kort, naturlig setning i starten av samtalen («Hei, du snakker med den digitale resepsjonisten til …») oppfyller kjernen i kravet.",
       },
       {
         type: "figure",
         src: "/blog/ai-resepsjonist-lovlig-sjekkliste.svg",
-        alt: "Sjekkliste som viser når en AI-resepsjonist er lovlig i Norge: fem GDPR-krav - si fra at det er KI, rettslig grunnlag og informasjon, databehandleravtale, data lagret i Norge eller EØS, og sletterutiner - ved siden av tidslinjen for KI-loven (AI Act) som gjelder i EU fra august 2026",
-        caption: "Fem krav og én tidslinje: dette skal på plass før AI-resepsjonisten tar sin første samtale.",
-      },
-      { type: "h2", text: "GDPR: de fem kravene i praksis" },
-      {
-        type: "p",
-        text: "KI-loven er ny, men det viktigste regelverket for en AI-resepsjonist er fortsatt GDPR og personopplysningsloven. I praksis koker det ned til fem krav:",
-      },
-      {
-        type: "ol",
-        items: [
-          "**Si fra at det er KI.** Både KI-loven og god skikk krever at kunden vet at den snakker med en maskin - og får komme til et menneske når det trengs.",
-          "**Ha rettslig grunnlag og informer.** Samtaler inneholder personopplysninger: navn, telefonnummer, ærend. Oppdater personvernerklæringen så den dekker hva som samles inn, hvorfor og hvor lenge.",
-          "**Tegn databehandleravtale.** Leverandøren behandler data på dine vegne og er databehandler - du er behandlingsansvarlig. Uten avtale er bruken ulovlig, uansett hvor god tjenesten er.",
-          "**Hold dataene i Norge eller EØS.** Lagring utenfor EØS utløser egne krav til overføringsgrunnlag. Enklest er en leverandør som hoster alt i Norge.",
-          "**Slett og gi innsyn.** Sett faste sletterutiner for samtalelogger og opptak, og sørg for at du kan svare på innsyns- og slettekrav fra kundene.",
-        ],
+        alt: "Sjekkliste som viser at en AI-resepsjonist er lovlig i Norge med tre plikter: si fra at det er KI (kravet i KI-loven/AI Act fra august 2026), informer om hva som lagres i personvernerklæringen, og signer databehandleravtalen fra leverandøren",
+        caption: "Hele plikten på én huskelapp: si fra at det er KI, informer om lagring, signer avtalen fra leverandøren.",
       },
       { type: "h2", text: "Er samtaleopptak lovlig?" },
       {
         type: "p",
-        text: "Ja - å ta opp samtaler bedriften selv deltar i, er ikke forbudt i Norge. Det som er straffbart, er hemmelig avlytting av samtaler du ikke er del av. Men GDPR stiller krav når opptak lagres: du må ha et rettslig grunnlag og informere om opptaket, for eksempel i starten av samtalen. Rådet fra Datatilsynet er ryddighet: fortell om opptaket, bruk det til definerte formål - som kvalitetssikring - og slett etter faste rutiner.",
+        text: "Ja. Å ta opp samtaler bedriften selv deltar i, er lov i Norge - det ulovlige er hemmelig avlytting av andres samtaler. Kravet er at du informerer om opptaket og bruker det til noe fornuftig, som kvalitetssikring. Slett opptak du ikke lenger trenger.",
       },
-      { type: "h2", text: "Hvem har ansvaret hvis KI-en svarer feil?" },
+      { type: "h2", text: "Resten er leverandørens jobb" },
       {
         type: "p",
-        text: "Bedriften din. En AI-resepsjonist endrer ikke ansvarsforholdene: det er fortsatt du som er behandlingsansvarlig for kundenes opplysninger, og det er bedriften som står bak svarene agenten gir. Derfor bør løsningen ha to ting innebygget: **kvalitetssikring** - samtalelogger du faktisk kan gå gjennom - og en **trygg vei til et menneske** når spørsmålet er utenfor det agenten skal svare på. En godt oppsatt agent sier «det skal jeg la en kollega svare deg på» i stedet for å gjette. Det er både god jus og god kundeservice.",
-      },
-      { type: "h2", text: "Hva med sensitive opplysninger?" },
-      {
-        type: "p",
-        text: "Driver du tannlegeklinikk, legesenter eller annen virksomhet der samtalene kan røre ved helseopplysninger, gjelder GDPRs særlige kategorier - med strengere krav. Prinsippet er **dataminimering**: agenten skal samle det den trenger for å booke timen, ikke mer, og sensitive detaljer skal ikke bli liggende i logger uten grunn. Trenger du sikker identifisering, bør løsningen støtte BankID i stedet for å be kunden oppgi fødselsnummer muntlig. Sjekk også at sletterutinene er kortere for denne typen samtaler.",
-      },
-      { type: "h2", text: "Sjekkliste før du velger leverandør" },
-      {
-        type: "ul",
-        items: [
-          "Hoster leverandøren alt i Norge eller EØS - og står det i avtalen?",
-          "Får du en databehandleravtale uten å mase?",
-          "Presenterer agenten seg som KI i starten av samtalen?",
-          "Kan samtalelogger og opptak slettes automatisk etter faste intervaller?",
-          "Kommer kunden enkelt videre til et menneske når det trengs?",
-        ],
-      },
-      {
-        type: "p",
-        text: "Kan leverandøren svare trygt på alle fem, er det juridiske fundamentet på plass. Hva løsningen ellers bør kunne, har vi skrevet om i [guiden til AI-resepsjonister](/blog/ai-resepsjonist-guide) og [sammenligningen av sentralbordtjenester](/blog/ai-sentralbord-vs-svarservice).",
+        text: "Alt det andre du kan lese om der ute - risikoklasser, overføringsgrunnlag, lagringsregler - er i praksis ting leverandøren må ha orden på, ikke du. Velg en leverandør som har databehandleravtalen klar og svarer ryddig når du spør hvor data lagres, så er du der du skal være. Hva løsningen ellers bør kunne, står i [guiden til AI-resepsjonister](/blog/ai-resepsjonist-guide) og [sammenligningen av sentralbordtjenester](/blog/ai-sentralbord-vs-svarservice).",
       },
       {
         type: "callout",
-        title: "Bygget for norske krav",
-        text: "KI Consult sin AI-resepsjonist er norskutviklet: all data hostes i Norge, databehandleravtale følger med, agenten presenterer seg som KI og setter over til mennesker ved behov. [Snakk med den i nettleseren](/#demo) - så hører du hvordan åpenhet høres ut i praksis. (Artikkelen er generell veiledning, ikke juridisk rådgivning.)",
+        title: "Enkelt i praksis",
+        text: "KI Consult sin AI-resepsjonist presenterer seg som KI i starten av samtalen, databehandleravtale følger med, og den setter over til et menneske når det trengs. [Snakk med den i nettleseren](/#demo) - så hører du hvordan det låter. (Artikkelen er generell veiledning, ikke juridisk rådgivning.)",
       },
     ],
     faq: [
       {
         q: "Er det lov å bruke en AI-resepsjonist i Norge?",
-        a: "Ja. Verken GDPR eller KI-loven forbyr å la kunstig intelligens svare bedriftens telefon eller chat. Kravene handler om åpenhet og ryddig databehandling: fortell at det er KI, ha rettslig grunnlag, tegn databehandleravtale, hold dataene i Norge/EØS og ha sletterutiner.",
+        a: "Ja. Verken GDPR eller KI-loven forbyr å la kunstig intelligens svare bedriftens telefon eller chat. Det som er pålagt: fortell kunden at det er KI, informer om hva som lagres, og signer databehandleravtalen fra leverandøren.",
       },
       {
         q: "Må jeg fortelle kundene at de snakker med KI?",
-        a: "Ja. KI-loven (AI Act) plasserer chatboter og taleagenter i klassen «begrenset risiko», der kravet er åpenhet: brukeren skal vite at den samhandler med en maskin. En kort presentasjon i starten av samtalen oppfyller kjernen i kravet.",
+        a: "Ja. KI-loven (AI Act) plasserer chatboter og taleagenter i klassen «begrenset risiko», der kravet er åpenhet: brukeren skal vite at den samhandler med en maskin. En kort presentasjon i starten av samtalen oppfyller kravet.",
       },
       {
         q: "Er det lovlig å ta opp kundesamtaler?",
-        a: "Å ta opp samtaler du selv deltar i, er ikke forbudt i Norge - hemmelig avlytting av andres samtaler er det. GDPR krever likevel rettslig grunnlag og informasjon når opptak lagres, pluss faste sletterutiner og et definert formål, som kvalitetssikring.",
+        a: "Ja, når bedriften selv deltar i samtalen og informerer om opptaket. Hemmelig avlytting av andres samtaler er forbudt. Bruk opptakene til et fornuftig formål, som kvalitetssikring, og slett dem når de ikke trengs lenger.",
       },
       {
         q: "Hva er KI-loven (AI Act)?",
-        a: "EUs felles regelverk for kunstig intelligens, vedtatt i 2024. Hovedreglene gjelder i EU fra 2. august 2026, og loven er på vei inn i norsk rett via EØS-avtalen med Nkom som koordinerende tilsyn. AI-resepsjonister regnes som «begrenset risiko» med åpenhetskrav - ikke forbud.",
-      },
-      {
-        q: "Trenger jeg databehandleravtale med leverandøren?",
-        a: "Ja. Bedriften din er behandlingsansvarlig for kundenes opplysninger, og leverandøren av AI-resepsjonisten er databehandler. GDPR krever en skriftlig databehandleravtale - seriøse leverandører har den klar som standard.",
+        a: "EUs felles regelverk for kunstig intelligens, vedtatt i 2024. Hovedreglene gjelder i EU fra 2. august 2026, og loven er på vei inn i norsk rett via EØS-avtalen. AI-resepsjonister regnes som «begrenset risiko» med åpenhetskrav - ikke forbud.",
       },
     ],
   },
