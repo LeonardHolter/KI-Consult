@@ -11,7 +11,7 @@
 import { after } from "next/server";
 import { verifyOpenAIWebhook } from "@/lib/telephony/verifyWebhook";
 import { loadPhoneAgent, PHONE_CLIENT_ID, recordPhoneUsage } from "@/lib/telephony/config";
-import { clientForNumber, dialedFromSipHeaders } from "@/lib/telephony/numbers";
+import { clientForNumber, dialedFromSipHeaders , numberFromSipUri } from "@/lib/telephony/numbers";
 import { runCallSession } from "@/lib/telephony/callSession";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +64,12 @@ export async function POST(req: Request) {
   // No match falls back to PHONE_CLIENT_ID — the original line has no row.
   const sipHeaders = event.data.sip_headers ?? [];
   const dialed = dialedFromSipHeaders(sipHeaders);
+  // The caller's own number, for prompts that offer «bruke nummeret du
+  // ringer fra». Anonymous/withheld callers parse to null, which makes the
+  // prompt fall back to asking for a number the old way.
+  const callerDigits = numberFromSipUri(
+    sipHeaders.find((h) => h.name?.toLowerCase() === "from")?.value,
+  );
   const mappedClient = dialed ? await clientForNumber(dialed) : null;
   const clientId = mappedClient ?? PHONE_CLIENT_ID;
   console.info(`[phone ${callId.slice(0, 8)}] routing`, {
@@ -76,7 +82,7 @@ export async function POST(req: Request) {
     sipHeaders: sipHeaders.map((h) => h.name).join(","),
   });
 
-  const agent = await loadPhoneAgent(clientId);
+  const agent = await loadPhoneAgent(clientId, callerDigits);
   if (!agent) {
     return Response.json({ error: "no_agent_config" }, { status: 500 });
   }

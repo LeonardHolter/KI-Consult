@@ -117,3 +117,21 @@ describe("dialedFromSipHeaders", () => {
     expect(dialedFromSipHeaders([])).toBeNull();
   });
 });
+
+describe('caller-number injection (withCallerNumber)', () => {
+  it('appends a SYSTEMINFO block with the caller number', async () => {
+    const { withCallerNumber } = await import('@/lib/telephony/config')
+    const out = withCallerNumber('BASE PROMPT', '4798361774')
+    expect(out.startsWith('BASE PROMPT')).toBe(true)
+    expect(out).toContain('SYSTEMINFO FRA TELEFONSYSTEMET')
+    expect(out).toContain('+4798361774')
+    // The reliability claim is the point: this number must never be
+    // read back digit-by-digit like a transcribed one.
+    expect(out).toContain('ALDRI leses opp siffer for siffer')
+  })
+
+  it('anonymous caller (null) leaves the prompt untouched — the fallback flow', async () => {
+    const { withCallerNumber } = await import('@/lib/telephony/config')
+    expect(withCallerNumber('BASE PROMPT', null)).toBe('BASE PROMPT')
+  })
+})

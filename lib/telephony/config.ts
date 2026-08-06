@@ -36,9 +36,29 @@ type SettingsRow = {
   instructions: string;
 };
 
+/** Appends the caller's number (parsed from the SIP From header) to the
+ *  instructions, so a prompt can offer «Kan vi nå deg på nummeret du ringer
+ *  fra?» instead of taking a number by ear. Pure and exported for tests.
+ *
+ *  The framing in the block matters: this number comes from the phone
+ *  system, NOT from transcription — so the prompt is told it never needs
+ *  the digit-by-digit read-back that spoken numbers require. That skip is
+ *  the whole reliability win. Anonymous callers (no plausible From) get no
+ *  block, and a prompt written for this flow falls back to asking. */
+export function withCallerNumber(instructions: string, callerDigits: string | null): string {
+  if (!callerDigits) return instructions;
+  return (
+    instructions +
+    `\n\n# SYSTEMINFO FRA TELEFONSYSTEMET\n` +
+    `Innringerens telefonnummer er +${callerDigits}. Nummeret er hentet fra telefonsystemet og er pålitelig — det skal ALDRI leses opp siffer for siffer eller bekreftes på den måten. Følger instruksjonene over en «nummeret du ringer fra»-flyt, er det DETTE nummeret som skal brukes som kundens telefonnummer.`
+  );
+}
+
 /** Loads the client's live voice agent config for the phone bridge. Uses the
- *  service role because a webhook has no portal session to scope by. */
-export async function loadPhoneAgent(clientId: string): Promise<{
+ *  service role because a webhook has no portal session to scope by.
+ *  `callerDigits` (from the SIP From header) is appended to the prompt so
+ *  number-confirmation flows can use it — null for anonymous callers. */
+export async function loadPhoneAgent(clientId: string, callerDigits: string | null = null): Promise<{
   session: ReturnType<typeof buildRealtimeSession>;
   scope: BookingScope;
 } | null> {
@@ -59,7 +79,7 @@ export async function loadPhoneAgent(clientId: string): Promise<{
     noiseReduction: row.noise_reduction,
     transcriptionModel: row.transcription_model,
     transcriptionLanguage: row.transcription_language,
-    instructions: row.instructions,
+    instructions: withCallerNumber(row.instructions, callerDigits),
   };
 
   // Same booking store the dashboard agent uses — sandbox while testing, live
