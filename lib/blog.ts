@@ -1123,7 +1123,7 @@ export const posts: BlogPost[] = [
         type: "table",
         headers: ["", "Menneskelig resepsjonist", "KI-resepsjonist"],
         rows: [
-          ["Årlig kostnad", "~585 000 kr", "fra ~90 000 kr"],
+          ["Årlig kostnad", "~585 000 kr", "fra ~60 000 kr"],
           ["Tilgjengelighet", "8 t/dag, hverdager", "24/7, hele året"],
           ["Sykefravær og ferie", "Ja - krever vikar", "Aldri fravær"],
           ["Samtaler samtidig", "1 av gangen", "Ubegrenset"],
@@ -1132,7 +1132,7 @@ export const posts: BlogPost[] = [
       },
       {
         type: "p",
-        text: "En resepsjonist i Norge koster typisk 450 000 kr i årslønn, og med arbeidsgiveravgift, pensjon og andre sosiale kostnader lander den reelle kostnaden ofte rundt 585 000 kr i året - for én person som dekker vanlig arbeidstid. En KI-resepsjonist dekker hele døgnet fra rundt 90 000 kr i året.",
+        text: "En resepsjonist i Norge koster typisk 450 000 kr i årslønn, og med arbeidsgiveravgift, pensjon og andre sosiale kostnader lander den reelle kostnaden ofte rundt 585 000 kr i året - for én person som dekker vanlig arbeidstid. En KI-resepsjonist dekker hele døgnet fra rundt 60 000 kr i året.",
       },
       { type: "h2", text: "Regneeksempel: så mye kan du spare" },
       {
@@ -1143,8 +1143,8 @@ export const posts: BlogPost[] = [
         type: "stats",
         items: [
           { value: "585 000 kr", label: "Årlig kostnad for én ekstra ansatt" },
-          { value: "90 000 kr", label: "Årlig kostnad for KI-resepsjonist" },
-          { value: "~495 000 kr", label: "Potensiell besparelse per år" },
+          { value: "60 000 kr", label: "Årlig kostnad for KI-resepsjonist" },
+          { value: "~525 000 kr", label: "Potensiell besparelse per år" },
         ],
       },
       {
