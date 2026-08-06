@@ -141,5 +141,5 @@ export const faqs: Faq[] = [
   { q: "Hvor lagres dataene?", a: "Alt hostes i Norge og er fullt GDPR-kompatibelt. Du eier dine data, og vi deler dem aldri." },
   { q: "Hvor lang tid tar oppsettet?", a: "Live på 7 dager fra signert avtale. Enkle FAQ-agenter kan settes opp gratis og raskere." },
   { q: "Hva om agenten ikke kan svare?", a: "Da overleveres samtalen sømløst til en av dine ansatte - med full kontekst, så kunden slipper å gjenta seg." },
-  { q: "Er det bindingstid?", a: "Nei. Ingen binding, 60 dagers oppsigelse, og 30 dagers pengene-tilbake hvis du ikke finner verdi." },
+  { q: "Er det bindingstid?", a: "Nei. Ingen binding og 60 dagers oppsigelse. Første måneds abonnement er gratis - du betaler kun engangsbeløpet for oppsett ved oppstart." },
 ];

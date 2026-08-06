@@ -882,9 +882,6 @@ export default function Home() {
               Book et møte →
             </a>
           </div>
-          <div style={{ fontFamily: mono, fontSize: 12.5, color: "#7E9187", marginTop: 24 }}>
-            Ingen kredittkort nødvendig.
-          </div>
         </div>
       </section>
 
