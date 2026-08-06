@@ -1,0 +1,64 @@
+<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <rect width="800" height="420" fill="#0B2118"/>
+
+  <!-- Header -->
+  <text x="40" y="52" fill="#EFEDE2" font-size="26" font-weight="700">AI-resepsjonist for frisør og salong</text>
+  <text x="40" y="80" fill="#9FB3A7" font-size="15">Booker kunder mens du klipper – 24/7, på norsk</text>
+  <line x1="40" y1="98" x2="760" y2="98" stroke="#15C07C" stroke-width="2" opacity="0.4"/>
+
+  <!-- Step 1: Kunden ringer -->
+  <g>
+    <rect x="40" y="140" width="150" height="150" rx="14" fill="#F3EFE4" stroke="#E6E0D0" stroke-width="1.5"/>
+    <circle cx="115" cy="188" r="26" fill="#15C07C" opacity="0.15"/>
+    <path d="M104 178 q-4 0 -4 4 q0 22 20 42 q22 20 42 20 q4 0 4 -4 l0 -12 q0 -3 -3 -4 l-13 -3 q-3 -1 -5 2 l-4 5 q-11 -6 -18 -18 l5 -4 q3 -2 2 -5 l-3 -13 q-1 -3 -4 -3 z" fill="#15A06A"/>
+    <text x="115" y="240" fill="#16190F" font-size="14" font-weight="700" text-anchor="middle">Kunden ringer</text>
+    <text x="115" y="262" fill="#16190F" font-size="12" text-anchor="middle" opacity="0.7">kl. 20:30 – salongen</text>
+    <text x="115" y="278" fill="#16190F" font-size="12" text-anchor="middle" opacity="0.7">er stengt</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M198 215 l38 0" stroke="#3FE0A0" stroke-width="2.5" fill="none"/>
+  <path d="M236 215 l-9 -6 l0 12 z" fill="#3FE0A0"/>
+
+  <!-- Step 2: AI svarer (central node) -->
+  <g>
+    <rect x="245" y="128" width="180" height="174" rx="14" fill="#15C07C"/>
+    <circle cx="335" cy="176" r="30" fill="#0B2118" opacity="0.18"/>
+    <text x="335" y="184" fill="#EFEDE2" font-size="26" font-weight="700" text-anchor="middle">KI</text>
+    <text x="335" y="234" fill="#0B2118" font-size="15" font-weight="700" text-anchor="middle">AI-resepsjonist</text>
+    <text x="335" y="256" fill="#0B2118" font-size="12" text-anchor="middle">svarer på første ring</text>
+    <text x="335" y="274" fill="#0B2118" font-size="12" text-anchor="middle">forstår ønsket – klipp,</text>
+    <text x="335" y="290" fill="#0B2118" font-size="12" text-anchor="middle">farge, striper</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M433 215 l38 0" stroke="#3FE0A0" stroke-width="2.5" fill="none"/>
+  <path d="M471 215 l-9 -6 l0 12 z" fill="#3FE0A0"/>
+
+  <!-- Step 3: Resultat stack -->
+  <g>
+    <rect x="480" y="128" width="280" height="52" rx="10" fill="#F3EFE4" stroke="#E6E0D0" stroke-width="1.5"/>
+    <circle cx="508" cy="154" r="11" fill="#15A06A"/>
+    <path d="M503 154 l4 4 l7 -8" stroke="#F3EFE4" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <text x="530" y="150" fill="#16190F" font-size="13" font-weight="700">Booket time i kalenderen</text>
+    <text x="530" y="168" fill="#16190F" font-size="11" opacity="0.7">riktig varighet for behandlingen</text>
+
+    <rect x="480" y="190" width="280" height="52" rx="10" fill="#F3EFE4" stroke="#E6E0D0" stroke-width="1.5"/>
+    <circle cx="508" cy="216" r="11" fill="#15A06A"/>
+    <path d="M503 216 l4 4 l7 -8" stroke="#F3EFE4" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <text x="530" y="212" fill="#16190F" font-size="13" font-weight="700">SMS-bekreftelse og påminnelse</text>
+    <text x="530" y="230" fill="#16190F" font-size="11" opacity="0.7">færre no-shows</text>
+
+    <rect x="480" y="252" width="280" height="52" rx="10" fill="#F3EFE4" stroke="#E6E0D0" stroke-width="1.5"/>
+    <circle cx="508" cy="278" r="11" fill="#15A06A"/>
+    <path d="M503 278 l4 4 l7 -8" stroke="#F3EFE4" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <text x="530" y="274" fill="#16190F" font-size="13" font-weight="700">Fyller ledige luker i stolen</text>
+    <text x="530" y="292" fill="#16190F" font-size="11" opacity="0.7">mer produktiv arbeidsdag</text>
+  </g>
+
+  <!-- Footer stat band -->
+  <rect x="40" y="332" width="720" height="54" rx="12" fill="#0B2118" stroke="#15C07C" stroke-width="1.5"/>
+  <text x="70" y="367" fill="#3FE0A0" font-size="24" font-weight="700">1 av 3</text>
+  <text x="165" y="356" fill="#EFEDE2" font-size="14">bookinger skjer utenfor åpningstid – nettopp når</text>
+  <text x="165" y="376" fill="#EFEDE2" font-size="14">kundene har tid til å ringe. KI Consult fanger dem.</text>
+</svg>
