@@ -1,0 +1,68 @@
+<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <rect width="800" height="420" fill="#0B2118"/>
+
+  <!-- Title -->
+  <text x="40" y="52" fill="#EFEDE2" font-size="22" font-weight="700">AI-resepsjonist for tannlege</text>
+  <text x="40" y="78" fill="#9FB3A7" font-size="14">Svarer 24/7 på norsk - booker mens klinikken behandler</text>
+
+  <!-- Step 1: Incoming call -->
+  <g>
+    <rect x="40" y="120" width="180" height="200" rx="14" fill="#F3EFE4" stroke="#E6E0D0"/>
+    <circle cx="130" cy="168" r="26" fill="#15C07C"/>
+    <path d="M119 158 c0 14 9 23 23 23 l0 -8 c-4 0 -6 -1 -8 -3 l-4 3 c-5 -3 -8 -6 -11 -11 l3 -4 c-2 -2 -3 -4 -3 -8 z" fill="#0B2118"/>
+    <text x="130" y="216" fill="#16190F" font-size="14" font-weight="700" text-anchor="middle">Pasienten ringer</text>
+    <text x="130" y="240" fill="#16190F" font-size="12" text-anchor="middle">Akutt tannverk</text>
+    <text x="130" y="258" fill="#16190F" font-size="12" text-anchor="middle">kl. 21 - stengt</text>
+    <rect x="86" y="278" width="88" height="26" rx="13" fill="#15A06A"/>
+    <text x="130" y="295" fill="#EFEDE2" font-size="12" font-weight="700" text-anchor="middle">Ubesvart?</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <path d="M228 220 L272 220" stroke="#3FE0A0" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Step 2: AI core -->
+  <g>
+    <rect x="284" y="120" width="200" height="200" rx="14" fill="#0B2118" stroke="#15C07C" stroke-width="2"/>
+    <text x="384" y="150" fill="#3FE0A0" font-size="13" font-weight="700" text-anchor="middle">KI CONSULT</text>
+    <circle cx="384" cy="200" r="34" fill="none" stroke="#15C07C" stroke-width="2"/>
+    <circle cx="384" cy="200" r="10" fill="#3FE0A0"/>
+    <circle cx="384" cy="200" r="20" fill="none" stroke="#9FB3A7" stroke-width="1" opacity="0.5"/>
+    <text x="384" y="264" fill="#EFEDE2" font-size="13" font-weight="700" text-anchor="middle">Skiller akutt</text>
+    <text x="384" y="283" fill="#EFEDE2" font-size="13" font-weight="700" text-anchor="middle">fra rutine</text>
+    <text x="384" y="304" fill="#9FB3A7" font-size="11" text-anchor="middle">Naturlig samtale på norsk</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <path d="M492 220 L536 220" stroke="#3FE0A0" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Step 3: Outcomes -->
+  <g>
+    <rect x="548" y="120" width="212" height="200" rx="14" fill="#F3EFE4" stroke="#E6E0D0"/>
+    <text x="570" y="150" fill="#16190F" font-size="13" font-weight="700">Resultat</text>
+
+    <circle cx="578" cy="176" r="6" fill="#15A06A"/>
+    <text x="594" y="181" fill="#16190F" font-size="13">Booker riktig timelengde</text>
+
+    <circle cx="578" cy="208" r="6" fill="#15A06A"/>
+    <text x="594" y="213" fill="#16190F" font-size="13">Rett i kalenderen</text>
+
+    <circle cx="578" cy="240" r="6" fill="#15A06A"/>
+    <text x="594" y="245" fill="#16190F" font-size="13">SMS-bekreftelse</text>
+
+    <circle cx="578" cy="272" r="6" fill="#15A06A"/>
+    <text x="594" y="277" fill="#16190F" font-size="13">Påminnelse - kutt no-show</text>
+
+    <circle cx="578" cy="304" r="6" fill="#15A06A"/>
+    <text x="594" y="309" fill="#16190F" font-size="13">Fyller luker fra venteliste</text>
+  </g>
+
+  <!-- Footer stat -->
+  <text x="40" y="372" fill="#9FB3A7" font-size="13">Hver undersøkelse er verdt 1 200-1 600 kr -</text>
+  <text x="40" y="392" fill="#EFEDE2" font-size="13" font-weight="700">et ubesvart anrop kan være en pasient for livet som velger en annen klinikk.</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#3FE0A0"/>
+    </marker>
+  </defs>
+</svg>
