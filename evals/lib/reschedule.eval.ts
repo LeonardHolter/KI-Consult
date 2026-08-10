@@ -94,6 +94,35 @@ describe("find_my_bookings (sandbox)", () => {
     expect(listEvents).not.toHaveBeenCalled();
   });
 
+  it("finds a booking made with a bare 8-digit number via +47 caller ID", async () => {
+    const [slot] = await twoFutureSlots();
+    await bookSlot(CLIENT, slot.id, "Leonard", "983 61 774", "Polering", "sandbox");
+
+    // What the phone bridge injects from the SIP From header.
+    const found = await findBookingsByPhone(CLIENT, "+47 983 61 774", "sandbox");
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ date: slot.date, time: slot.time, service: "Polering" });
+  });
+
+  it("finds a booking stored WITH the +47 prefix via a dictated 8-digit number", async () => {
+    const [slot] = await twoFutureSlots();
+    // A booking made through the «nummeret du ringer fra»-flow stores the
+    // caller ID verbatim, prefix included.
+    await bookSlot(CLIENT, slot.id, "Leonard", "+4798361774", "Polering", "sandbox");
+
+    const found = await findBookingsByPhone(CLIENT, "98361774", "sandbox");
+    expect(found).toHaveLength(1);
+  });
+
+  it("does not strip 47 from an 8-digit number that merely starts with 47", async () => {
+    const [slot] = await twoFutureSlots();
+    await bookSlot(CLIENT, slot.id, "Kari", "47836177", "Polering", "sandbox");
+
+    // 478361xx and 8361xx.. must not collide.
+    expect(await findBookingsByPhone(CLIENT, "47836177", "sandbox")).toHaveLength(1);
+    expect(await findBookingsByPhone(CLIENT, "83611774", "sandbox")).toHaveLength(0);
+  });
+
   it("returns an empty list (not an error) for an unknown number", async () => {
     const found = await execBookingTool(
       CLIENT,
@@ -117,7 +146,7 @@ describe("reschedule_booking (sandbox)", () => {
       {
         date: from.date,
         time: from.time,
-        customer_phone: "917 87 801",
+        customer_phone: "+47 917 87 801",
         new_date: to.date,
         new_time: to.time,
       },

@@ -523,6 +523,19 @@ export async function bookSlot(
 
 const digitsOnly = (s: string) => s.replace(/\D/g, "");
 
+/** Matching key for phone numbers: digits with the Norwegian country code
+ *  stripped. A booking stored as «983 61 774» must be found by caller ID
+ *  «+47 983 61 774» and vice versa — the caller-ID flow stores numbers WITH
+ *  the prefix, dictation without. Only strips when what remains is a full
+ *  8-digit national number, so an 8-digit number that happens to start with
+ *  47 is left alone. */
+const phoneKey = (s: string) => {
+  const d = digitsOnly(s);
+  if (d.length === 10 && d.startsWith("47")) return d.slice(2);
+  if (d.length === 12 && d.startsWith("0047")) return d.slice(4);
+  return d;
+};
+
 /** Wipes every sandbox booking for the client. Sandbox-only by construction
  *  — the writer is the demo store, which never touches Google Calendar. */
 export async function clearSandboxBookings(clientId: string): Promise<{ removed: number }> {
@@ -554,7 +567,7 @@ export async function appendBookingNote(
       return (
         start.date === date &&
         start.time === time &&
-        digitsOnly(priv.customerPhone ?? "") === digitsOnly(customerPhone)
+        phoneKey(priv.customerPhone ?? "") === phoneKey(customerPhone)
       );
     });
     if (!match) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
@@ -574,7 +587,7 @@ export async function appendBookingNote(
     (b) =>
       b.date === date &&
       b.time === time &&
-      digitsOnly(b.customerPhone ?? "") === digitsOnly(customerPhone),
+      phoneKey(b.customerPhone ?? "") === phoneKey(customerPhone),
   );
   if (idx === -1) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
   const service = bookings[idx].service ?? "";
@@ -632,7 +645,7 @@ export async function findBookingsByPhone(
   customerPhone: string,
   scope: BookingScope = "live",
 ): Promise<BookingMatch[]> {
-  const phone = digitsOnly(customerPhone);
+  const phone = phoneKey(customerPhone);
   if (!phone) return [];
   const settings = await loadSettings(clientId);
   const now = osloParts(new Date().toISOString());
@@ -655,7 +668,7 @@ export async function findBookingsByPhone(
           e.status !== "cancelled" &&
           priv?.hzAgent === "1" &&
           e.start?.dateTime &&
-          digitsOnly(priv.customerPhone ?? "") === phone
+          phoneKey(priv.customerPhone ?? "") === phone
         );
       })
       .map((e) => {
@@ -673,7 +686,7 @@ export async function findBookingsByPhone(
   }
 
   return (await demoReadBookings(clientId, scope))
-    .filter((b) => digitsOnly(b.customerPhone ?? "") === phone)
+    .filter((b) => phoneKey(b.customerPhone ?? "") === phone)
     .map((b) => ({ date: b.date, time: b.time, service: b.service, customerName: b.customerName }))
     .filter((b) => isUpcoming(b, now))
     .sort(byDateTime);
@@ -736,7 +749,7 @@ export async function rescheduleBooking(
       return (
         start.date === date &&
         start.time === time &&
-        digitsOnly(priv.customerPhone ?? "") === digitsOnly(customerPhone)
+        phoneKey(priv.customerPhone ?? "") === phoneKey(customerPhone)
       );
     });
     if (!match) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
@@ -762,7 +775,7 @@ export async function rescheduleBooking(
     (b) =>
       b.date === date &&
       b.time === time &&
-      digitsOnly(b.customerPhone ?? "") === digitsOnly(customerPhone),
+      phoneKey(b.customerPhone ?? "") === phoneKey(customerPhone),
   );
   if (idx === -1) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
   const booking = bookings[idx];
