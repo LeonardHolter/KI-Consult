@@ -218,7 +218,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
             output: JSON.stringify({
               success: false,
               reason:
-                "Kunden fortsatte samtalen, så det ble ikke lagt på. Svar kunden, og kall finish_session på nytt i samme replikk som din neste avslutning.",
+                "Kunden fortsatte samtalen, så det ble ikke lagt på. Hjelp kunden videre med det de ber om — ALLE verktøy og flyter gjelder fortsatt, inkludert å flytte timen som nettopp ble booket. Kall finish_session på nytt i samme replikk som din neste avslutning, først når kunden faktisk er ferdig.",
             }),
           },
         });
