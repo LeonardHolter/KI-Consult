@@ -14,14 +14,30 @@
 // The voice agent passes whatever the client's Settings.voiceBookingMode says
 // — "sandbox" until someone deliberately switches it to live.
 
-import { appendBookingNote, bookSlot, loadSlots, type BookingScope } from "@/lib/slots";
+import {
+  appendBookingNote,
+  bookSlot,
+  findBookingsByPhone,
+  loadSlots,
+  rescheduleBooking,
+  type BookingScope,
+} from "@/lib/slots";
 import { osloParts } from "@/lib/google-calendar";
 
 export const GET_SLOTS_TOOL = "get_available_demo_slots";
 export const BOOK_SLOT_TOOL = "book_demo_slot";
 export const ADD_NOTE_TOOL = "add_booking_note";
+export const FIND_BOOKINGS_TOOL = "find_my_bookings";
+export const RESCHEDULE_TOOL = "reschedule_booking";
 
 const WEEKDAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
+
+/** «torsdag 14. august kl. 10:00» / «i dag kl. 10:00» — the speech-friendly
+ *  form both slot listings and booking lookups present times in. */
+function spokenLabel(date: string, time: string, todayDate: string): string {
+  const d = new Date(`${date}T${time}:00`);
+  return `${date === todayDate ? "i dag" : WEEKDAYS[d.getDay()]} ${d.getDate()}. ${d.toLocaleString("no", { month: "long" })} kl. ${time}`;
+}
 
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
@@ -84,7 +100,7 @@ export const BOOKING_TOOL_SCHEMAS = {
   },
   [ADD_NOTE_TOOL]: {
     description:
-      "Legger et notat på en booking som ALLEREDE er opprettet i denne samtalen — for eksempel når kunden etter bookingen ønsker en vurdering av PDR/bulk eller en ekstra tjeneste uten fast pris. Notatet legges i bookingens tjenestefelt så avdelingen ser det ved levering. Bruk KUN for tilleggsønsker på en eksisterende booking — aldri for å endre tidspunkt eller avbestille (det kan du ikke; henvis til avdelingen). Si aldri at noe er notert før verktøyet har svart success: true.",
+      `Legger et notat på en booking som ALLEREDE er opprettet i denne samtalen — for eksempel når kunden etter bookingen ønsker en vurdering av PDR/bulk eller en ekstra tjeneste uten fast pris. Notatet legges i bookingens tjenestefelt så avdelingen ser det ved levering. Bruk KUN for tilleggsønsker på en eksisterende booking — aldri for å endre tidspunkt (har du verktøyet ${RESCHEDULE_TOOL}, er det DET som flytter en time) eller avbestille (det kan du ikke; henvis til avdelingen). Si aldri at noe er notert før verktøyet har svart success: true.`,
     parameters: {
       type: "object",
       properties: {
@@ -107,6 +123,64 @@ export const BOOKING_TOOL_SCHEMAS = {
         },
       },
       required: ["date", "time", "customer_phone", "note"],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * Voice-only booking tools — deliberately NOT in BOOKING_TOOL_SCHEMAS, which
+ * the chat bot registers wholesale. The phone number is both the lookup key
+ * and the only proof of identity here, and that is only sound when it is
+ * grounded by caller ID: on a phone call the agent knows what number the
+ * customer is actually calling from, while in the website chat anyone could
+ * type a stranger's number and list or move their booking. So these register
+ * only via realtimeToolDefs().
+ */
+export const VOICE_ONLY_BOOKING_TOOL_SCHEMAS = {
+  [FIND_BOOKINGS_TOOL]: {
+    description:
+      "Finner kundens kommende bookinger ut fra telefonnummeret bookingen ble gjort med. Bruk når kunden vil endre eller flytte en eksisterende time. Bekreft alltid med kunden HVILKEN booking det gjelder før du endrer noe.",
+    parameters: {
+      type: "object",
+      properties: {
+        customer_phone: {
+          type: "string",
+          description: "Telefonnummeret bookingen ble gjort med",
+        },
+      },
+      required: ["customer_phone"],
+      additionalProperties: false,
+    },
+  },
+  [RESCHEDULE_TOOL]: {
+    description:
+      `Flytter en eksisterende booking til et nytt tidspunkt. Bruk KUN etter at ${FIND_BOOKINGS_TOOL} har funnet bookingen, kunden har bekreftet hvilken booking det gjelder, og det nye tidspunktet er hentet fra ${GET_SLOTS_TOOL} og bekreftet av kunden. Si aldri at timen er flyttet før verktøyet har svart success: true.`,
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: `Bookingens NÅVÆRENDE dato, format YYYY-MM-DD, nøyaktig som returnert fra ${FIND_BOOKINGS_TOOL}`,
+        },
+        time: {
+          type: "string",
+          description: `Bookingens NÅVÆRENDE klokkeslett, format HH:MM, nøyaktig som returnert fra ${FIND_BOOKINGS_TOOL}`,
+        },
+        customer_phone: {
+          type: "string",
+          description: "Telefonnummeret bookingen ble gjort med",
+        },
+        new_date: {
+          type: "string",
+          description: `Ny dato, format YYYY-MM-DD, nøyaktig som returnert fra ${GET_SLOTS_TOOL}`,
+        },
+        new_time: {
+          type: "string",
+          description: `Nytt klokkeslett, format HH:MM, nøyaktig som returnert fra ${GET_SLOTS_TOOL}`,
+        },
+      },
+      required: ["date", "time", "customer_phone", "new_date", "new_time"],
       additionalProperties: false,
     },
   },
@@ -137,15 +211,19 @@ export function finishSessionToolDef() {
   };
 }
 
-/** OpenAI Realtime session tool definitions, derived from the shared schemas. */
+/** OpenAI Realtime session tool definitions, derived from the shared schemas
+ *  plus the voice-only ones (see VOICE_ONLY_BOOKING_TOOL_SCHEMAS for why the
+ *  find/reschedule pair never reaches the chat bot). */
 export function realtimeToolDefs() {
   return [
-    ...Object.entries(BOOKING_TOOL_SCHEMAS).map(([name, spec]) => ({
-      type: "function" as const,
-      name,
-      description: spec.description,
-      parameters: spec.parameters,
-    })),
+    ...Object.entries({ ...BOOKING_TOOL_SCHEMAS, ...VOICE_ONLY_BOOKING_TOOL_SCHEMAS }).map(
+      ([name, spec]) => ({
+        type: "function" as const,
+        name,
+        description: spec.description,
+        parameters: spec.parameters,
+      }),
+    ),
     finishSessionToolDef(),
   ];
 }
@@ -176,9 +254,8 @@ export async function execBookingTool(
       if (date) filtered = filtered.filter((s) => s.date === date);
 
       let available = filtered.map((s) => {
-        const d = new Date(`${s.date}T${s.time}:00`);
         return {
-          label: `${s.date === now.date ? "i dag" : WEEKDAYS[d.getDay()]} ${d.getDate()}. ${d.toLocaleString("no", { month: "long" })} kl. ${s.time}`,
+          label: spokenLabel(s.date, s.time, now.date),
           date: s.date,
           time: s.time,
           location: s.location,
@@ -260,6 +337,60 @@ export async function execBookingTool(
       return result.ok
         ? { success: true, service: result.service }
         : { success: false, error: result.error };
+    }
+
+    if (name === FIND_BOOKINGS_TOOL) {
+      const { customer_phone } = (input ?? {}) as { customer_phone?: string };
+      if (!customer_phone) return { success: false, error: "Mangler telefonnummer." };
+      const now = osloParts(new Date().toISOString());
+      const bookings = await findBookingsByPhone(clientId, customer_phone, scope);
+      return {
+        success: true,
+        bookings: bookings.map((b) => ({
+          label: spokenLabel(b.date, b.time, now.date),
+          date: b.date,
+          time: b.time,
+          service: b.service ?? null,
+          customer_name: b.customerName ?? null,
+        })),
+        note: "Bekreft med kunden hvilken booking det gjelder før du endrer noe. Er listen tom, finnes det ingen kommende booking på dette nummeret — kunden kan ha booket med et annet nummer.",
+      };
+    }
+
+    if (name === RESCHEDULE_TOOL) {
+      const { date, time, customer_phone, new_date, new_time } = (input ?? {}) as {
+        date?: string;
+        time?: string;
+        customer_phone?: string;
+        new_date?: string;
+        new_time?: string;
+      };
+      if (!date || !time || !customer_phone || !new_date || !new_time) {
+        return { success: false, error: "Mangler dato, tid, telefonnummer, ny dato eller ny tid." };
+      }
+      const norm = (t: string) => t.trim().replace(/^(\d):/, "0$1:").slice(0, 5);
+      const result = await rescheduleBooking(
+        clientId,
+        {
+          date: date.trim(),
+          time: norm(time),
+          customerPhone: customer_phone,
+          newDate: new_date.trim(),
+          newTime: norm(new_time),
+        },
+        scope,
+      );
+      if (!result.ok) return { success: false, error: result.error };
+      const now = osloParts(new Date().toISOString());
+      return {
+        success: true,
+        booking: {
+          label: spokenLabel(result.booking.date, result.booking.time, now.date),
+          date: result.booking.date,
+          time: result.booking.time,
+          service: result.booking.service ?? null,
+        },
+      };
     }
 
     return { error: `Ukjent verktøy: ${name}` };

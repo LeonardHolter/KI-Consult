@@ -604,6 +604,190 @@ export async function cancelBooking(
 }
 
 /* ------------------------------------------------------------------ */
+/* Finding + moving existing bookings — the voice agent's «endre       */
+/* booking»-flow. The phone number is the lookup key AND the proof of  */
+/* identity, which is only sound when it is grounded by caller ID —    */
+/* that is why the tools wrapping these are voice-only (see            */
+/* bookingTools.ts). Like appendBookingNote, only hzAgent-marked       */
+/* events are ever visible or movable: an event synced in from the     */
+/* store's other systems can neither be listed nor rescheduled here.   */
+/* ------------------------------------------------------------------ */
+
+export type BookingMatch = {
+  date: string; // YYYY-MM-DD (Oslo)
+  time: string; // HH:MM (Oslo)
+  service?: string;
+  customerName?: string;
+};
+
+const isUpcoming = (b: { date: string; time: string }, now: { date: string; time: string }) =>
+  b.date > now.date || (b.date === now.date && b.time > now.time);
+
+const byDateTime = (a: BookingMatch, b: BookingMatch) =>
+  a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.time < b.time ? -1 : 1;
+
+/** Upcoming agent-made bookings for a phone number. */
+export async function findBookingsByPhone(
+  clientId: string,
+  customerPhone: string,
+  scope: BookingScope = "live",
+): Promise<BookingMatch[]> {
+  const phone = digitsOnly(customerPhone);
+  if (!phone) return [];
+  const settings = await loadSettings(clientId);
+  const now = osloParts(new Date().toISOString());
+
+  if (scope === "live" && calendarConnected(settings)) {
+    // 60 days is deliberately wider than the bookable window (daysAhead):
+    // a booking made weeks ago must still be findable even if it now sits
+    // beyond what get_available_demo_slots offers.
+    const timeMin = osloToUTC(now.date, "00:00");
+    const timeMax = new Date(timeMin.getTime() + 60 * 24 * 3600 * 1000);
+    const events = await getCalendarProvider(settings).listEvents(
+      settings.calendarId!,
+      timeMin.toISOString(),
+      timeMax.toISOString(),
+    );
+    return events
+      .filter((e) => {
+        const priv = e.extendedProperties?.private;
+        return (
+          e.status !== "cancelled" &&
+          priv?.hzAgent === "1" &&
+          e.start?.dateTime &&
+          digitsOnly(priv.customerPhone ?? "") === phone
+        );
+      })
+      .map((e) => {
+        const start = osloParts(e.start!.dateTime!);
+        const priv = e.extendedProperties!.private!;
+        return {
+          date: start.date,
+          time: start.time,
+          service: priv.service ?? e.summary,
+          customerName: priv.customerName,
+        };
+      })
+      .filter((b) => isUpcoming(b, now))
+      .sort(byDateTime);
+  }
+
+  return (await demoReadBookings(clientId, scope))
+    .filter((b) => digitsOnly(b.customerPhone ?? "") === phone)
+    .map((b) => ({ date: b.date, time: b.time, service: b.service, customerName: b.customerName }))
+    .filter((b) => isUpcoming(b, now))
+    .sort(byDateTime);
+}
+
+/**
+ * Moves an existing agent-made booking (identified by date + time + phone,
+ * same key as appendBookingNote) to a new slot. The target slot gets the
+ * exact same validation as a fresh booking: it must exist, have capacity,
+ * and permit the booking's service. Calendar mode patches the event's
+ * start/end in one write — never delete-then-recreate, which would leave a
+ * window where the customer has no booking at all if the second call fails.
+ */
+export async function rescheduleBooking(
+  clientId: string,
+  args: { date: string; time: string; customerPhone: string; newDate: string; newTime: string },
+  scope: BookingScope = "live",
+): Promise<{ ok: true; booking: BookingMatch } | { ok: false; error: string }> {
+  const { date, time, customerPhone, newDate, newTime } = args;
+  if (date === newDate && time === newTime) {
+    return { ok: false, error: "Den nye tiden er den samme som bookingen allerede står på." };
+  }
+  const settings = await loadSettings(clientId);
+  const targetId = `${newDate}-${newTime.replace(":", "")}`;
+
+  const validateTarget = (
+    views: SlotView[],
+    service: string,
+  ): { ok: true; target: SlotView } | { ok: false; error: string } => {
+    const target = views.find((s) => s.id === targetId);
+    if (!target) return { ok: false, error: "Fant ikke den nye timen. Hent ledige tider på nytt." };
+    if (target.full) {
+      return {
+        ok: false,
+        error: `Den nye timen er full (maks ${target.capacity} samtidige bookinger). Velg et annet tidspunkt.`,
+      };
+    }
+    if (!matchesServiceKeyword(service, target.serviceKeyword)) {
+      return {
+        ok: false,
+        error: `Klokken ${target.time} kan vi kun ta imot tjenester som inkluderer «${target.serviceKeyword}». Velg et annet tidspunkt.`,
+      };
+    }
+    return { ok: true, target };
+  };
+
+  if (scope === "live" && calendarConnected(settings)) {
+    const startUTC = osloToUTC(date, "00:00");
+    const endUTC = new Date(startUTC.getTime() + 24 * 3600 * 1000);
+    const provider = getCalendarProvider(settings);
+    const events = await provider.listEvents(
+      settings.calendarId!,
+      startUTC.toISOString(),
+      endUTC.toISOString(),
+    );
+    const match = events.find((e) => {
+      const priv = e.extendedProperties?.private;
+      if (priv?.hzAgent !== "1" || !e.start?.dateTime) return false;
+      const start = osloParts(e.start.dateTime);
+      return (
+        start.date === date &&
+        start.time === time &&
+        digitsOnly(priv.customerPhone ?? "") === digitsOnly(customerPhone)
+      );
+    });
+    if (!match) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
+    const priv = match.extendedProperties?.private ?? {};
+    const service = priv.service ?? match.summary ?? "";
+
+    const check = validateTarget(await calendarSlotViews(settings), service);
+    if (!check.ok) return check;
+    const { target } = check;
+
+    await provider.patchEvent(settings.calendarId!, match.id, {
+      start: { dateTime: `${target.date}T${target.time}:00`, timeZone: "Europe/Oslo" },
+      end: { dateTime: `${target.date}T${target.endTime}:00`, timeZone: "Europe/Oslo" },
+    });
+    return {
+      ok: true,
+      booking: { date: target.date, time: target.time, service, customerName: priv.customerName },
+    };
+  }
+
+  const bookings = await demoReadBookings(clientId, scope);
+  const idx = bookings.findIndex(
+    (b) =>
+      b.date === date &&
+      b.time === time &&
+      digitsOnly(b.customerPhone ?? "") === digitsOnly(customerPhone),
+  );
+  if (idx === -1) return { ok: false, error: "Fant ingen booking på det tidspunktet og nummeret." };
+  const booking = bookings[idx];
+
+  const check = validateTarget(
+    await demoSlotViews(clientId, settings, scope),
+    booking.service ?? "",
+  );
+  if (!check.ok) return check;
+  const { target } = check;
+
+  bookings[idx] = { ...booking, slotId: target.id, date: target.date, time: target.time };
+  await demoWriteBookings(clientId, scope, bookings);
+  return {
+    ok: true,
+    booking: {
+      date: target.date,
+      time: target.time,
+      service: booking.service,
+      customerName: booking.customerName,
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Calendar view — real events + bookable slots for the dashboard      */
 /* ------------------------------------------------------------------ */
 
