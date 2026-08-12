@@ -1,0 +1,85 @@
+<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <rect width="800" height="420" fill="#0B2118"/>
+
+  <!-- Title -->
+  <text x="40" y="52" fill="#EFEDE2" font-size="24" font-weight="700">AI-resepsjonist for bilverksted</text>
+  <text x="40" y="78" fill="#9FB3A7" font-size="15">Tar førstelinjen mens mekanikeren skrur - 24/7 på norsk</text>
+
+  <!-- Column 1: Incoming -->
+  <text x="40" y="122" fill="#9FB3A7" font-size="13" font-weight="600" letter-spacing="1">INNRINGENDE KUNDER</text>
+
+  <g>
+    <rect x="40" y="138" width="200" height="52" rx="10" fill="#F3EFE4" stroke="#E6E0D0"/>
+    <text x="60" y="162" fill="#16190F" font-size="14" font-weight="600">Dekkskift &amp; dekkhotell</text>
+    <text x="60" y="180" fill="#16190F" font-size="12" opacity="0.7">Høysesong vår og høst</text>
+  </g>
+  <g>
+    <rect x="40" y="202" width="200" height="52" rx="10" fill="#F3EFE4" stroke="#E6E0D0"/>
+    <text x="60" y="226" fill="#16190F" font-size="14" font-weight="600">Service &amp; EU-kontroll</text>
+    <text x="60" y="244" fill="#16190F" font-size="12" opacity="0.7">Booking i kalenderen</text>
+  </g>
+  <g>
+    <rect x="40" y="266" width="200" height="52" rx="10" fill="#F3EFE4" stroke="#E6E0D0"/>
+    <text x="60" y="290" fill="#16190F" font-size="14" font-weight="600">Bil som ikke starter</text>
+    <text x="60" y="308" fill="#16190F" font-size="12" opacity="0.7">Etter stengetid kl. 20</text>
+  </g>
+
+  <!-- Arrows in -->
+  <g stroke="#15C07C" stroke-width="2.5" fill="none">
+    <path d="M240 164 C 290 164, 300 214, 330 224" marker-end="url(#arrow)"/>
+    <path d="M240 228 H 330" marker-end="url(#arrow)"/>
+    <path d="M240 292 C 290 292, 300 242, 330 232" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Central AI node -->
+  <g>
+    <rect x="335" y="176" width="150" height="104" rx="16" fill="#15C07C"/>
+    <circle cx="410" cy="212" r="20" fill="#0B2118"/>
+    <circle cx="403" cy="209" r="3.5" fill="#3FE0A0"/>
+    <circle cx="417" cy="209" r="3.5" fill="#3FE0A0"/>
+    <path d="M401 221 Q410 227 419 221" stroke="#3FE0A0" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <text x="410" y="256" fill="#0B2118" font-size="14" font-weight="700" text-anchor="middle">KI Consult</text>
+    <text x="410" y="272" fill="#0B2118" font-size="11" text-anchor="middle" opacity="0.8">svarer &amp; booker</text>
+  </g>
+
+  <!-- Arrows out -->
+  <g stroke="#3FE0A0" stroke-width="2.5" fill="none">
+    <path d="M485 200 C 520 200, 530 158, 560 152" marker-end="url(#arrow2)"/>
+    <path d="M485 228 H 560" marker-end="url(#arrow2)"/>
+    <path d="M485 256 C 520 256, 530 298, 560 304" marker-end="url(#arrow2)"/>
+  </g>
+
+  <!-- Column 3: Outputs -->
+  <text x="560" y="122" fill="#9FB3A7" font-size="13" font-weight="600" letter-spacing="1">RESULTAT</text>
+
+  <g>
+    <rect x="560" y="128" width="200" height="50" rx="10" fill="none" stroke="#3FE0A0" stroke-width="1.5"/>
+    <text x="580" y="150" fill="#EFEDE2" font-size="14" font-weight="600">Time i kalenderen</text>
+    <text x="580" y="168" fill="#9FB3A7" font-size="12">Riktig tidsbruk per jobb</text>
+  </g>
+  <g>
+    <rect x="560" y="204" width="200" height="50" rx="10" fill="none" stroke="#3FE0A0" stroke-width="1.5"/>
+    <text x="580" y="226" fill="#EFEDE2" font-size="14" font-weight="600">Dekkhotell koblet</text>
+    <text x="580" y="244" fill="#9FB3A7" font-size="12">Sesongskifte planlagt</text>
+  </g>
+  <g>
+    <rect x="560" y="280" width="200" height="50" rx="10" fill="none" stroke="#3FE0A0" stroke-width="1.5"/>
+    <text x="580" y="302" fill="#EFEDE2" font-size="14" font-weight="600">SMS-bekreftelse</text>
+    <text x="580" y="320" fill="#9FB3A7" font-size="12">Påminnelse mot no-show</text>
+  </g>
+
+  <!-- Bottom stat bar -->
+  <line x1="40" y1="358" x2="760" y2="358" stroke="#15A06A" stroke-width="1" opacity="0.4"/>
+  <text x="40" y="392" fill="#3FE0A0" font-size="22" font-weight="700">24/7<tspan fill="#9FB3A7" font-size="13" font-weight="400">  svarer på første ring</tspan></text>
+  <text x="300" y="392" fill="#3FE0A0" font-size="22" font-weight="700">~1 av 5<tspan fill="#9FB3A7" font-size="13" font-weight="400">  anrop går ellers tapt</tspan></text>
+  <text x="600" y="392" fill="#3FE0A0" font-size="22" font-weight="700">0<tspan fill="#9FB3A7" font-size="13" font-weight="400">  opptattsignal</tspan></text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#15C07C"/>
+    </marker>
+    <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#3FE0A0"/>
+    </marker>
+  </defs>
+</svg>
