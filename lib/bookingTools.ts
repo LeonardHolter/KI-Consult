@@ -23,6 +23,7 @@ import {
   type BookingScope,
 } from "@/lib/slots";
 import { osloParts } from "@/lib/google-calendar";
+import { notifyShop } from "@/lib/notify";
 
 export const GET_SLOTS_TOOL = "get_available_demo_slots";
 export const BOOK_SLOT_TOOL = "book_demo_slot";
@@ -310,6 +311,20 @@ export async function execBookingTool(
         service,
         scope,
       );
+      if (result.ok) {
+        // The shop's inbox copy. Awaited (serverless may kill a dangling
+        // promise) but notifyShop never throws — a mail failure cannot
+        // unmake the booking that just succeeded.
+        await notifyShop(clientId, {
+          kind: "booking",
+          date: date.trim(),
+          time: normalizedTime,
+          customerName: customer_name,
+          customerPhone: customer_phone,
+          service,
+          scope,
+        }).catch(() => {});
+      }
       return result.ok
         ? { success: true, slot: result.slot }
         : { success: false, error: result.error };
@@ -334,6 +349,17 @@ export async function execBookingTool(
         note,
         scope,
       );
+      if (result.ok) {
+        await notifyShop(clientId, {
+          kind: "note",
+          date: date.trim(),
+          time: normalizedTime,
+          customerPhone: customer_phone,
+          service: result.service,
+          note,
+          scope,
+        }).catch(() => {});
+      }
       return result.ok
         ? { success: true, service: result.service }
         : { success: false, error: result.error };
@@ -381,6 +407,17 @@ export async function execBookingTool(
         scope,
       );
       if (!result.ok) return { success: false, error: result.error };
+      await notifyShop(clientId, {
+        kind: "reschedule",
+        date: result.booking.date,
+        time: result.booking.time,
+        oldDate: date.trim(),
+        oldTime: norm(time),
+        customerName: result.booking.customerName,
+        customerPhone: customer_phone,
+        service: result.booking.service,
+        scope,
+      }).catch(() => {});
       const now = osloParts(new Date().toISOString());
       return {
         success: true,

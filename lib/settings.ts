@@ -35,6 +35,9 @@ export type Settings = {
    *  so no existing client loses it. Only affects the portal — the widget on
    *  the client's real website is their own embed and is untouched by this. */
   showChatWidget?: boolean;
+  /** Where the shop wants booking/message e-mails (lib/notify.ts). Absent or
+   *  empty = no e-mails for this client. */
+  notificationEmail?: string;
   /**
    * Where the VOICE agent's bookings go.
    *
