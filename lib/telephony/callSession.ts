@@ -23,6 +23,11 @@ export type CallUsage = {
   inputTokens: number;
   outputTokens: number;
   cacheReadInputTokens: number;
+  // Text/audio split from the same usage events — what lets the admin cost
+  // view price the call exactly instead of at the all-audio upper bound.
+  textInputTokens: number;
+  audioInputTokens: number;
+  audioOutputTokens: number;
 };
 
 export type CallSummary = {
@@ -93,7 +98,14 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
   return new Promise<void>((resolve) => {
     let settled = false;
     let startedAt = 0;
-    const usage: CallUsage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0 };
+    const usage: CallUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadInputTokens: 0,
+      textInputTokens: 0,
+      audioInputTokens: 0,
+      audioOutputTokens: 0,
+    };
 
     const finish = () => {
       if (settled) return;
@@ -311,7 +323,12 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
                 usage?: {
                   input_tokens?: number;
                   output_tokens?: number;
-                  input_token_details?: { cached_tokens?: number };
+                  input_token_details?: {
+                    cached_tokens?: number;
+                    text_tokens?: number;
+                    audio_tokens?: number;
+                  };
+                  output_token_details?: { audio_tokens?: number };
                 };
                 output?: Array<{ type?: string; name?: string; content?: Array<{ type?: string }> }>;
               }
@@ -320,6 +337,9 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
             usage.inputTokens += response.usage.input_tokens ?? 0;
             usage.outputTokens += response.usage.output_tokens ?? 0;
             usage.cacheReadInputTokens += response.usage.input_token_details?.cached_tokens ?? 0;
+            usage.textInputTokens += response.usage.input_token_details?.text_tokens ?? 0;
+            usage.audioInputTokens += response.usage.input_token_details?.audio_tokens ?? 0;
+            usage.audioOutputTokens += response.usage.output_token_details?.audio_tokens ?? 0;
           }
           const output = response?.output ?? [];
           const hasAudio = output.some(

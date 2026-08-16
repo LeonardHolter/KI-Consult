@@ -37,7 +37,7 @@ export default function VoiceAgentCard({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const assistantTextRef = useRef<string>("");
   const startedAtRef = useRef<number>(0);
-  const usageRef = useRef({ inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 });
+  const usageRef = useRef({ inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0, textInputTokens: 0, audioInputTokens: 0, audioOutputTokens: 0 });
   // Owns the "agent must never leave the caller in silence" contract. Four
   // inline predecessors of this were patched against live calls and each
   // still had a hole; the full history and every scenario live in
@@ -163,7 +163,7 @@ export default function VoiceAgentCard({
     }).catch(() => {
       /* best-effort — the call itself already ended fine */
     });
-    usageRef.current = { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 };
+    usageRef.current = { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0, textInputTokens: 0, audioInputTokens: 0, audioOutputTokens: 0 };
   }, [clientId]);
 
   // Realtime tool calls arrive HERE, in the browser, because the WebRTC
@@ -313,8 +313,14 @@ export default function VoiceAgentCard({
         if (usage) {
           usageRef.current.inputTokens += Number(usage.input_tokens ?? 0);
           usageRef.current.outputTokens += Number(usage.output_tokens ?? 0);
-          const cached = (usage.input_token_details as { cached_tokens?: number } | undefined)?.cached_tokens;
-          usageRef.current.cacheReadInputTokens += Number(cached ?? 0);
+          const inDetails = usage.input_token_details as
+            | { cached_tokens?: number; text_tokens?: number; audio_tokens?: number }
+            | undefined;
+          const outDetails = usage.output_token_details as { audio_tokens?: number } | undefined;
+          usageRef.current.cacheReadInputTokens += Number(inDetails?.cached_tokens ?? 0);
+          usageRef.current.textInputTokens += Number(inDetails?.text_tokens ?? 0);
+          usageRef.current.audioInputTokens += Number(inDetails?.audio_tokens ?? 0);
+          usageRef.current.audioOutputTokens += Number(outDetails?.audio_tokens ?? 0);
         }
         // The model sometimes calls finish_session as a BARE turn — no
         // closing line spoken. Left unanswered, the next generic nudge has

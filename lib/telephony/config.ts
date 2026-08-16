@@ -122,7 +122,14 @@ export async function recordPhoneUsage(
     startedAt: number;
     endedAt: number;
     durationSeconds: number;
-    usage: { inputTokens: number; outputTokens: number; cacheReadInputTokens: number };
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadInputTokens: number;
+      textInputTokens?: number;
+      audioInputTokens?: number;
+      audioOutputTokens?: number;
+    };
   },
 ): Promise<void> {
   try {
@@ -136,6 +143,9 @@ export async function recordPhoneUsage(
       output_tokens: summary.usage.outputTokens,
       cache_creation_input_tokens: 0,
       cache_read_input_tokens: summary.usage.cacheReadInputTokens,
+      text_input_tokens: summary.usage.textInputTokens ?? 0,
+      audio_input_tokens: summary.usage.audioInputTokens ?? 0,
+      audio_output_tokens: summary.usage.audioOutputTokens ?? 0,
     });
   } catch {
     /* best-effort */

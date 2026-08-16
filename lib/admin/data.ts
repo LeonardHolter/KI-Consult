@@ -93,7 +93,17 @@ export type VoiceUsageStats = {
   outputTokens: number;
   cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
-};
+} & Pick<
+  import("@/lib/usagePricing").VoiceUsageTotals,
+  | "textInputTokens"
+  | "audioInputTokens"
+  | "audioOutputTokens"
+  | "splitOutputTokens"
+  | "splitCacheReadInputTokens"
+  | "legacyInputTokens"
+  | "legacyOutputTokens"
+  | "legacyCacheReadInputTokens"
+>;
 
 export async function getVoiceUsageStats(): Promise<Map<string, VoiceUsageStats>> {
   const supabase = await createClient();
@@ -107,6 +117,14 @@ export async function getVoiceUsageStats(): Promise<Map<string, VoiceUsageStats>
       outputTokens: row.output_tokens ?? 0,
       cacheCreationInputTokens: row.cache_creation_input_tokens ?? 0,
       cacheReadInputTokens: row.cache_read_input_tokens ?? 0,
+      textInputTokens: row.text_input_tokens ?? 0,
+      audioInputTokens: row.audio_input_tokens ?? 0,
+      audioOutputTokens: row.audio_output_tokens ?? 0,
+      splitOutputTokens: row.split_output_tokens ?? 0,
+      splitCacheReadInputTokens: row.split_cache_read_input_tokens ?? 0,
+      legacyInputTokens: row.legacy_input_tokens ?? 0,
+      legacyOutputTokens: row.legacy_output_tokens ?? 0,
+      legacyCacheReadInputTokens: row.legacy_cache_read_input_tokens ?? 0,
     });
   }
   return map;

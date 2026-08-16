@@ -41,6 +41,9 @@ export async function POST(req: Request) {
     output_tokens: body.usage?.outputTokens ?? 0,
     cache_creation_input_tokens: body.usage?.cacheCreationInputTokens ?? 0,
     cache_read_input_tokens: body.usage?.cacheReadInputTokens ?? 0,
+    text_input_tokens: body.usage?.textInputTokens ?? 0,
+    audio_input_tokens: body.usage?.audioInputTokens ?? 0,
+    audio_output_tokens: body.usage?.audioOutputTokens ?? 0,
   });
 
   if (error) return Response.json({ error: error.message }, { status: 500 });

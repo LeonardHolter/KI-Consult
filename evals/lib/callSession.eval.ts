@@ -197,7 +197,12 @@ describe("runCallSession", () => {
       JSON.stringify({
         type: "response.done",
         response: {
-          usage: { input_tokens: 100, output_tokens: 40, input_token_details: { cached_tokens: 10 } },
+          usage: {
+            input_tokens: 100,
+            output_tokens: 40,
+            input_token_details: { cached_tokens: 10, text_tokens: 85, audio_tokens: 15 },
+            output_token_details: { audio_tokens: 30 },
+          },
           output: [{ type: "message", content: [{ type: "output_audio" }] }],
         },
       }),
@@ -206,7 +211,16 @@ describe("runCallSession", () => {
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     const s = onComplete.mock.calls[0][0];
-    expect(s.usage).toEqual({ inputTokens: 100, outputTokens: 40, cacheReadInputTokens: 10 });
+    expect(s.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 40,
+      cacheReadInputTokens: 10,
+      // The text/audio split rides along from the same usage event — it is
+      // what lets the admin cost view price the call exactly (migration 008).
+      textInputTokens: 85,
+      audioInputTokens: 15,
+      audioOutputTokens: 30,
+    });
     expect(s.durationSeconds).toBeGreaterThanOrEqual(0);
   });
 
