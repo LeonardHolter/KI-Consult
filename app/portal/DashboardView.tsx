@@ -465,7 +465,7 @@ export default function PortalDashboard({
           </span>
         )}
         <Link href={samtalerHref} className="ctp-back">
-          Samtaler ›
+          Chatbot-samtaler ›
         </Link>
         {overviewHref && (
           <Link href={`/portal/voice-demo${clientId ? `?client=${clientId}` : ""}`} className="ctp-back">
