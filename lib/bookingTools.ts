@@ -24,10 +24,12 @@ import {
 } from "@/lib/slots";
 import { osloParts } from "@/lib/google-calendar";
 import { notifyShop } from "@/lib/notify";
+import { lookupVehicle, vegvesenConfigured } from "@/lib/vehicleLookup";
 
 export const GET_SLOTS_TOOL = "get_available_demo_slots";
 export const BOOK_SLOT_TOOL = "book_demo_slot";
 export const ADD_NOTE_TOOL = "add_booking_note";
+export const LOOKUP_VEHICLE_TOOL = "lookup_vehicle";
 export const FIND_BOOKINGS_TOOL = "find_my_bookings";
 export const RESCHEDULE_TOOL = "reschedule_booking";
 
@@ -96,6 +98,21 @@ export const BOOKING_TOOL_SCHEMAS = {
         },
       },
       required: ["date", "time", "customer_name", "customer_phone", "service"],
+      additionalProperties: false,
+    },
+  },
+  [LOOKUP_VEHICLE_TOOL]: {
+    description:
+      "Slår opp bilen i Statens vegvesens register ut fra registreringsnummeret: merke, modell, kjøretøyklasse (personbil/varebil/lastebil), egenvekt og tillatt totalvekt. Bruk når kunden oppgir registreringsnummer, i stedet for å spørre om merke og modell. Bekreft ALLTID bilen tilbake til kunden («en Volkswagen Golf, stemmer det?») — svarer kunden nei, er registreringsnummeret trolig feiloppfattet: be om det på nytt. Finnes ikke skiltet: spør om merke og modell som vanlig.",
+    parameters: {
+      type: "object",
+      properties: {
+        registration_number: {
+          type: "string",
+          description: "Registreringsnummeret, f.eks. 'EB 10001'. Mellomrom spiller ingen rolle.",
+        },
+      },
+      required: ["registration_number"],
       additionalProperties: false,
     },
   },
@@ -285,6 +302,32 @@ export async function execBookingTool(
         current_time: now.time,
         available_slots: available,
         note: "Har et tidspunkt en service_restriction, må du nevne restriksjonen når du foreslår det til kunden. Bruk feltet 'today' til å vite hvilken dato som er i dag. Listen er sortert nærmest 'near_time' først når det er oppgitt.",
+      };
+    }
+
+    if (name === LOOKUP_VEHICLE_TOOL) {
+      const { registration_number } = (input ?? {}) as { registration_number?: string };
+      if (!registration_number) return { success: false, error: "Mangler registreringsnummer." };
+      if (!vegvesenConfigured()) {
+        return {
+          success: false,
+          error: "Oppslag er ikke tilgjengelig — spør kunden om merke og modell i stedet.",
+        };
+      }
+      const result = await lookupVehicle(registration_number);
+      if (!result.ok) {
+        return {
+          success: false,
+          error:
+            result.reason === "not_found"
+              ? "Fant ingen bil på dette registreringsnummeret. Du kan ha hørt feil — be kunden gjenta det, eller spør om merke og modell i stedet."
+              : "Oppslaget feilet teknisk. Spør kunden om merke og modell i stedet.",
+        };
+      }
+      return {
+        success: true,
+        vehicle: result.vehicle,
+        note: "Bekreft bilen tilbake til kunden (merke + modell) før du bruker den til prising. Svarer kunden nei, be om registreringsnummeret på nytt.",
       };
     }
 
