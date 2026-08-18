@@ -100,3 +100,36 @@ describe("computeKpis", () => {
     expect(osloMonth(new Date("2026-07-31T23:30:00Z"))).toBe("2026-08");
   });
 });
+
+// The non-destructive reset: kpiSince is the epoch, everything before it is
+// invisible to the tiles but stays in the database (admin cost figures).
+describe("kpiSince epoch", () => {
+  const s: Settings = { ...DEFAULT_SETTINGS, servicePrices: [{ match: "vask", priceNok: 590 }], kpiSince: "2026-08-15T12:00:00.000Z" };
+  const now = new Date("2026-08-19T12:00:00Z");
+
+  it("bookings and calls before the epoch vanish from both periods", () => {
+    const k = computeKpis({
+      now, settings: s, monthlyPriceNok: null,
+      bookings: [
+        { date: "2026-08-24", time: "08:00", service: "Vask", bookedAt: "2026-08-10T09:00:00.000Z" }, // booket før reset
+        { date: "2026-08-24", time: "09:00", service: "Vask", bookedAt: "2026-08-16T09:00:00.000Z" }, // etter
+      ],
+      calls: [
+        { startedAt: "2026-08-14T10:00:00Z", durationSeconds: 100 }, // før
+        { startedAt: "2026-08-18T10:00:00Z", durationSeconds: 60 }, // etter
+      ],
+    });
+    expect(k.total.bookings).toBe(1);
+    expect(k.total.valueNok).toBe(590);
+    expect(k.total.calls).toBe(1);
+    expect(k.total.callSeconds).toBe(60);
+  });
+
+  it("no epoch set counts everything, and showKpis=false flips show", () => {
+    const all = computeKpis({ now, settings: { ...s, kpiSince: undefined }, monthlyPriceNok: null, bookings: [], calls: [{ startedAt: "2020-01-01T00:00:00Z", durationSeconds: 5 }] });
+    expect(all.total.calls).toBe(1);
+    expect(all.show).toBe(true);
+    const hidden = computeKpis({ now, settings: { ...s, showKpis: false }, monthlyPriceNok: null, bookings: [], calls: [] });
+    expect(hidden.show).toBe(false);
+  });
+});

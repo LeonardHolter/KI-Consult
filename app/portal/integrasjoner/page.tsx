@@ -7,6 +7,7 @@ import { numberForClient } from "@/lib/telephony/numbers";
 import GoogleCalendarConnect from "../GoogleCalendarConnect";
 import TelnyxNumberConnect from "./TelnyxNumberConnect";
 import ChatWidgetToggle from "./ChatWidgetToggle";
+import KpiControls from "./KpiControls";
 import NotifyEmailForm from "./NotifyEmailForm";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,7 @@ export default async function IntegrasjonerPage({
   const settings = await loadSettings(activeClientId);
   const googleConnected = calendarConfigured(settings);
   const chatWidgetShown = settings.showChatWidget !== false;
+  const kpisShown = settings.showKpis !== false;
   const notifyEmail = settings.notificationEmail ?? null;
   // Connected = a mapped number, or being the default line's client.
   const assignedNumber = await numberForClient(activeClientId);
@@ -243,6 +245,34 @@ export default async function IntegrasjonerPage({
               på nettsiden deres styres av deres eget embed-script.
             </p>
             <ChatWidgetToggle clientId={activeClientId} />
+          </section>
+
+          {/* KPI-fliser — show/hide on the client dashboard + the
+              non-destructive tally reset (KPI epoch in settings.kpiSince). */}
+          <section
+            style={{
+              background: "#fff", border: `1px solid ${MUTED}44`, borderRadius: 12,
+              padding: "20px 22px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 11, height: 11, borderRadius: "50%",
+                  background: kpisShown ? GREEN : MUTED, flexShrink: 0,
+                }}
+              />
+              <h2 style={{ fontSize: 17, margin: 0 }}>📊 KPI-fliser</h2>
+              <span style={{ fontSize: 13, color: kpisShown ? "#0d6b47" : MUTED, fontWeight: 600 }}>
+                {kpisShown ? "Vises" : "Skjult"}
+              </span>
+            </div>
+            <p style={{ fontSize: 13.5, color: MUTED, margin: "0 0 6px", lineHeight: 1.5 }}>
+              Bookingverdi, besvarte anrop og spart telefontid øverst på kundens dashbord.
+              Nullstill ved go-live, så teller flisene bare ekte trafikk.
+            </p>
+            <KpiControls clientId={activeClientId} />
           </section>
 
           {/* Outlook — announced, not built. The provider seam is ready. */}

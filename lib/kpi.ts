@@ -39,6 +39,8 @@ export type KpiPeriod = {
 };
 
 export type Kpis = {
+  /** False = the admin has hidden the tiles for this client. */
+  show: boolean;
   month: KpiPeriod;
   total: KpiPeriod;
   monthlyPriceNok: number | null;
@@ -89,7 +91,17 @@ export function computeKpis(input: {
   const m = emptyPeriod();
   const t = emptyPeriod();
 
-  for (const b of input.bookings) {
+  // The KPI epoch: everything before kpiSince is invisible to the tiles —
+  // the non-destructive reset. Bookings gate on bookedAt (when the agent
+  // BOOKED it, which is what a reset means), falling back to the visit date
+  // for records old enough to predate bookedAt.
+  const since = input.settings.kpiSince ?? "";
+  const bookings = since
+    ? input.bookings.filter((b) => (b.bookedAt ?? `${b.date}T00:00:00`) >= since)
+    : input.bookings;
+  const calls = since ? input.calls.filter((c) => c.startedAt >= since) : input.calls;
+
+  for (const b of bookings) {
     const price = priceForService(b.service, input.settings.servicePrices);
     const inMonth = b.date.slice(0, 7) === month;
     for (const p of inMonth ? [m, t] : [t]) {
@@ -99,7 +111,7 @@ export function computeKpis(input: {
     }
   }
 
-  for (const c of input.calls) {
+  for (const c of calls) {
     const outside = isOutsideHours(c.startedAt, input.settings);
     const inMonth = osloParts(c.startedAt).date.slice(0, 7) === month;
     for (const p of inMonth ? [m, t] : [t]) {
@@ -114,7 +126,13 @@ export function computeKpis(input: {
       ? Math.round((m.valueNok / input.monthlyPriceNok) * 10) / 10
       : null;
 
-  return { month: m, total: t, monthlyPriceNok: input.monthlyPriceNok, roiMultiple };
+  return {
+    show: input.settings.showKpis !== false,
+    month: m,
+    total: t,
+    monthlyPriceNok: input.monthlyPriceNok,
+    roiMultiple,
+  };
 }
 
 /** Assembles a client's KPIs. Tenancy is the CALLER's job (the route pins a

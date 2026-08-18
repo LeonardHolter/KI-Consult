@@ -38,6 +38,14 @@ export type Settings = {
   /** Where the shop wants booking/message e-mails (lib/notify.ts). Absent or
    *  empty = no e-mails for this client. */
   notificationEmail?: string;
+  /** Whether the client's dashboard shows the KPI tiles. Absent = shown. */
+  showKpis?: boolean;
+  /** KPI epoch: tiles only count activity at/after this ISO timestamp.
+   *  "Nullstill KPI-er" sets it to now — a non-destructive reset that keeps
+   *  the underlying usage rows (the admin cost figures need them). Doubles
+   *  as the go-live marker: reset at launch and the client only ever sees
+   *  real-era numbers. Absent = count everything. */
+  kpiSince?: string;
   /** The client's ACTUAL prices, for the dashboard's estimated-booking-value
    *  KPI (lib/kpi.ts). Ordered: first entry whose every `match` token appears
    *  in the booking's service string wins. A booking no entry matches counts

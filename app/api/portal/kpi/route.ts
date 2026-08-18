@@ -18,5 +18,9 @@ export async function GET(req: Request) {
       : profile.client_id;
   if (!clientId) return Response.json({ error: "no_client" }, { status: 400 });
 
-  return Response.json(await buildClientKpis(clientId));
+  const kpis = await buildClientKpis(clientId);
+  // Hidden tiles send no numbers at all — the browser has nothing to show
+  // and nothing to leak.
+  if (!kpis.show) return Response.json({ show: false });
+  return Response.json(kpis);
 }

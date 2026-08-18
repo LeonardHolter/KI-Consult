@@ -17,7 +17,8 @@ type Period = {
 };
 
 type Kpis = {
-  month: Period;
+  show?: boolean;
+  month?: Period;
   total: Period;
   monthlyPriceNok: number | null;
   roiMultiple: number | null;
@@ -56,10 +57,13 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
     };
   }, [fetchKpis]);
 
-  // Nothing to brag about yet — render nothing rather than a row of zeros.
-  if (!kpis || (kpis.total.bookings === 0 && kpis.total.calls === 0)) return null;
+  // Hidden by the admin, not loaded yet, or nothing to brag about — render
+  // nothing rather than a row of zeros.
+  if (!kpis || kpis.show === false || !kpis.month || !kpis.total) return null;
+  if (kpis.total.bookings === 0 && kpis.total.calls === 0) return null;
 
   const { month, total, monthlyPriceNok, roiMultiple } = kpis;
+  if (!month || !total) return null;
 
   return (
     <div className="kpi-row">
