@@ -99,3 +99,31 @@ describe("per-client notice", () => {
     }
   });
 });
+
+// The outage this buries: a raw `&` between the Gather action's query params
+// made the whole document invalid XML, and Telnyx answered every call with
+// «an application error has occurred». Both phone lines were dead.
+describe("TeXML well-formedness", () => {
+  it("no raw & anywhere — every ampersand is a proper entity", async () => {
+    const { inboundTexml, gatherResponseTexml } = await import("@/lib/telephony/texml");
+    const docs = [
+      inboundTexml({
+        base: "https://www.kiconsult.no",
+        dialed: "+4732994223",
+        clientId: "ad19951e-00e1-4293-8975-6c6bb1dbdad7",
+      }),
+      gatherResponseTexml({
+        base: "https://www.kiconsult.no",
+        dialed: "+4723509651",
+        clientId: CLIENT,
+        digits: "1",
+      }),
+    ];
+    for (const doc of docs) {
+      const rawAmps = doc.match(/&(?!amp;|lt;|gt;|quot;|apos;)/g);
+      expect(rawAmps).toBeNull();
+      // And the action URL must still carry BOTH params through the entity.
+    }
+    expect(docs[0]).toContain("client=ad19951e-00e1-4293-8975-6c6bb1dbdad7&amp;dialed=");
+  });
+});

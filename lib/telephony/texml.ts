@@ -7,6 +7,19 @@ import { OPENAI_SIP_URI } from "@/lib/telephony/config";
 
 export const FALLBACK_BASE = "https://www.kiconsult.no";
 
+/** XML-escape for attribute values and text content. The bug this exists
+ *  for: a raw `&` between query params in the Gather action URL made the
+ *  whole document invalid XML, and Telnyx answered every call with
+ *  «an application error has occurred» — the lines were dead. EVERY dynamic
+ *  value embedded in TeXML goes through this. */
+export function xml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /**
  * Per-client pre-roll notices under public/telephony/. The DEFAULT notice
  * carries the AI-disclosure clause («vår digitale assistent»), so a client
@@ -57,10 +70,10 @@ export function dialTexml(opts: {
     opts.clientId ? `?client=${encodeURIComponent(opts.clientId)}` : ""
   }`;
   const recordAttrs = opts.record
-    ? ` record="record-from-answer" recordingChannels="dual" recordingStatusCallback="${recordingCallback}" recordingStatusCallbackMethod="POST"`
+    ? ` record="record-from-answer" recordingChannels="dual" recordingStatusCallback="${xml(recordingCallback)}" recordingStatusCallbackMethod="POST"`
     : "";
   return `<Dial${recordAttrs}>
-    <Sip>${sipTarget(opts.dialed)}</Sip>
+    <Sip>${xml(sipTarget(opts.dialed))}</Sip>
   </Dial>`;
 }
 
@@ -81,8 +94,8 @@ export function inboundTexml(opts: {
   const gatherAction = `${opts.base}/api/telephony/gather${qs.size ? `?${qs}` : ""}`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather input="dtmf" numDigits="1" timeout="3" action="${gatherAction}" method="POST">
-    <Play>${noticeUrl(opts.base, opts.clientId)}</Play>
+  <Gather input="dtmf" numDigits="1" timeout="3" action="${xml(gatherAction)}" method="POST">
+    <Play>${xml(noticeUrl(opts.base, opts.clientId))}</Play>
   </Gather>
   ${dialTexml({ ...opts, record: true })}
 </Response>`;
