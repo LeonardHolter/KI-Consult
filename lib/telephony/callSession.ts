@@ -41,9 +41,9 @@ export type CallSummary = {
 // before the line actually drops. Two cases, told apart by the farewell's
 // own words: the booking closing PROMISES «fem sekunder», so it gets them;
 // a plain «ha det bra» promised nothing, and five seconds of dead air after
-// a mutual goodbye reads as a hung line — 1.7s is enough to catch a "vent!".
+// a mutual goodbye reads as a hung line — 2.5s is enough to catch a "vent!".
 const GRACE_PROMISED_MS = 5000;
-const GRACE_PLAIN_MS = 1700;
+const GRACE_PLAIN_MS = 2500;
 const HANGUP_SAFETY_MS = 12_000;
 const MAX_HANGUP_RECOVERIES = 3;
 // Half-duplex echo gate: while the agent speaks we disable input turn

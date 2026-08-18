@@ -384,11 +384,11 @@ export default function VoiceAgentCard({
         // The farewell has finished playing — hang up after a grace window
         // sized by the farewell itself: the booking closing PROMISES the
         // caller «fem sekunder», so it gets 5s; a plain «ha det bra»
-        // promised nothing, and 1.7s is enough to catch a "vent!".
+        // promised nothing, and 2.5s is enough to catch a "vent!".
         if (hangupPendingRef.current) {
           if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
           const promised = /fem sekunder|5 sekunder/i.test(assistantTextRef.current);
-          hangupTimerRef.current = setTimeout(completeHangup, promised ? 5000 : 1700);
+          hangupTimerRef.current = setTimeout(completeHangup, promised ? 5000 : 2500);
         }
         break;
       case "output_audio_buffer.cleared":
