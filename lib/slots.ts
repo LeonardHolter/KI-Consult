@@ -912,3 +912,72 @@ export async function loadCalendarView(
   }
   return demoCalendarView(clientId, settings, scope);
 }
+
+/* ------------------------------------------------------------------ */
+/* Customer-list export                                                */
+/* ------------------------------------------------------------------ */
+
+export type AgentBookingRecord = {
+  date: string; // YYYY-MM-DD (Oslo)
+  time: string; // HH:MM (Oslo)
+  customerName?: string;
+  customerPhone?: string;
+  service?: string;
+  bookedAt?: string;
+};
+
+/**
+ * Every AGENT-MADE booking for a client, past ones included — the grid views
+ * only look daysAhead forward, which is useless for a customer history.
+ *
+ * Calendar mode reads 12 months back and 60 days forward and keeps only
+ * hzAgent-marked events: the customer list is "customers the agent booked",
+ * not everything humans put in the calendar. Demo mode reads the live store,
+ * which keeps all bookings regardless of date. The voice SANDBOX is
+ * deliberately excluded — test calls are not customers.
+ */
+export async function listAgentBookings(clientId: string): Promise<AgentBookingRecord[]> {
+  const settings = await loadSettings(clientId);
+  if (calendarConnected(settings)) {
+    try {
+      const now = Date.now();
+      const timeMin = new Date(now - 365 * 24 * 3600 * 1000).toISOString();
+      const timeMax = new Date(now + 60 * 24 * 3600 * 1000).toISOString();
+      const events = await getCalendarProvider(settings).listEvents(
+        settings.calendarId!,
+        timeMin,
+        timeMax,
+      );
+      return events
+        .filter(
+          (e) =>
+            e.status !== "cancelled" &&
+            e.start?.dateTime &&
+            e.extendedProperties?.private?.hzAgent === "1",
+        )
+        .map((e) => {
+          const priv = e.extendedProperties!.private!;
+          const parts = osloParts(e.start!.dateTime!);
+          return {
+            date: parts.date,
+            time: parts.time,
+            customerName: priv.customerName,
+            customerPhone: priv.customerPhone,
+            service: priv.service ?? e.summary,
+            bookedAt: priv.bookedAt,
+          };
+        });
+    } catch (err) {
+      console.error(`listAgentBookings: calendar unreachable for ${clientId}:`, err);
+      return [];
+    }
+  }
+  return (await demoReadBookings(clientId, "live")).map((b) => ({
+    date: b.date,
+    time: b.time,
+    customerName: b.customerName,
+    customerPhone: b.customerPhone,
+    service: b.service,
+    bookedAt: b.bookedAt,
+  }));
+}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import VoiceAgentCard from "@/components/VoiceAgentCard";
 import VoiceRecordingsPanel from "@/components/VoiceRecordingsPanel";
+import CustomerListPanel from "@/components/CustomerListPanel";
 
 /**
  * The client-facing view of their bot: the live booking calendar plus the chat
@@ -530,6 +531,7 @@ export default function PortalDashboard({
         {clientId && (
           <VoiceRecordingsPanel clientId={clientId} showOrigin={Boolean(overviewHref)} />
         )}
+        <CustomerListPanel clientId={clientId} />
         <div style={{ height: 20 }} />
 
         <div className="ctp-card">
