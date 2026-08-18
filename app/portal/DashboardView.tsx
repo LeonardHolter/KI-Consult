@@ -6,6 +6,7 @@ import { signOut } from "@/app/login/actions";
 import VoiceAgentCard from "@/components/VoiceAgentCard";
 import VoiceRecordingsPanel from "@/components/VoiceRecordingsPanel";
 import CustomerListPanel from "@/components/CustomerListPanel";
+import KpiTiles from "@/components/KpiTiles";
 
 /**
  * The client-facing view of their bot: the live booking calendar plus the chat
@@ -506,6 +507,7 @@ export default function PortalDashboard({
             customers hit (Telnyx -> SIP -> agent -> recording). Clients
             without a number keep the WebRTC caller — they have nothing to
             dial yet. */}
+        <KpiTiles clientId={clientId} />
         {phoneNumber ? (
           <div className="ctp-card" style={{ textAlign: "center", padding: "30px 20px 26px" }}>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".08em", color: "#9a9a8c", textTransform: "uppercase" }}>

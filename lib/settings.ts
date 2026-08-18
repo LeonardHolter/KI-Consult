@@ -38,6 +38,11 @@ export type Settings = {
   /** Where the shop wants booking/message e-mails (lib/notify.ts). Absent or
    *  empty = no e-mails for this client. */
   notificationEmail?: string;
+  /** The client's ACTUAL prices, for the dashboard's estimated-booking-value
+   *  KPI (lib/kpi.ts). Ordered: first entry whose every `match` token appears
+   *  in the booking's service string wins. A booking no entry matches counts
+   *  as "uten fastpris" — the estimate never guesses. */
+  servicePrices?: { match: string; priceNok: number }[];
   /**
    * Where the VOICE agent's bookings go.
    *
