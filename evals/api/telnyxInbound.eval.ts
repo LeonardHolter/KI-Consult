@@ -63,12 +63,15 @@ describe("telnyx-inbound TeXML", () => {
     expect(body).not.toContain("X-Dialed-Number");
   });
 
-  it("requests dual-channel recording with a callback to our recording webhook", async () => {
+  it("requests dual-channel recording, callback tagged with the resolved client", async () => {
     const body = await (await POST(req())).text();
     expect(body).toContain('record="record-from-answer"');
     expect(body).toContain('recordingChannels="dual"');
-    expect(body).toContain(
-      'recordingStatusCallback="https://www.kiconsult.no/api/telephony/telnyx-recording"',
+    // No mapping resolves to the DEFAULT line's client explicitly — the
+    // recording must land in that client's panel, not rely on the recording
+    // route's own fallback.
+    expect(body).toMatch(
+      /recordingStatusCallback="https:\/\/www\.kiconsult\.no\/api\/telephony\/telnyx-recording\?client=/,
     );
     expect(body).toContain('recordingStatusCallbackMethod="POST"');
   });
@@ -91,7 +94,7 @@ describe("telnyx-inbound recording callback", () => {
     );
   });
 
-  it("leaves the callback bare for an unmapped number, so it falls back", async () => {
+  it("an unmapped number resolves to the default line's client", async () => {
     vi.mocked(clientForNumber).mockResolvedValue(null);
     const res = await GET(
       new Request("https://www.kiconsult.no/api/telephony/telnyx-inbound?To=%2B4799999999", {
@@ -99,9 +102,9 @@ describe("telnyx-inbound recording callback", () => {
       }),
     );
     const body = await res.text();
-    expect(body).toContain(
-      'recordingStatusCallback="https://www.kiconsult.no/api/telephony/telnyx-recording"',
-    );
-    expect(body).not.toContain("?client=");
+    // PHONE_CLIENT_ID fallback, same rule as /api/telephony/incoming: the
+    // default line has no row in the number map, so null means "the
+    // original line", not "no client".
+    expect(body).toContain("telnyx-recording?client=");
   });
 });

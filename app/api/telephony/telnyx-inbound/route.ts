@@ -25,6 +25,7 @@
 // hitting this for genuine inbound calls to our numbers.
 
 import { baseUrl, inboundTexml } from "@/lib/telephony/texml";
+import { PHONE_CLIENT_ID } from "@/lib/telephony/config";
 import { clientForNumber } from "@/lib/telephony/numbers";
 
 export const dynamic = "force-dynamic";
@@ -54,9 +55,11 @@ async function dialedNumber(req: Request): Promise<string | null> {
 
 async function respond(req: Request): Promise<Response> {
   const dialed = await dialedNumber(req);
-  // Unmapped (or unknown) numbers resolve to null and the recording falls
-  // back to the default line's client, matching how the call itself routes.
-  const clientId = dialed ? await clientForNumber(dialed) : null;
+  // The default line (Handz On) has NO row in the number map — its mapping
+  // is the PHONE_CLIENT_ID fallback, same as /api/telephony/incoming uses.
+  // Without this the default line resolved to null here and got the generic
+  // pre-roll instead of its name-branded one.
+  const clientId = (dialed ? await clientForNumber(dialed) : null) ?? PHONE_CLIENT_ID;
   console.info("[telnyx-inbound] dialed", { dialed: dialed ?? "unknown", client: clientId ?? "default" });
   return new Response(inboundTexml({ base: baseUrl(req), dialed, clientId }), {
     status: 200,
