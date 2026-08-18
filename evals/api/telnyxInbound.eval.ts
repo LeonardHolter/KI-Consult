@@ -23,7 +23,7 @@ describe("telnyx-inbound TeXML", () => {
       expect(res.headers.get("Content-Type")).toContain("xml");
       const body = await res.text();
       expect(body).toContain("<Dial");
-      expect(body).toContain(`<Sip>${OPENAI_SIP_URI}</Sip>`);
+      expect(body).toMatch(new RegExp(`<Sip>${OPENAI_SIP_URI.replace(/[.?+;]/g, (c) => "\\" + c)}\\?(X-Dialed-Number=[^&<]+&amp;)?X-Transfer-Key=[a-f0-9-]{36}</Sip>`));
       // Guardrails against the two mistakes that would silently break routing.
       expect(body).toContain("sip.api.openai.com"); // not sip.openai.com
       expect(body).toContain("proj_"); // project id present as user part
@@ -59,7 +59,7 @@ describe("telnyx-inbound TeXML", () => {
 
   it("dials the plain URI when the dialed number is missing", async () => {
     const body = await (await POST(req())).text();
-    expect(body).toContain(`<Sip>${OPENAI_SIP_URI}</Sip>`);
+    expect(body).toMatch(new RegExp(`<Sip>${OPENAI_SIP_URI.replace(/[.?+;]/g, (c) => "\\" + c)}\\?(X-Dialed-Number=[^&<]+&amp;)?X-Transfer-Key=[a-f0-9-]{36}</Sip>`));
     expect(body).not.toContain("X-Dialed-Number");
   });
 

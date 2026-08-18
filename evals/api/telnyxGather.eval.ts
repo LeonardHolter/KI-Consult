@@ -53,8 +53,18 @@ describe("pre-roll notice (telnyx-inbound)", () => {
   it("the gather action carries client and dialed for the branch response", async () => {
     const body = await (await inbound()).text();
     expect(body).toMatch(
-      /action="https:\/\/www\.kiconsult\.no\/api\/telephony\/gather\?client=fe264dcd[^"]*dialed=%2B4723509651"/,
+      /action="https:\/\/www\.kiconsult\.no\/api\/telephony\/gather\?client=fe264dcd[^"]*dialed=%2B4723509651[^"]*"/,
     );
+  });
+
+  it("one transfer key rides the gather action, the dial action and the SIP INVITE alike", async () => {
+    const body = await (await inbound()).text();
+    // gather action + dial action carry ?key=, the INVITE carries
+    // X-Transfer-Key= — the case-insensitive match finds all three.
+    const keys = [...body.matchAll(/key=([a-f0-9-]{36})/gi)].map((m) => m[1]);
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(1);
+    expect(body).toContain(`X-Transfer-Key=${keys[0]}`);
   });
 
   it("routing header survives into the fallthrough dial", async () => {

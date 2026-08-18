@@ -27,6 +27,7 @@ async function respond(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const clientId = url.searchParams.get("client");
   const dialed = url.searchParams.get("dialed");
+  const transferKey = url.searchParams.get("key");
   const digits = await digitsFrom(req);
   console.info("[telnyx-gather]", {
     digits: digits || "(ingen)",
@@ -34,7 +35,7 @@ async function respond(req: Request): Promise<Response> {
     client: clientId ?? "default",
   });
   return new Response(
-    gatherResponseTexml({ base: baseUrl(req), dialed, clientId, digits }),
+    gatherResponseTexml({ base: baseUrl(req), dialed, clientId, transferKey, digits }),
     { status: 200, headers: { "Content-Type": "application/xml" } },
   );
 }

@@ -60,8 +60,12 @@ async function respond(req: Request): Promise<Response> {
   // Without this the default line resolved to null here and got the generic
   // pre-roll instead of its name-branded one.
   const clientId = (dialed ? await clientForNumber(dialed) : null) ?? PHONE_CLIENT_ID;
+  // Minted per call and threaded through the SIP INVITE, the gather action
+  // and the Dial action — it's what lets the call runner's transfer request
+  // find its way back to THIS call's dial-done callback.
+  const transferKey = crypto.randomUUID();
   console.info("[telnyx-inbound] dialed", { dialed: dialed ?? "unknown", client: clientId ?? "default" });
-  return new Response(inboundTexml({ base: baseUrl(req), dialed, clientId }), {
+  return new Response(inboundTexml({ base: baseUrl(req), dialed, clientId, transferKey }), {
     status: 200,
     headers: { "Content-Type": "application/xml" },
   });

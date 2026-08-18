@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import { ReplyWatchdog } from "@/lib/voiceDemo/replyWatchdog";
 import { execBookingTool } from "@/lib/bookingTools";
 import { TRANSFER_CALL_TOOL } from "@/lib/telephony/config";
+import { requestTransfer } from "@/lib/telephony/transferStore";
 import type { BookingScope } from "@/lib/slots";
 
 // Server-side runner for ONE inbound phone call, once OpenAI has accepted the
@@ -65,8 +66,8 @@ const MAX_HANGUP_RECOVERIES = 3;
 const ECHO_TAIL_MS = 600;
 
 // transfer_call: how long after the hand-off line's audio drains before the
-// SIP REFER goes out (a beat, so the last word isn't clipped), and the safety
-// net if the model calls the tool but no audio ever starts.
+// agent leg hangs up to trigger the dial-done transfer (a beat, so the last
+// word isn't clipped), and the safety net if no audio ever starts.
 const TRANSFER_AFTER_AUDIO_MS = 400;
 const TRANSFER_SAFETY_MS = 8_000;
 
@@ -87,9 +88,14 @@ export type RunCallOptions = {
   apiKey: string;
   clientId: string;
   scope: BookingScope;
-  /** E.164 number transfer_call REFERs the caller to; null/absent = tool
+  /** E.164 number transfer_call hands the caller to; null/absent = tool
    *  answers with a failure so the model falls back to taking a message. */
   transferTo?: string | null;
+  /** The X-Transfer-Key minted by telnyx-inbound for this call — the handle
+   *  the dial-done callback uses to find the transfer marker. Absent (e.g.
+   *  a connection that dialed us directly) = transfers can't work; the tool
+   *  answers with a failure. */
+  transferKey?: string | null;
   withTools: boolean;
   log?: Logger;
   onComplete?: (summary: CallSummary) => void;
@@ -239,27 +245,17 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       clearTransferTimer();
       const cid = transferCallId;
       transferCallId = null;
-      let ok = false;
-      try {
-        const res = await fetch(
-          `https://api.openai.com/v1/realtime/calls/${encodeURIComponent(callId)}/refer`,
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ target_uri: `tel:${opts.transferTo}` }),
-          },
-        );
-        ok = res.ok;
-        if (!ok) log("transfer refer rejected", { status: res.status, body: (await res.text()).slice(0, 200) });
-      } catch (e) {
-        log("transfer refer failed", { error: String(e) });
-      }
+      // Telnyx ignores SIP REFER on TeXML calls (tested live 2026-08-18), so
+      // the hand-off happens at the TeXML layer: set the marker, hang up the
+      // agent leg, and the Dial's action callback dials the human.
+      const ok = Boolean(opts.transferKey && opts.transferTo) &&
+        (await requestTransfer(opts.transferKey!, opts.transferTo!));
       if (ok) {
-        // The call now belongs to the SIP peer; OpenAI ends its leg and the
-        // ws close handler wraps up. Nothing more to say to the model.
-        log("transfer refer accepted", { target: opts.transferTo });
+        log("transfer marker set — hanging up agent leg", { target: opts.transferTo });
+        await hangup();
         return;
       }
+      log("transfer marker failed", { hadKey: Boolean(opts.transferKey) });
       if (cid) {
         send({
           type: "conversation.item.create",

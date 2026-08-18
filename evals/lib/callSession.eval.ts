@@ -6,10 +6,12 @@ import type WsType from "ws";
 // calls through execBookingTool, and runs the finish_session hangup dance
 // (wait for the closing audio, grace window, caller-speech aborts).
 
-const { execBookingTool } = vi.hoisted(() => ({
+const { execBookingTool, requestTransfer } = vi.hoisted(() => ({
   execBookingTool: vi.fn(async () => ({ success: true, slot: { id: "x" } })),
+  requestTransfer: vi.fn(async () => true),
 }));
 vi.mock("@/lib/bookingTools", () => ({ execBookingTool }));
+vi.mock("@/lib/telephony/transferStore", () => ({ requestTransfer }));
 
 type Handler = (...args: unknown[]) => void;
 class FakeWs {
@@ -39,7 +41,7 @@ class FakeWs {
 import { runCallSession } from "@/lib/telephony/callSession";
 
 let fake: FakeWs;
-function start(opts: { transferTo?: string | null } = {}) {
+function start(opts: { transferTo?: string | null; transferKey?: string | null } = {}) {
   fake = new FakeWs();
   void runCallSession({
     callId: "rtc_test",
@@ -61,6 +63,8 @@ const funcCallDone = (name: string, args: string) => ({
 beforeEach(() => {
   vi.useFakeTimers();
   execBookingTool.mockClear();
+  requestTransfer.mockClear();
+  requestTransfer.mockResolvedValue(true);
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
 });
 afterEach(() => {
@@ -247,57 +251,70 @@ describe("runCallSession", () => {
   });
 });
 
-// The transfer_call hand-off: the REFER must wait for the spoken hand-off
-// line (same reasoning as the hangup dance — the caller should hear «jeg
-// setter deg over» before the line moves), failures must be surfaced to the
-// model so it can fall back to the message flow, and the booking executor
-// must never see the tool.
+// The transfer_call hand-off: the marker+hangup must wait for the spoken
+// hand-off line (same reasoning as the hangup dance — the caller should hear
+// «jeg setter deg over» before the line moves), failures must be surfaced to
+// the model so it can fall back to the message flow, and the booking
+// executor must never see the tool. Telnyx ignores SIP REFER on TeXML calls,
+// so the hand-off is: write marker, hang up the agent leg, and dial-done
+// (see evals/api/dialDone.eval.ts) dials the human.
 describe("transfer_call", () => {
   const transferDone = () => funcCallDone("transfer_call", "{}");
-  const referCalls = () =>
+  const hangupCalls = () =>
     (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
-      String(url).includes("/refer"),
+      String(url).includes("/hangup"),
     );
 
-  it("REFERs to the transfer target after the hand-off line finishes", async () => {
-    start({ transferTo: "+4798252356" });
+  it("sets the marker and hangs up the agent leg after the hand-off line finishes", async () => {
+    start({ transferTo: "+4798252356", transferKey: "key-1" });
     fake.emit("message", JSON.stringify(transferDone()));
     fake.emit("message", JSON.stringify({ type: "output_audio_buffer.started" }));
     fake.emit("message", JSON.stringify({ type: "output_audio_buffer.stopped" }));
     await vi.advanceTimersByTimeAsync(500);
     expect(execBookingTool).not.toHaveBeenCalled();
-    const calls = referCalls();
-    expect(calls).toHaveLength(1);
-    expect(String(calls[0][0])).toContain("/v1/realtime/calls/rtc_test/refer");
-    expect(JSON.parse((calls[0][1] as RequestInit).body as string)).toEqual({
-      target_uri: "tel:+4798252356",
-    });
+    expect(requestTransfer).toHaveBeenCalledWith("key-1", "+4798252356");
+    expect(hangupCalls()).toHaveLength(1);
+    expect(String(hangupCalls()[0][0])).toContain("/v1/realtime/calls/rtc_test/hangup");
   });
 
-  it("fires the safety REFER even if no hand-off audio ever starts", async () => {
-    start({ transferTo: "+4798252356" });
+  it("fires the safety hand-off even if no hand-off audio ever starts", async () => {
+    start({ transferTo: "+4798252356", transferKey: "key-1" });
     fake.emit("message", JSON.stringify(transferDone()));
     await vi.advanceTimersByTimeAsync(9000);
-    expect(referCalls()).toHaveLength(1);
+    expect(requestTransfer).toHaveBeenCalledTimes(1);
+    expect(hangupCalls()).toHaveLength(1);
   });
 
-  it("a rejected REFER tells the model to fall back to the message flow", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
-    start({ transferTo: "+4798252356" });
+  it("a failed marker write tells the model to fall back to the message flow", async () => {
+    requestTransfer.mockResolvedValue(false);
+    start({ transferTo: "+4798252356", transferKey: "key-1" });
     fake.emit("message", JSON.stringify(transferDone()));
     fake.emit("message", JSON.stringify({ type: "output_audio_buffer.stopped" }));
     await vi.advanceTimersByTimeAsync(500);
+    expect(hangupCalls()).toHaveLength(0);
     const outputs = fake.parsed.filter((m) => m.item?.type === "function_call_output");
     expect(outputs).toHaveLength(1);
     expect(JSON.parse(outputs[0].item.output).success).toBe(false);
     expect(fake.typesSent().filter((t) => t === "response.create").length).toBeGreaterThan(1);
   });
 
-  it("without a configured target the tool answers failure and never REFERs", async () => {
+  it("without a transfer key (direct SIP dial) the tool fails safe, no hangup", async () => {
+    start({ transferTo: "+4798252356" });
+    fake.emit("message", JSON.stringify(transferDone()));
+    fake.emit("message", JSON.stringify({ type: "output_audio_buffer.stopped" }));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(requestTransfer).not.toHaveBeenCalled();
+    expect(hangupCalls()).toHaveLength(0);
+    const outputs = fake.parsed.filter((m) => m.item?.type === "function_call_output");
+    expect(outputs).toHaveLength(1);
+    expect(JSON.parse(outputs[0].item.output).success).toBe(false);
+  });
+
+  it("without a configured target the tool answers failure immediately", async () => {
     start();
     fake.emit("message", JSON.stringify(transferDone()));
     await vi.advanceTimersByTimeAsync(9000);
-    expect(referCalls()).toHaveLength(0);
+    expect(requestTransfer).not.toHaveBeenCalled();
     const outputs = fake.parsed.filter((m) => m.item?.type === "function_call_output");
     expect(outputs).toHaveLength(1);
     expect(JSON.parse(outputs[0].item.output).success).toBe(false);

@@ -70,6 +70,9 @@ export async function POST(req: Request) {
   const callerDigits = numberFromSipUri(
     sipHeaders.find((h) => h.name?.toLowerCase() === "from")?.value,
   );
+  // Minted by telnyx-inbound; the handle transfers hinge on (see dial-done).
+  const transferKey =
+    sipHeaders.find((h) => h.name?.toLowerCase() === "x-transfer-key")?.value ?? null;
   const mappedClient = dialed ? await clientForNumber(dialed) : null;
   const clientId = mappedClient ?? PHONE_CLIENT_ID;
   console.info(`[phone ${callId.slice(0, 8)}] routing`, {
@@ -111,6 +114,7 @@ export async function POST(req: Request) {
       clientId,
       scope: agent.scope,
       transferTo: agent.transferTo,
+      transferKey,
       withTools: true,
       // Restored by the half-duplex gate each time the agent finishes speaking.
       turnDetection: agent.session.audio.input.turn_detection,

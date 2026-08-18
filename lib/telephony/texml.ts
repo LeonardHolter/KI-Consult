@@ -53,9 +53,11 @@ export function baseUrl(req: Request): string {
 /** SIP URI headers ride along on the INVITE. Only X--prefixed ones are
  *  forwarded, and they arrive in OpenAI's `sip_headers`, which is how
  *  /api/telephony/incoming learns which client the call belongs to. */
-export function sipTarget(dialed: string | null): string {
-  if (!dialed) return OPENAI_SIP_URI;
-  return `${OPENAI_SIP_URI}?X-Dialed-Number=${encodeURIComponent(dialed)}`;
+export function sipTarget(dialed: string | null, transferKey?: string | null): string {
+  const headers: string[] = [];
+  if (dialed) headers.push(`X-Dialed-Number=${encodeURIComponent(dialed)}`);
+  if (transferKey) headers.push(`X-Transfer-Key=${encodeURIComponent(transferKey)}`);
+  return headers.length ? `${OPENAI_SIP_URI}?${headers.join("&")}` : OPENAI_SIP_URI;
 }
 
 /**
@@ -64,11 +66,16 @@ export function sipTarget(dialed: string | null): string {
  * to delete, which is a stronger answer to the objection than deletion.
  * answerOnBridge is gone: the pre-roll notice already answered the call,
  * so there is no unanswered PSTN leg left to hold back.
+ *
+ * The Dial's `action` is how transfers happen (Telnyx ignores SIP REFER on
+ * TeXML calls): when the agent leg ends, Telnyx POSTs to dial-done, which
+ * either dials the human (transfer marker set for transferKey) or hangs up.
  */
 export function dialTexml(opts: {
   base: string;
   dialed: string | null;
   clientId: string | null;
+  transferKey?: string | null;
   record: boolean;
 }): string {
   const recordingCallback = `${opts.base}/api/telephony/telnyx-recording${
@@ -77,8 +84,13 @@ export function dialTexml(opts: {
   const recordAttrs = opts.record
     ? ` record="record-from-answer" recordingChannels="dual" recordingStatusCallback="${xml(recordingCallback)}" recordingStatusCallbackMethod="POST"`
     : "";
-  return `<Dial${recordAttrs}>
-    <Sip>${xml(sipTarget(opts.dialed))}</Sip>
+  const doneQs = new URLSearchParams();
+  if (opts.clientId) doneQs.set("client", opts.clientId);
+  if (opts.dialed) doneQs.set("dialed", opts.dialed);
+  if (opts.transferKey) doneQs.set("key", opts.transferKey);
+  const dialDone = `${opts.base}/api/telephony/dial-done${doneQs.size ? `?${doneQs}` : ""}`;
+  return `<Dial action="${xml(dialDone)}" method="POST"${recordAttrs}>
+    <Sip>${xml(sipTarget(opts.dialed, opts.transferKey))}</Sip>
   </Dial>`;
 }
 
@@ -92,10 +104,12 @@ export function inboundTexml(opts: {
   base: string;
   dialed: string | null;
   clientId: string | null;
+  transferKey?: string | null;
 }): string {
   const qs = new URLSearchParams();
   if (opts.clientId) qs.set("client", opts.clientId);
   if (opts.dialed) qs.set("dialed", opts.dialed);
+  if (opts.transferKey) qs.set("key", opts.transferKey);
   const gatherAction = `${opts.base}/api/telephony/gather${qs.size ? `?${qs}` : ""}`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -112,6 +126,7 @@ export function gatherResponseTexml(opts: {
   base: string;
   dialed: string | null;
   clientId: string | null;
+  transferKey?: string | null;
   digits: string;
 }): string {
   const record = opts.digits.trim() !== "1";
