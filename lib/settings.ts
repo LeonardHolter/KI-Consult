@@ -51,6 +51,10 @@ export type Settings = {
    *  in the booking's service string wins. A booking no entry matches counts
    *  as "uten fastpris" — the estimate never guesses. */
   servicePrices?: { match: string; priceNok: number }[];
+  /** Number (E.164, e.g. "+4798252356") the phone agent may transfer a
+   *  caller to when they ask for a human — exposed as the transfer_call
+   *  tool on phone sessions. Absent = no transfer tool, message flow only. */
+  transferPhoneNumber?: string;
   /**
    * Where the VOICE agent's bookings go.
    *

@@ -110,6 +110,7 @@ export async function POST(req: Request) {
       apiKey,
       clientId,
       scope: agent.scope,
+      transferTo: agent.transferTo,
       withTools: true,
       // Restored by the half-duplex gate each time the agent finishes speaking.
       turnDetection: agent.session.audio.input.turn_detection,

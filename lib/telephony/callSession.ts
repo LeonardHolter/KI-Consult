@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import { ReplyWatchdog } from "@/lib/voiceDemo/replyWatchdog";
 import { execBookingTool } from "@/lib/bookingTools";
+import { TRANSFER_CALL_TOOL } from "@/lib/telephony/config";
 import type { BookingScope } from "@/lib/slots";
 
 // Server-side runner for ONE inbound phone call, once OpenAI has accepted the
@@ -63,6 +64,12 @@ const MAX_HANGUP_RECOVERIES = 3;
 // re-arm the gate for the whole call.
 const ECHO_TAIL_MS = 600;
 
+// transfer_call: how long after the hand-off line's audio drains before the
+// SIP REFER goes out (a beat, so the last word isn't clipped), and the safety
+// net if the model calls the tool but no audio ever starts.
+const TRANSFER_AFTER_AUDIO_MS = 400;
+const TRANSFER_SAFETY_MS = 8_000;
+
 // Event types that fire many times per second — logging them would drown the
 // trace. Everything else is logged.
 const NOISY = new Set([
@@ -80,6 +87,9 @@ export type RunCallOptions = {
   apiKey: string;
   clientId: string;
   scope: BookingScope;
+  /** E.164 number transfer_call REFERs the caller to; null/absent = tool
+   *  answers with a failure so the model falls back to taking a message. */
+  transferTo?: string | null;
   withTools: boolean;
   log?: Logger;
   onComplete?: (summary: CallSummary) => void;
@@ -119,6 +129,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       watchdog.dispose();
       clearHangupTimer();
       clearUnmuteTimer();
+      clearTransferTimer();
       try {
         ws.close();
       } catch {
@@ -210,6 +221,63 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
       finish();
     };
 
+    // --- transfer_call state ---
+    // Mirrors the hangup dance in miniature: the REFER waits for the model's
+    // «jeg setter deg over»-line to finish playing, so the caller hears it.
+    let transferPending = false;
+    let transferCallId: string | null = null;
+    let transferTimer: NodeJS.Timeout | null = null;
+    const clearTransferTimer = () => {
+      if (transferTimer) {
+        clearTimeout(transferTimer);
+        transferTimer = null;
+      }
+    };
+    const doTransfer = async () => {
+      if (!transferPending) return;
+      transferPending = false;
+      clearTransferTimer();
+      const cid = transferCallId;
+      transferCallId = null;
+      let ok = false;
+      try {
+        const res = await fetch(
+          `https://api.openai.com/v1/realtime/calls/${encodeURIComponent(callId)}/refer`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ target_uri: `tel:${opts.transferTo}` }),
+          },
+        );
+        ok = res.ok;
+        if (!ok) log("transfer refer rejected", { status: res.status, body: (await res.text()).slice(0, 200) });
+      } catch (e) {
+        log("transfer refer failed", { error: String(e) });
+      }
+      if (ok) {
+        // The call now belongs to the SIP peer; OpenAI ends its leg and the
+        // ws close handler wraps up. Nothing more to say to the model.
+        log("transfer refer accepted", { target: opts.transferTo });
+        return;
+      }
+      if (cid) {
+        send({
+          type: "conversation.item.create",
+          item: {
+            type: "function_call_output",
+            call_id: cid,
+            output: JSON.stringify({
+              success: false,
+              reason:
+                "Overføringen feilet teknisk. Beklag kort til kunden at du ikke fikk satt over, og tilby å ta imot en beskjed i stedet — følg beskjedflyten.",
+            }),
+          },
+        });
+        send({ type: "response.create" });
+        watchdog.expectReply();
+      }
+    };
+
     // --- finish_session shutdown state (mirrors the browser agent) ---
     let hangupPending = false;
     // Decided per farewell from its transcript (see GRACE_* above).
@@ -297,6 +365,33 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
             | { type?: string; call_id?: string; name?: string; arguments?: string }
             | undefined;
           if (item?.type !== "function_call" || !item.call_id || !item.name) break;
+
+          if (item.name === TRANSFER_CALL_TOOL) {
+            if (!opts.transferTo) {
+              // Tool offered without a target should be impossible (the def is
+              // only registered when configured) — answer rather than hang.
+              send({
+                type: "conversation.item.create",
+                item: {
+                  type: "function_call_output",
+                  call_id: item.call_id,
+                  output: JSON.stringify({
+                    success: false,
+                    reason: "Overføring er ikke satt opp. Ta imot en beskjed i stedet.",
+                  }),
+                },
+              });
+              send({ type: "response.create" });
+              watchdog.expectReply();
+              break;
+            }
+            transferPending = true;
+            transferCallId = item.call_id;
+            clearTransferTimer();
+            transferTimer = setTimeout(() => void doTransfer(), TRANSFER_SAFETY_MS);
+            log("transfer pending", { target: opts.transferTo });
+            break;
+          }
 
           if (item.name === "finish_session") {
             hangupPending = true;
@@ -391,6 +486,10 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
 
         case "output_audio_buffer.started":
           muteInput(); // agent is speaking — stop listening (echo gate)
+          if (transferPending) {
+            clearTransferTimer();
+            transferTimer = setTimeout(() => void doTransfer(), 60_000);
+          }
           if (hangupPending) {
             clearHangupTimer();
             hangupTimer = setTimeout(() => void hangup(), 60_000);
@@ -400,6 +499,10 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
         case "output_audio_buffer.stopped":
         case "output_audio_buffer.cleared":
           scheduleUnmute(); // agent done — listen again after the echo tail
+          if (transferPending) {
+            clearTransferTimer();
+            transferTimer = setTimeout(() => void doTransfer(), TRANSFER_AFTER_AUDIO_MS);
+          }
           if (hangupPending) {
             clearHangupTimer();
             hangupTimer = setTimeout(() => void hangup(), hangupGraceMs);

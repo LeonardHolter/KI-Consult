@@ -39,7 +39,7 @@ class FakeWs {
 import { runCallSession } from "@/lib/telephony/callSession";
 
 let fake: FakeWs;
-function start() {
+function start(opts: { transferTo?: string | null } = {}) {
   fake = new FakeWs();
   void runCallSession({
     callId: "rtc_test",
@@ -47,6 +47,7 @@ function start() {
     clientId: "client-1",
     scope: "sandbox",
     withTools: true,
+    ...opts,
     wsFactory: () => fake as unknown as WsType,
   });
   fake.emit("open");
@@ -243,5 +244,62 @@ describe("runCallSession", () => {
         JSON.parse(m.item.output).note?.includes("Si avslutningsreplikken NÅ"),
     );
     expect(nudge).toBeTruthy();
+  });
+});
+
+// The transfer_call hand-off: the REFER must wait for the spoken hand-off
+// line (same reasoning as the hangup dance — the caller should hear «jeg
+// setter deg over» before the line moves), failures must be surfaced to the
+// model so it can fall back to the message flow, and the booking executor
+// must never see the tool.
+describe("transfer_call", () => {
+  const transferDone = () => funcCallDone("transfer_call", "{}");
+  const referCalls = () =>
+    (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
+      String(url).includes("/refer"),
+    );
+
+  it("REFERs to the transfer target after the hand-off line finishes", async () => {
+    start({ transferTo: "+4798252356" });
+    fake.emit("message", JSON.stringify(transferDone()));
+    fake.emit("message", JSON.stringify({ type: "output_audio_buffer.started" }));
+    fake.emit("message", JSON.stringify({ type: "output_audio_buffer.stopped" }));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(execBookingTool).not.toHaveBeenCalled();
+    const calls = referCalls();
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0][0])).toContain("/v1/realtime/calls/rtc_test/refer");
+    expect(JSON.parse((calls[0][1] as RequestInit).body as string)).toEqual({
+      target_uri: "tel:+4798252356",
+    });
+  });
+
+  it("fires the safety REFER even if no hand-off audio ever starts", async () => {
+    start({ transferTo: "+4798252356" });
+    fake.emit("message", JSON.stringify(transferDone()));
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(referCalls()).toHaveLength(1);
+  });
+
+  it("a rejected REFER tells the model to fall back to the message flow", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
+    start({ transferTo: "+4798252356" });
+    fake.emit("message", JSON.stringify(transferDone()));
+    fake.emit("message", JSON.stringify({ type: "output_audio_buffer.stopped" }));
+    await vi.advanceTimersByTimeAsync(500);
+    const outputs = fake.parsed.filter((m) => m.item?.type === "function_call_output");
+    expect(outputs).toHaveLength(1);
+    expect(JSON.parse(outputs[0].item.output).success).toBe(false);
+    expect(fake.typesSent().filter((t) => t === "response.create").length).toBeGreaterThan(1);
+  });
+
+  it("without a configured target the tool answers failure and never REFERs", async () => {
+    start();
+    fake.emit("message", JSON.stringify(transferDone()));
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(referCalls()).toHaveLength(0);
+    const outputs = fake.parsed.filter((m) => m.item?.type === "function_call_output");
+    expect(outputs).toHaveLength(1);
+    expect(JSON.parse(outputs[0].item.output).success).toBe(false);
   });
 });

@@ -54,6 +54,22 @@ export function withCallerNumber(instructions: string, callerDigits: string | nu
   );
 }
 
+export const TRANSFER_CALL_TOOL = "transfer_call";
+
+/** Phone-only tool: hands the call over to a human. The actual SIP REFER is
+ *  performed by the call runner (callSession.ts) — the model only signals
+ *  intent. Registered only when the client has a transferPhoneNumber, so the
+ *  browser demo and non-configured clients never see a tool they can't use. */
+export function transferCallToolDef() {
+  return {
+    type: "function" as const,
+    name: TRANSFER_CALL_TOOL,
+    description:
+      "Setter samtalen over til kundemottaket (et menneske). Bruk KUN når kunden ber om å snakke med et menneske, eller instruksene dine sier at samtalen skal overføres. Si en kort setning om at du setter over FØR du kaller verktøyet — overføringen skjer når replikken er ferdig spilt.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  };
+}
+
 /** Loads the client's live voice agent config for the phone bridge. Uses the
  *  service role because a webhook has no portal session to scope by.
  *  `callerDigits` (from the SIP From header) is appended to the prompt so
@@ -61,6 +77,8 @@ export function withCallerNumber(instructions: string, callerDigits: string | nu
 export async function loadPhoneAgent(clientId: string, callerDigits: string | null = null): Promise<{
   session: ReturnType<typeof buildRealtimeSession>;
   scope: BookingScope;
+  /** E.164 target for transfer_call, or null when the tool is not offered. */
+  transferTo: string | null;
 } | null> {
   const supabase = createServiceClient();
   const { data } = await supabase
@@ -85,9 +103,17 @@ export async function loadPhoneAgent(clientId: string, callerDigits: string | nu
   // Same booking store the dashboard agent uses — sandbox while testing, live
   // once the client flips it. A real caller must never be told a slot is
   // booked when it only landed in the sandbox, so this is server-decided.
-  const scope = (await loadSettings(clientId)).voiceBookingMode;
+  const clientSettings = await loadSettings(clientId);
+  const scope = clientSettings.voiceBookingMode;
+  const transferTo = clientSettings.transferPhoneNumber?.trim() || null;
 
   const session = buildRealtimeSession(settings, { withTools: true });
+  if (transferTo) {
+    (session as { tools?: unknown[] }).tools = [
+      ...((session as { tools?: unknown[] }).tools ?? []),
+      transferCallToolDef(),
+    ];
+  }
   // PHONE-ONLY turn detection. Call logs confirmed the agent's own audio
   // echoes back over the SIP leg (no line-side echo cancellation, unlike the
   // browser mic) and gets heard as the caller, cancelling the response
@@ -113,7 +139,7 @@ export async function loadPhoneAgent(clientId: string, callerDigits: string | nu
     interrupt_response: false, // never cut the agent mid-turn
   };
 
-  return { session, scope };
+  return { session, scope, transferTo };
 }
 
 /** Records a finished phone call's duration + token usage into voice_usage —
