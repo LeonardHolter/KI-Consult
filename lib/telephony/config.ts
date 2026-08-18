@@ -105,7 +105,11 @@ export async function loadPhoneAgent(clientId: string, callerDigits: string | nu
     type: "server_vad",
     threshold: 0.65, // above the echo level, below full-volume caller speech
     prefix_padding_ms: 300,
-    silence_duration_ms: 700,
+    // 700 made the agent jump into the caller's THINKING pauses — people
+    // dictating a reg.nr or km-stand pause longer than 700ms mid-utterance.
+    // A flat second of patience costs 300ms extra response latency per turn
+    // and buys back every "no wait, I wasn't done" repair loop.
+    silence_duration_ms: 1000,
     interrupt_response: false, // never cut the agent mid-turn
   };
 
