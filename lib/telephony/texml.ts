@@ -7,6 +7,24 @@ import { OPENAI_SIP_URI } from "@/lib/telephony/config";
 
 export const FALLBACK_BASE = "https://www.kiconsult.no";
 
+/**
+ * Per-client pre-roll notices under public/telephony/. The DEFAULT notice
+ * carries the AI-disclosure clause («vår digitale assistent»), so a client
+ * may only get a name-branded override when their agent's own greeting
+ * discloses the AI — Hanz introduces itself as digital, Namsos' greeting
+ * does not, which is why Namsos stays on the default.
+ */
+const CLIENT_NOTICES: Record<string, string> = {
+  // Handz On Strømmen — «Velkommen til Handz On Strømmen. Denne samtalen
+  // blir tatt opp. Hvis du ikke ønsker det, trykk én.» (cedar-stemmen)
+  "ad19951e-00e1-4293-8975-6c6bb1dbdad7": "notice-ad19951e-00e1-4293-8975-6c6bb1dbdad7.mp3",
+};
+
+export function noticeUrl(base: string, clientId: string | null): string {
+  const file = (clientId && CLIENT_NOTICES[clientId]) || "opptak-varsel.mp3";
+  return `${base}/telephony/${file}`;
+}
+
 /** Absolute base for callbacks/assets, derived from the request so preview
  *  deploys call themselves, falling back to prod. */
 export function baseUrl(req: Request): string {
@@ -64,7 +82,7 @@ export function inboundTexml(opts: {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather input="dtmf" numDigits="1" timeout="3" action="${gatherAction}" method="POST">
-    <Play>${opts.base}/telephony/opptak-varsel.mp3</Play>
+    <Play>${noticeUrl(opts.base, opts.clientId)}</Play>
   </Gather>
   ${dialTexml({ ...opts, record: true })}
 </Response>`;

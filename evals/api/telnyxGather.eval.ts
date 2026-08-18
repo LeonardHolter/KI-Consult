@@ -78,3 +78,24 @@ describe("gather action", () => {
     expect(await (await gather("")).text()).toContain('record="record-from-answer"');
   });
 });
+
+describe("per-client notice", () => {
+  it("Handz On gets its name-branded notice", async () => {
+    // clientForNumber is mocked to Namsos' id above, so build the doc directly.
+    const { inboundTexml } = await import("@/lib/telephony/texml");
+    const body = inboundTexml({
+      base: "https://www.kiconsult.no",
+      dialed: "+4732994223",
+      clientId: "ad19951e-00e1-4293-8975-6c6bb1dbdad7",
+    });
+    expect(body).toContain("/telephony/notice-ad19951e-00e1-4293-8975-6c6bb1dbdad7.mp3");
+  });
+
+  it("every other client (and unknown) gets the default with the AI clause", async () => {
+    const { inboundTexml } = await import("@/lib/telephony/texml");
+    for (const clientId of ["fe264dcd-84e0-4e59-8efb-cbb5e39c8125", null]) {
+      const body = inboundTexml({ base: "https://www.kiconsult.no", dialed: null, clientId });
+      expect(body).toContain("/telephony/opptak-varsel.mp3");
+    }
+  });
+});
