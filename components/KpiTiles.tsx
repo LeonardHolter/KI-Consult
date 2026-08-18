@@ -69,7 +69,7 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
     <div className="kpi-row">
       <style>{`
         .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .kpi-tile { background: #fff; border: 1px solid #9a9a8c44; border-radius: 12px; padding: 14px 16px; }
+        .kpi-tile { background: #fff; border: 1px solid #9a9a8c44; border-radius: 0px; padding: 14px 16px; }
         .kpi-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #9a9a8c; margin: 0 0 6px; }
         .kpi-value { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 0; color: #16190f; }
         .kpi-sub { font-size: 12.5px; color: #5c5f52; margin: 4px 0 0; }

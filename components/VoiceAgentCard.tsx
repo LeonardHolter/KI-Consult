@@ -592,7 +592,7 @@ export default function VoiceAgentCard({
     return (
       <div className="vacm">
         <style>{`
-          .vacm { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 14px; padding: 44px 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-height: 320px; }
+          .vacm { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 0px; padding: 44px 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-height: 320px; }
           .vacm-circle { width: 148px; height: 148px; border-radius: 50%; border: none; cursor: pointer; transition: background .3s ease, box-shadow .3s ease; background: ${uiState === "active" ? "radial-gradient(circle at 50% 38%, #1ACE87, #15C07C)" : uiState === "connecting" ? "#d9d5c6" : "radial-gradient(circle at 50% 38%, #20241a, #16190f)"}; box-shadow: ${uiState === "active" ? "0 0 0 10px rgba(21,192,124,.14)" : "0 10px 30px rgba(22,25,15,.18)"}; }
           .vacm-circle.speaking { animation: vacm-pulse 1.05s ease-in-out infinite; }
           .vacm-circle.connecting { animation: vacm-breathe 1.6s ease-in-out infinite; }
@@ -625,13 +625,13 @@ export default function VoiceAgentCard({
     return (
       <div className="vac vac-disabled">
         <style>{`
-          .vac { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 14px; padding: 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+          .vac { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 0px; padding: 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
           .vac-disabled { background: #faf8f1; }
           .vac-orb.muted { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 24px; background: #efede2; opacity: .7; }
           .vac-body { flex: 1; min-width: 220px; }
           .vac-status.muted { font-family: var(--font-space-mono), monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: #9a9a8c; }
           .vac-msg { font-size: 13.5px; color: #5c5f52; margin-top: 4px; max-width: 52ch; }
-          .vac-btn-disabled { padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 700; border: none; flex-shrink: 0; background: #efede2; color: #9a9a8c; cursor: not-allowed; }
+          .vac-btn-disabled { padding: 10px 18px; border-radius: 0px; font-size: 14px; font-weight: 700; border: none; flex-shrink: 0; background: #efede2; color: #9a9a8c; cursor: not-allowed; }
         `}</style>
         <div className="vac-orb muted">📞</div>
         <div className="vac-body">
@@ -648,14 +648,14 @@ export default function VoiceAgentCard({
   return (
     <div className="vac">
       <style>{`
-        .vac { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 14px; padding: 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .vac { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 0px; padding: 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
         .vac-orb { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 24px; transition: all .25s ease; background: ${uiState === "active" ? "radial-gradient(circle at 50% 40%, #1ACE87, #15C07C)" : "#f3efe4"}; box-shadow: ${uiState === "active" ? "0 0 0 6px rgba(21,192,124,.16)" : "none"}; }
         .vac-orb.speaking { animation: vac-pulse 1.1s ease-in-out infinite; }
         @keyframes vac-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
         .vac-body { flex: 1; min-width: 220px; }
         .vac-status { font-family: var(--font-space-mono), monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: ${uiState === "active" ? "#0d6b47" : "#9a9a8c"}; }
         .vac-msg { font-size: 13.5px; color: #5c5f52; margin-top: 4px; max-width: 52ch; }
-        .vac-btn { padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 700; border: none; cursor: pointer; font-family: inherit; flex-shrink: 0; }
+        .vac-btn { padding: 10px 18px; border-radius: 0px; font-size: 14px; font-weight: 700; border: none; cursor: pointer; font-family: inherit; flex-shrink: 0; }
         .vac-btn.primary { background: #15c07c; color: #08231a; }
         .vac-btn.stop { background: #C2562C; color: #fff; }
       `}</style>

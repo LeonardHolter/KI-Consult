@@ -320,13 +320,13 @@ export default function PortalDashboard({
         .ctp-brand { font-weight: 800; font-size: 19px; letter-spacing: -.03em; }
         .ctp-brand span { color: #15A06A; }
         .ctp-back {
-          padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(154,154,140,.4);
+          padding: 7px 12px; border-radius: 4px; border: 1px solid rgba(154,154,140,.4);
           background: #f3efe4; color: #16190f; text-decoration: none; font-size: 14px; font-weight: 600;
         }
         .ctp-back:hover { background: #efede2; }
         .ctp-live {
           margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
-          background: #e4f7ee; color: #0d6b47; border-radius: 999px;
+          background: #e4f7ee; color: #0d6b47; border-radius: 0px;
           padding: 7px 14px; font-size: .82rem; font-weight: 700;
         }
         .ctp-dot {
@@ -340,27 +340,27 @@ export default function PortalDashboard({
         .ctp-title { font-size: 26px; letter-spacing: -.02em; margin: 0 0 4px; }
         .ctp-sub { color: #9a9a8c; font-size: 14px; margin: 0 0 22px; }
 
-        .ctp-card { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 14px; overflow: hidden; }
+        .ctp-card { background: #fff; border: 1px solid rgba(154,154,140,.27); border-radius: 0px; overflow: hidden; }
         .ctp-card-head {
           padding: 18px 22px; border-bottom: 1px solid rgba(154,154,140,.22);
           display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
         }
         .ctp-card-head h2 { margin: 0; font-size: 1.05rem; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
         .ctp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-left: auto; font-size: .8rem; color: #9a9a8c; }
-        .ctp-sync { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-weight: 700; }
+        .ctp-sync { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 0px; font-weight: 700; }
         .ctp-sync.is-on { background: #e4f7ee; color: #0d6b47; }
         .ctp-sync.is-off { background: #efede2; color: #9a9a8c; }
         .ctp-sync.is-sandbox { background: #fdf4e3; color: #a35a00; }
-        .ctp-scope { display: inline-flex; gap: 4px; padding: 3px; background: #f3efe4; border-radius: 999px; }
+        .ctp-scope { display: inline-flex; gap: 4px; padding: 3px; background: #f3efe4; border-radius: 0px; }
         .ctp-scope button {
           border: 0; background: transparent; color: #9a9a8c; cursor: pointer; font-family: inherit;
-          font-size: .72rem; font-weight: 700; padding: 4px 11px; border-radius: 999px;
+          font-size: .72rem; font-weight: 700; padding: 4px 11px; border-radius: 0px;
         }
         .ctp-scope button.on { background: #fff; color: #16190f; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         /* Kept for the booking modal's service chip — the colour legend that
            used to sit above the grid is gone, its categories were car-wash
            specific and meaningless to a workshop. */
-        .ctp-legend-item { padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; background: var(--svc-bg); color: var(--svc); }
+        .ctp-legend-item { padding: 3px 10px; border-radius: 0px; font-size: .72rem; font-weight: 700; background: var(--svc-bg); color: var(--svc); }
 
         .ctp-scroll { overflow-x: auto; }
         table.ctp-table { border-collapse: collapse; width: 100%; min-width: 900px; }
@@ -385,7 +385,7 @@ export default function PortalDashboard({
         .ctp-chip {
           display: inline-flex; align-items: center; gap: 4px;
           font-size: .73rem; font-weight: 700; line-height: 1.3;
-          padding: 3px 9px; border-radius: 8px; width: fit-content; max-width: 100%;
+          padding: 3px 9px; border-radius: 4px; width: fit-content; max-width: 100%;
           border: 0; font-family: inherit;
         }
         .ctp-chip.is-booked { background: var(--svc-bg); color: var(--svc); cursor: pointer; transition: filter .15s; }
@@ -396,7 +396,7 @@ export default function PortalDashboard({
         .ctp-loading { padding: 40px; text-align: center; color: #9a9a8c; }
         .ctp-hint {
           margin: 18px 0 0; padding: 13px 16px; background: #fff;
-          border: 1px solid rgba(154,154,140,.27); border-radius: 12px;
+          border: 1px solid rgba(154,154,140,.27); border-radius: 0px;
           color: #3d4034; font-size: 13.5px; line-height: 1.55;
         }
         .ctp-hint b { color: #16190f; }
@@ -414,7 +414,7 @@ export default function PortalDashboard({
           display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
         }
         .ctp-modal {
-          background: #fff; border-radius: 14px; padding: 28px; width: 100%; max-width: 380px;
+          background: #fff; border-radius: 0px; padding: 28px; width: 100%; max-width: 380px;
           box-shadow: 0 20px 50px rgba(0,0,0,.25); position: relative;
         }
         .ctp-modal-close {
@@ -430,7 +430,7 @@ export default function PortalDashboard({
         .ctp-modal-fields a:hover { text-decoration: underline; }
         .ctp-modal-cancel { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(154,154,140,.22); }
         .ctp-modal-cancel-btn {
-          width: 100%; padding: 9px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 700;
+          width: 100%; padding: 9px 14px; border-radius: 0px; font-size: 13.5px; font-weight: 700;
           border: 1px solid #e0847533; background: #fdf0ed; color: #c0392b; cursor: pointer; font-family: inherit;
         }
         .ctp-modal-cancel-btn:hover { background: #fbe3dd; }
@@ -439,7 +439,7 @@ export default function PortalDashboard({
         .ctp-modal-cancel-confirm p { margin: 0; font-size: 13px; color: #3d4034; line-height: 1.5; }
         .ctp-modal-cancel-actions { display: flex; gap: 8px; }
         .ctp-modal-cancel-actions button {
-          flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 700;
+          flex: 1; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: 700;
           cursor: pointer; font-family: inherit; border: 1px solid rgba(154,154,140,.4);
         }
         .ctp-modal-cancel-actions .is-danger { background: #c0392b; color: #fff; border-color: #c0392b; }
@@ -570,7 +570,7 @@ export default function PortalDashboard({
                   border: "1px solid #9a9a8c66",
                   background: "transparent",
                   color: "#16190f",
-                  borderRadius: 8,
+                  borderRadius: 4,
                   padding: "4px 12px",
                   fontSize: 12.5,
                   cursor: refreshing ? "default" : "pointer",
@@ -592,7 +592,7 @@ export default function PortalDashboard({
                     border: "1px solid #c2562c66",
                     background: confirmingClearSandbox ? "#c2562c" : "transparent",
                     color: confirmingClearSandbox ? "#fff" : "#c2562c",
-                    borderRadius: 8,
+                    borderRadius: 4,
                     padding: "4px 12px",
                     fontSize: 12.5,
                     cursor: "pointer",

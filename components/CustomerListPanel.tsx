@@ -49,11 +49,11 @@ export default function CustomerListPanel({ clientId }: { clientId?: string }) {
   return (
     <div className="clp-card">
       <style>{`
-        .clp-card { background: #fff; border: 1px solid #9a9a8c44; border-radius: 12px; padding: 20px 22px; margin-top: 20px; }
+        .clp-card { background: #fff; border: 1px solid #9a9a8c44; border-radius: 0px; padding: 20px 22px; margin-top: 20px; }
         .clp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
         .clp-head h2 { font-size: 17px; margin: 0; }
         .clp-sub { color: #9a9a8c; font-size: 13.5px; margin: 0 0 12px; }
-        .clp-dl { margin-left: auto; border: 1px solid #9a9a8c66; background: transparent; color: #16190f; border-radius: 8px; padding: 4px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; text-decoration: none; }
+        .clp-dl { margin-left: auto; border: 1px solid #9a9a8c66; background: transparent; color: #16190f; border-radius: 4px; padding: 4px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; text-decoration: none; }
         .clp-scroll { overflow-x: auto; }
         .clp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
         .clp-table th { text-align: left; color: #9a9a8c; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; padding: 8px 10px; border-bottom: 1px solid #9a9a8c33; white-space: nowrap; }

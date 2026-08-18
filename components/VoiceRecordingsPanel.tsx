@@ -98,7 +98,7 @@ export default function VoiceRecordingsPanel({
       style={{
         marginTop: 18,
         border: `1px solid ${MUTED}44`,
-        borderRadius: 14,
+        borderRadius: 0,
         background: "#fff",
         padding: "16px 18px",
       }}
@@ -110,7 +110,7 @@ export default function VoiceRecordingsPanel({
           style={{
             border: `1px solid ${MUTED}66`,
             background: "transparent",
-            borderRadius: 8,
+            borderRadius: 4,
             padding: "4px 10px",
             fontSize: 12,
             cursor: "pointer",
@@ -138,7 +138,7 @@ export default function VoiceRecordingsPanel({
               key={r.id}
               style={{
                 border: `1px solid ${MUTED}33`,
-                borderRadius: 10,
+                borderRadius: 4,
                 padding: "10px 12px",
               }}
             >
@@ -163,7 +163,7 @@ export default function VoiceRecordingsPanel({
                         letterSpacing: ".08em",
                         color: "#0d6b47",
                         background: "#15c07c22",
-                        borderRadius: 6,
+                        borderRadius: 4,
                         padding: "2px 7px",
                       }}
                     >
@@ -181,7 +181,7 @@ export default function VoiceRecordingsPanel({
                       style={{
                         border: `1px solid ${MUTED}66`,
                         background: "transparent",
-                        borderRadius: 8,
+                        borderRadius: 4,
                         padding: "4px 12px",
                         fontSize: 12.5,
                         cursor: "pointer",
@@ -200,7 +200,7 @@ export default function VoiceRecordingsPanel({
                         style={{
                           border: "1px solid #c2562c",
                           background: "#c2562c",
-                          borderRadius: 8,
+                          borderRadius: 4,
                           padding: "4px 12px",
                           fontSize: 12.5,
                           cursor: "pointer",
@@ -217,7 +217,7 @@ export default function VoiceRecordingsPanel({
                         style={{
                           border: "1px solid #c2562c66",
                           background: "transparent",
-                          borderRadius: 8,
+                          borderRadius: 4,
                           padding: "4px 12px",
                           fontSize: 12.5,
                           cursor: "pointer",
