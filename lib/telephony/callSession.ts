@@ -37,7 +37,13 @@ export type CallSummary = {
   usage: CallUsage;
 };
 
-const GRACE_MS = 5000;
+// Grace after the farewell audio: how long the caller can still jump in
+// before the line actually drops. Two cases, told apart by the farewell's
+// own words: the booking closing PROMISES «fem sekunder», so it gets them;
+// a plain «ha det bra» promised nothing, and five seconds of dead air after
+// a mutual goodbye reads as a hung line — 1.2s is enough to catch a "vent!".
+const GRACE_PROMISED_MS = 5000;
+const GRACE_PLAIN_MS = 1200;
 const HANGUP_SAFETY_MS = 12_000;
 const MAX_HANGUP_RECOVERIES = 3;
 // Half-duplex echo gate: while the agent speaks we disable input turn
@@ -206,6 +212,8 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
 
     // --- finish_session shutdown state (mirrors the browser agent) ---
     let hangupPending = false;
+    // Decided per farewell from its transcript (see GRACE_* above).
+    let hangupGraceMs = GRACE_PROMISED_MS;
     let hangupCallId: string | null = null;
     let hangupRecoveries = 0;
     let hangupTimer: NodeJS.Timeout | null = null;
@@ -330,7 +338,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
                   };
                   output_token_details?: { audio_tokens?: number };
                 };
-                output?: Array<{ type?: string; name?: string; content?: Array<{ type?: string }> }>;
+                output?: Array<{ type?: string; name?: string; content?: Array<{ type?: string; transcript?: string }> }>;
               }
             | undefined;
           if (response?.usage) {
@@ -348,6 +356,16 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
           const calledFinish = output.some(
             (i) => i.type === "function_call" && i.name === "finish_session",
           );
+          if (calledFinish) {
+            const spoken = output
+              .flatMap((i) => i.content ?? [])
+              .map((c) => c.transcript ?? "")
+              .join(" ")
+              .toLowerCase();
+            hangupGraceMs = /fem sekunder|5 sekunder/.test(spoken)
+              ? GRACE_PROMISED_MS
+              : GRACE_PLAIN_MS;
+          }
           if (hangupPending && calledFinish && !hasAudio && hangupRecoveries < MAX_HANGUP_RECOVERIES && hangupCallId) {
             hangupRecoveries += 1;
             send({
@@ -384,7 +402,7 @@ export function runCallSession(opts: RunCallOptions): Promise<void> {
           scheduleUnmute(); // agent done — listen again after the echo tail
           if (hangupPending) {
             clearHangupTimer();
-            hangupTimer = setTimeout(() => void hangup(), GRACE_MS);
+            hangupTimer = setTimeout(() => void hangup(), hangupGraceMs);
           }
           break;
       }
