@@ -31,10 +31,11 @@ const CLIENT_NOTICES: Record<string, string> = {
   // Handz On Strømmen — «Velkommen til Handz On Strømmen. Denne samtalen
   // blir tatt opp. Hvis du ikke ønsker det, trykk én.» (cedar-stemmen)
   "ad19951e-00e1-4293-8975-6c6bb1dbdad7": "notice-ad19951e-00e1-4293-8975-6c6bb1dbdad7.mp3",
-  // Namsos Bilteknikk — samme ordlyd og stemme, kun navnet byttet:
-  // «Velkommen til Namsos Bilteknikk. Denne samtalen blir tatt opp. Hvis du
-  // ikke ønsker det, trykk én.» (cedar-stemmen)
-  "fe264dcd-84e0-4e59-8efb-cbb5e39c8125": "notice-fe264dcd-84e0-4e59-8efb-cbb5e39c8125.mp3",
+  // Namsos Bilteknikk — samme ordlyd, kun navnet byttet, i damestemme
+  // (marin, per Leonard): «Velkommen til Namsos Bilteknikk. Denne samtalen
+  // blir tatt opp. Hvis du ikke ønsker det, trykk én.» -v2 in the name so
+  // Telnyx' media cache can't serve the retired cedar take.
+  "fe264dcd-84e0-4e59-8efb-cbb5e39c8125": "notice-fe264dcd-84e0-4e59-8efb-cbb5e39c8125-v2.mp3",
 };
 
 export function noticeUrl(base: string, clientId: string | null): string {

@@ -41,7 +41,7 @@ describe("pre-roll notice (telnyx-inbound)", () => {
     expect(
       body,
     ).toContain(
-      "<Play>https://www.kiconsult.no/telephony/notice-fe264dcd-84e0-4e59-8efb-cbb5e39c8125.mp3</Play>",
+      "<Play>https://www.kiconsult.no/telephony/notice-fe264dcd-84e0-4e59-8efb-cbb5e39c8125-v2.mp3</Play>",
     );
     // The Gather must come BEFORE the dial — the notice plays first.
     expect(body.indexOf("<Gather")).toBeLessThan(body.indexOf("<Dial"));
@@ -88,12 +88,12 @@ describe("per-client notice", () => {
   it("Handz On and Namsos each get their name-branded notice", async () => {
     // clientForNumber is mocked above, so build the docs directly.
     const { inboundTexml } = await import("@/lib/telephony/texml");
-    for (const clientId of [
-      "ad19951e-00e1-4293-8975-6c6bb1dbdad7",
-      "fe264dcd-84e0-4e59-8efb-cbb5e39c8125",
+    for (const [clientId, file] of [
+      ["ad19951e-00e1-4293-8975-6c6bb1dbdad7", "notice-ad19951e-00e1-4293-8975-6c6bb1dbdad7.mp3"],
+      ["fe264dcd-84e0-4e59-8efb-cbb5e39c8125", "notice-fe264dcd-84e0-4e59-8efb-cbb5e39c8125-v2.mp3"],
     ]) {
       const body = inboundTexml({ base: "https://www.kiconsult.no", dialed: null, clientId });
-      expect(body).toContain(`/telephony/notice-${clientId}.mp3`);
+      expect(body).toContain(`/telephony/${file}`);
     }
   });
 
