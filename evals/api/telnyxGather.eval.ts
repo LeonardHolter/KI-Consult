@@ -37,7 +37,12 @@ describe("pre-roll notice (telnyx-inbound)", () => {
   it("plays the notice inside a Gather, then falls through to the recorded dial", async () => {
     const body = await (await inbound()).text();
     expect(body).toContain('<Gather input="dtmf" numDigits="1"');
-    expect(body).toContain("<Play>https://www.kiconsult.no/telephony/opptak-varsel.mp3</Play>");
+    // clientForNumber is mocked to Namsos' id, which has a name-branded notice.
+    expect(
+      body,
+    ).toContain(
+      "<Play>https://www.kiconsult.no/telephony/notice-fe264dcd-84e0-4e59-8efb-cbb5e39c8125.mp3</Play>",
+    );
     // The Gather must come BEFORE the dial — the notice plays first.
     expect(body.indexOf("<Gather")).toBeLessThan(body.indexOf("<Dial"));
     // No keypress = recorded, exactly as before the pre-roll existed.
@@ -80,20 +85,21 @@ describe("gather action", () => {
 });
 
 describe("per-client notice", () => {
-  it("Handz On gets its name-branded notice", async () => {
-    // clientForNumber is mocked to Namsos' id above, so build the doc directly.
+  it("Handz On and Namsos each get their name-branded notice", async () => {
+    // clientForNumber is mocked above, so build the docs directly.
     const { inboundTexml } = await import("@/lib/telephony/texml");
-    const body = inboundTexml({
-      base: "https://www.kiconsult.no",
-      dialed: "+4732994223",
-      clientId: "ad19951e-00e1-4293-8975-6c6bb1dbdad7",
-    });
-    expect(body).toContain("/telephony/notice-ad19951e-00e1-4293-8975-6c6bb1dbdad7.mp3");
+    for (const clientId of [
+      "ad19951e-00e1-4293-8975-6c6bb1dbdad7",
+      "fe264dcd-84e0-4e59-8efb-cbb5e39c8125",
+    ]) {
+      const body = inboundTexml({ base: "https://www.kiconsult.no", dialed: null, clientId });
+      expect(body).toContain(`/telephony/notice-${clientId}.mp3`);
+    }
   });
 
   it("every other client (and unknown) gets the default with the AI clause", async () => {
     const { inboundTexml } = await import("@/lib/telephony/texml");
-    for (const clientId of ["fe264dcd-84e0-4e59-8efb-cbb5e39c8125", null]) {
+    for (const clientId of ["18c22e0d-95f6-4a34-aac6-621281771364", null]) {
       const body = inboundTexml({ base: "https://www.kiconsult.no", dialed: null, clientId });
       expect(body).toContain("/telephony/opptak-varsel.mp3");
     }

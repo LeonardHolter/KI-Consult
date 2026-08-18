@@ -22,15 +22,19 @@ export function xml(value: string): string {
 
 /**
  * Per-client pre-roll notices under public/telephony/. The DEFAULT notice
- * carries the AI-disclosure clause («vår digitale assistent»), so a client
- * may only get a name-branded override when their agent's own greeting
- * discloses the AI — Hanz introduces itself as digital, Namsos' greeting
- * does not, which is why Namsos stays on the default.
+ * carries the AI-disclosure clause («vår digitale assistent»); a name-branded
+ * override drops that clause, so the AI must be disclosed elsewhere in the
+ * call — Hanz introduces itself as digital; for Namsos (Leonard's call,
+ * 2026-08-18) the agent's own greeting has to carry the disclosure.
  */
 const CLIENT_NOTICES: Record<string, string> = {
   // Handz On Strømmen — «Velkommen til Handz On Strømmen. Denne samtalen
   // blir tatt opp. Hvis du ikke ønsker det, trykk én.» (cedar-stemmen)
   "ad19951e-00e1-4293-8975-6c6bb1dbdad7": "notice-ad19951e-00e1-4293-8975-6c6bb1dbdad7.mp3",
+  // Namsos Bilteknikk — samme ordlyd og stemme, kun navnet byttet:
+  // «Velkommen til Namsos Bilteknikk. Denne samtalen blir tatt opp. Hvis du
+  // ikke ønsker det, trykk én.» (cedar-stemmen)
+  "fe264dcd-84e0-4e59-8efb-cbb5e39c8125": "notice-fe264dcd-84e0-4e59-8efb-cbb5e39c8125.mp3",
 };
 
 export function noticeUrl(base: string, clientId: string | null): string {
