@@ -39,7 +39,7 @@ async function firstSlot(): Promise<{ date: string; time: string }> {
 beforeEach(() => {
   blobStore.clear();
   vi.mocked(notifyShop).mockClear();
-  vi.mocked(notifyShop).mockResolvedValue(undefined);
+  vi.mocked(notifyShop).mockResolvedValue({ sent: true });
   process.env.BLOB_READ_WRITE_TOKEN = "test-token";
 });
 

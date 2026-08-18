@@ -22,14 +22,20 @@ export function looksLikeEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 200;
 }
 
-export async function notifyShop(clientId: string, n: ShopNotification): Promise<void> {
+/** The outcome is for diagnostics (the admin notify-test route shows it);
+ *  every production caller ignores it — fire-and-forget stays the contract. */
+export async function notifyShop(
+  clientId: string,
+  n: ShopNotification,
+): Promise<{ sent: boolean; reason?: string; to?: string }> {
   try {
     const key = process.env.RESEND_API_KEY;
-    if (!key) return; // not configured — silently off, like portal-log
+    if (!key) return { sent: false, reason: "RESEND_API_KEY ikke satt" };
 
     const settings = await loadSettings(clientId);
     const to = settings.notificationEmail;
-    if (!to || !looksLikeEmail(to)) return; // no recipient set for this client
+    if (!to || !looksLikeEmail(to))
+      return { sent: false, reason: "ingen notificationEmail satt for klienten" };
 
     let clientName = "kunden";
     try {
@@ -54,8 +60,11 @@ export async function notifyShop(clientId: string, n: ShopNotification): Promise
     });
     if (error) {
       console.warn(`[notify] send failed for client ${clientId}:`, error);
+      return { sent: false, reason: `${error.name}: ${error.message}`, to };
     }
+    return { sent: true, to };
   } catch (err) {
     console.warn(`[notify] failed for client ${clientId}:`, err);
+    return { sent: false, reason: String(err) };
   }
 }
