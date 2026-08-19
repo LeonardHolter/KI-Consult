@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import VoiceAgentCard from "@/components/VoiceAgentCard";
+import ElevenLabsAgentCard from "@/components/ElevenLabsAgentCard";
+import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
 import VoiceRecordingsPanel from "@/components/VoiceRecordingsPanel";
 import CustomerListPanel from "@/components/CustomerListPanel";
 import KpiTiles from "@/components/KpiTiles";
@@ -527,6 +529,10 @@ export default function PortalDashboard({
               dukker opp under Samtaleopptak et halvt minutt etter at du legger på.
             </p>
           </div>
+        ) : elevenlabsAgentIdFor(clientId) ? (
+          // ElevenLabs-pilot (kun klienter i ELEVENLABS_VOICE_AGENTS-mappen):
+          // samme plass og verktøy-executor, annen taleplattform.
+          <ElevenLabsAgentCard clientId={clientId} variant={overviewHref ? "full" : "minimal"} />
         ) : (
           <VoiceAgentCard clientId={clientId} variant={overviewHref ? "full" : "minimal"} />
         )}
