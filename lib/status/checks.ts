@@ -30,6 +30,12 @@ const SLOW_MS = 2000;
 /** Telnyx stops accepting calls at zero. A dead phone line with no explanation
  *  is precisely the failure we couldn't diagnose, so warn before it happens. */
 const LOW_BALANCE = 10;
+/** ElevenLabs credits burned per minute of conversation, measured across the
+ *  first real calls (voice platform + the LLM passthrough it bills through
+ *  the same pool). Used only to express the remaining pool in minutes. */
+const CREDITS_PER_MINUTE = 430;
+/** Warn while there is still about a working day of calls left. */
+const LOW_VOICE_MINUTES = 60;
 
 export type CheckState = "ok" | "degraded" | "down" | "unconfigured";
 
@@ -119,6 +125,51 @@ const CHECKS: CheckDef[] = [
       const shown = `saldo ${balance.toFixed(2)} ${currency}`.trim();
       return balance < LOW_BALANCE
         ? { state: "degraded", detail: `${shown} — fyll på før nummeret stopper` }
+        : { state: "ok", detail: shown };
+    },
+  },
+  {
+    id: "elevenlabs",
+    name: "ElevenLabs",
+    impact: "Taleagenten slutter å svare for kunder på ElevenLabs (Handz On).",
+    // All four, not just the API key. A missing SIP credential is the worst
+    // failure this product has: Telnyx' INVITE is rejected, the caller hears
+    // the pre-roll and then silence, and every other probe stays green. The
+    // tools secret is nearly as bad — it gates both the booking webhook and
+    // the per-call date/caller context. Naming the missing variable turns a
+    // "the phone is dead" morning into a two-minute fix.
+    requires: [
+      "ELEVENLABS_API_KEY",
+      "ELEVENLABS_TOOLS_SECRET",
+      "ELEVENLABS_SIP_USERNAME",
+      "ELEVENLABS_SIP_PASSWORD",
+    ],
+    probe: async () => {
+      const res = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
+        headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY! },
+        cache: "no-store",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (res.status === 401 || res.status === 403) {
+        return { state: "down", detail: `nøkkelen ble avvist (${res.status})` };
+      }
+      if (!res.ok) return { state: "down", detail: `HTTP ${res.status}` };
+
+      // Same reason as Telnyx' balance: an empty credit pool looks exactly
+      // like an outage from the caller's side — the agent simply stops
+      // answering. Credits are shown as MINUTES because that is the unit the
+      // failure arrives in; CREDITS_PER_MINUTE is measured from real calls
+      // (voice platform + LLM passthrough), so it is an estimate, not a quote.
+      const body = (await res.json().catch(() => null)) as
+        | { character_count?: number; character_limit?: number }
+        | null;
+      const used = Number(body?.character_count);
+      const limit = Number(body?.character_limit);
+      if (!Number.isFinite(used) || !Number.isFinite(limit)) return { state: "ok" };
+      const minutes = Math.max(0, limit - used) / CREDITS_PER_MINUTE;
+      const shown = `≈ ${Math.round(minutes)} min samtaletid igjen`;
+      return minutes < LOW_VOICE_MINUTES
+        ? { state: "degraded", detail: `${shown} — fyll på før agenten stopper` }
         : { state: "ok", detail: shown };
     },
   },

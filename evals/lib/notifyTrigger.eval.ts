@@ -29,11 +29,21 @@ import { execBookingTool, ADD_NOTE_TOOL, BOOK_SLOT_TOOL, GET_SLOTS_TOOL } from "
 
 const CLIENT = "99999999-8888-7777-6666-555555555555";
 
+/** The first slot that accepts ANY service.
+ *
+ *  Not simply available_slots[0]: the grid's last slot of the day is
+ *  restricted to one keyword ("utvendig" by default), and get_available_demo_slots
+ *  drops slots whose start time has passed — so between 18:30 and 19:30 Oslo
+ *  the restricted 19:30 slot was the only one left for today and became [0].
+ *  These tests book an unrelated service, so the booking failed and all three
+ *  assertions went red for exactly one hour a day. */
 async function firstSlot(): Promise<{ date: string; time: string }> {
   const res = (await execBookingTool(CLIENT, GET_SLOTS_TOOL, { date: null, near_time: null }, "sandbox")) as {
-    available_slots: { date: string; time: string }[];
+    available_slots: { date: string; time: string; service_restriction: string | null }[];
   };
-  return res.available_slots[0];
+  const slot = res.available_slots.find((s) => !s.service_restriction);
+  if (!slot) throw new Error("no unrestricted slot in the generated grid");
+  return { date: slot.date, time: slot.time };
 }
 
 beforeEach(() => {

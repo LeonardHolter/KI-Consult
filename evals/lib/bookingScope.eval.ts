@@ -155,7 +155,12 @@ describe("the two stores are isolated from each other", () => {
 describe("execBookingTool honours the scope it is given", () => {
   it("books into the sandbox without calling the calendar", async () => {
     const slots = await execBookingTool(CLIENT, "get_available_demo_slots", { date: null, near_time: null }, "sandbox");
-    const first = (slots.available_slots as { date: string; time: string }[])[0];
+    // Skip the day's keyword-restricted last slot: after 18:30 Oslo it is the
+    // only one left for today, and [0] then books a slot the service may not
+    // match (see notifyTrigger.eval.ts, where that was a daily one-hour flake).
+    const first = (
+      slots.available_slots as { date: string; time: string; service_restriction: string | null }[]
+    ).find((s) => !s.service_restriction)!;
     expect(first).toBeTruthy();
 
     const booked = await execBookingTool(

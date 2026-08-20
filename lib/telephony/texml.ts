@@ -5,7 +5,7 @@
 
 import { OPENAI_SIP_URI } from "@/lib/telephony/config";
 import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
-import { normalizeNumber } from "@/lib/telephony/numbers";
+import { normalizeNumber, numberFromSipUri } from "@/lib/telephony/numbers";
 
 export const FALLBACK_BASE = "https://www.kiconsult.no";
 
@@ -98,10 +98,28 @@ export function dialTexml(opts: {
   // else (pre-roll, press-1, recording, dial-done) is identical, so the
   // recording panel and hangup flow keep working. Transfer-to-human is not
   // wired for these calls; dial-done just hangs up.
-  const elevenLabsUri =
-    elevenlabsAgentIdFor(opts.clientId) && opts.dialed
-      ? `sip:+${normalizeNumber(opts.dialed)}@sip.rtc.elevenlabs.io`
-      : null;
+  // The dialed number becomes the SIP user part, which is how ElevenLabs
+  // matches the call to an agent — so it must be JUST the number.
+  // normalizeNumber strips non-digits from the whole string, which turns
+  // "sip:+4732994223@sip.telnyx.com;tag=99213" into a number with the host's
+  // digits glued on and an INVITE ElevenLabs cannot route. numberFromSipUri
+  // stops at @ or ; and falls back to the plain form Telnyx usually sends.
+  const dialedDigits = opts.dialed
+    ? (numberFromSipUri(opts.dialed) ?? normalizeNumber(opts.dialed))
+    : null;
+  const isElevenLabsClient = Boolean(elevenlabsAgentIdFor(opts.clientId));
+  const elevenLabsUri = isElevenLabsClient && dialedDigits
+    ? `sip:+${dialedDigits}@sip.rtc.elevenlabs.io`
+    : null;
+  // A pilot client whose dialed number never arrived falls back to the OpenAI
+  // agent: the call still connects, but on the other platform, with another
+  // prompt and voice. That is a survivable outcome and a confusing one, so it
+  // must never happen quietly.
+  if (isElevenLabsClient && !elevenLabsUri) {
+    console.warn(
+      `[texml] ElevenLabs-klient ${opts.clientId} uten kjent nummer — ringer OpenAI-agenten i stedet`,
+    );
+  }
   const sipAuth =
     elevenLabsUri && process.env.ELEVENLABS_SIP_USERNAME
       ? ` username="${xml(process.env.ELEVENLABS_SIP_USERNAME)}" password="${xml(process.env.ELEVENLABS_SIP_PASSWORD ?? "")}"`

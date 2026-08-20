@@ -26,14 +26,27 @@ export async function POST(req: Request) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return Response.json({ error: "elevenlabs_not_configured" }, { status: 500 });
 
-  const res = await fetch(
-    `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${agentId}`,
-    { headers: { "xi-api-key": apiKey }, cache: "no-store" },
-  );
-  if (!res.ok) {
-    console.error(`[elevenlabs-session] signed-url failed: ${res.status} ${await res.text()}`);
+  let signedUrl: unknown;
+  try {
+    const res = await fetch(
+      `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${agentId}`,
+      { headers: { "xi-api-key": apiKey }, cache: "no-store", signal: AbortSignal.timeout(8000) },
+    );
+    if (!res.ok) {
+      console.error(`[elevenlabs-session] signed-url failed: ${res.status} ${await res.text()}`);
+      return Response.json({ error: "elevenlabs_error" }, { status: 502 });
+    }
+    signedUrl = (await res.json()).signed_url;
+  } catch (err) {
+    // A timeout or an HTML error page from a proxy lands here. Without this
+    // the browser gets a 500 and shows the SDK's own English error inside an
+    // otherwise Norwegian UI.
+    console.error(`[elevenlabs-session] ${err instanceof Error ? err.message : err}`);
     return Response.json({ error: "elevenlabs_error" }, { status: 502 });
   }
-  const { signed_url } = await res.json();
-  return Response.json({ signedUrl: signed_url });
+  if (typeof signedUrl !== "string" || !signedUrl) {
+    console.error("[elevenlabs-session] svar uten signed_url");
+    return Response.json({ error: "elevenlabs_error" }, { status: 502 });
+  }
+  return Response.json({ signedUrl });
 }

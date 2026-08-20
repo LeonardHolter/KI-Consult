@@ -6,9 +6,12 @@ import { Conversation } from "@elevenlabs/client";
 // The ElevenLabs-pilot counterpart to VoiceAgentCard: same dashboard slot,
 // same visual language, but the conversation runs against the client's
 // ElevenLabs agent (lib/voiceDemo/elevenlabsAgents.ts) instead of OpenAI
-// Realtime. Tool calls surface in the browser exactly like the WebRTC agent's
-// do, and are relayed to the same authenticated executor
-// (/api/portal/voice-agent/tools) — the server still decides sandbox vs live.
+// Realtime. The booking tools are registered hos ElevenLabs as WEBHOOK tools
+// (the same agent answers the phone, where no browser exists to run client
+// tools), so they execute server-side via /api/telephony/elevenlabs-tools;
+// the clientTools map below is the fallback for an agent configured the other
+// way. Either path ends in the same executor, and the server — never the
+// browser — decides sandbox vs live.
 //
 // Deliberately NOT wired up here (pilot scope): call recording and usage
 // reporting. Both are OpenAI-session-shaped today; they come along if the
@@ -49,6 +52,11 @@ export default function ElevenLabsAgentCard({
   const [lastMessage, setLastMessage] = useState<string | null>(null);
 
   const convRef = useRef<Awaited<ReturnType<typeof Conversation.startSession>> | null>(null);
+  // Set when the user hangs up while the session is still being established.
+  // convRef is only assigned AFTER startSession resolves, so without this the
+  // cancel had nothing to close: the UI went idle, the session came up anyway
+  // and the browser microphone stayed captured.
+  const cancelledRef = useRef(false);
   // finish_session contract (same as production): hang up only after the
   // farewell has finished PLAYING — the mode flip back to "listening" is the
   // signal, a 10 s timer the backstop.
@@ -59,6 +67,7 @@ export default function ElevenLabsAgentCard({
     if (hangupTimerRef.current) clearTimeout(hangupTimerRef.current);
     hangupTimerRef.current = null;
     hangupPendingRef.current = false;
+    cancelledRef.current = true;
     const conv = convRef.current;
     convRef.current = null;
     if (conv) await conv.endSession().catch(() => {});
@@ -88,6 +97,7 @@ export default function ElevenLabsAgentCard({
   const start = useCallback(async () => {
     setUiState("connecting");
     setErrorMsg(null);
+    cancelledRef.current = false;
     try {
       const res = await fetch("/api/portal/voice-agent/elevenlabs-session", {
         method: "POST",
@@ -105,7 +115,7 @@ export default function ElevenLabsAgentCard({
         hangupTimerRef.current = setTimeout(() => void endCall(), 10_000);
       };
 
-      convRef.current = await Conversation.startSession({
+      const conversation = await Conversation.startSession({
         signedUrl: json.signedUrl,
         connectionType: "websocket",
         dynamicVariables: { date_context: dateContextLine() },
@@ -125,8 +135,19 @@ export default function ElevenLabsAgentCard({
         },
         onError: (err: unknown) => {
           console.error("[elevenlabs-agent]", err);
+          // Silence with no explanation is the worst outcome here: without a
+          // message the user keeps talking to a dead connection.
+          setErrorMsg("Forbindelsen falt ut. Prøv å ringe igjen.");
+          setUiState("error");
         },
       });
+      if (cancelledRef.current) {
+        // Hung up while connecting: close the session that just came up
+        // instead of leaving it — and the microphone — running.
+        await conversation.endSession().catch(() => {});
+        return;
+      }
+      convRef.current = conversation;
     } catch (err) {
       const message =
         err instanceof DOMException && err.name === "NotAllowedError"

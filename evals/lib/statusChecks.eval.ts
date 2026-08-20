@@ -28,17 +28,26 @@ const ALL_KEYS = [
   "BLOB_READ_WRITE_TOKEN",
   "GOOGLE_SERVICE_ACCOUNT_KEY",
   "RESEND_API_KEY",
+  "ELEVENLABS_API_KEY",
+  "ELEVENLABS_TOOLS_SECRET",
+  "ELEVENLABS_SIP_USERNAME",
+  "ELEVENLABS_SIP_PASSWORD",
 ];
 
 const SECRET = "sk-super-secret-value";
 
 /** Every vendor answers 200; Telnyx returns a healthy balance. */
 const happyFetch = () =>
-  vi.fn(async (url: string) =>
-    url.includes("telnyx")
-      ? new Response(JSON.stringify({ data: { balance: "250.00", currency: "USD" } }), { status: 200 })
-      : new Response("{}", { status: 200 }),
-  );
+  vi.fn(async (url: string) => {
+    if (url.includes("telnyx")) {
+      return new Response(JSON.stringify({ data: { balance: "250.00", currency: "USD" } }), { status: 200 });
+    }
+    if (url.includes("elevenlabs")) {
+      // ~230 min igjen: godt over varselgrensen.
+      return new Response(JSON.stringify({ character_count: 1000, character_limit: 100_000 }), { status: 200 });
+    }
+    return new Response("{}", { status: 200 });
+  });
 
 const byId = (results: CheckResult[], id: string) => results.find((r) => r.id === id)!;
 
@@ -60,7 +69,7 @@ describe("status checks", () => {
   it("reports every service as ok when all of them answer", async () => {
     const results = await runStatusChecks();
     expect(results.map((r) => r.id).sort()).toEqual(
-      ["anthropic", "blob", "google", "openai", "resend", "supabase", "telnyx"].sort(),
+      ["anthropic", "blob", "elevenlabs", "google", "openai", "resend", "supabase", "telnyx"].sort(),
     );
     expect(results.every((r) => r.state === "ok")).toBe(true);
     expect(overallState(results)).toBe("ok");
@@ -119,6 +128,70 @@ describe("status checks", () => {
     const telnyx = byId(await runStatusChecks(), "telnyx");
     expect(telnyx.state).toBe("degraded");
     expect(telnyx.detail).toContain("1.20");
+  });
+
+  // Credits are the ElevenLabs equivalent of a Telnyx balance: at zero the
+  // agent simply stops answering the phone, which from outside looks exactly
+  // like an outage. Warn while there is still a working day left.
+  // The failure that shows a green status page while the phone is dead:
+  // Telnyx' INVITE to ElevenLabs is rejected, the caller hears the pre-roll
+  // and then silence. Naming the variable is the whole value here.
+  it("names a missing ElevenLabs SIP credential instead of showing green", async () => {
+    delete process.env.ELEVENLABS_SIP_PASSWORD;
+    const el = byId(await runStatusChecks(), "elevenlabs");
+    expect(el.state).toBe("unconfigured");
+    expect(el.detail).toContain("ELEVENLABS_SIP_PASSWORD");
+  });
+
+  it("names a missing tools secret — it gates booking AND the per-call context", async () => {
+    delete process.env.ELEVENLABS_TOOLS_SECRET;
+    const el = byId(await runStatusChecks(), "elevenlabs");
+    expect(el.state).toBe("unconfigured");
+    expect(el.detail).toContain("ELEVENLABS_TOOLS_SECRET");
+  });
+
+  it("warns before the ElevenLabs credit pool runs out, in minutes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.includes("elevenlabs")
+          ? // 8600 kreditter igjen ≈ 20 min — under grensen.
+            new Response(JSON.stringify({ character_count: 91_400, character_limit: 100_000 }), { status: 200 })
+          : new Response(JSON.stringify({ data: { balance: "250.00", currency: "USD" } }), { status: 200 }),
+      ),
+    );
+    const el = byId(await runStatusChecks(), "elevenlabs");
+    expect(el.state).toBe("degraded");
+    expect(el.detail).toContain("20 min");
+    expect(el.detail).toContain("fyll på");
+  });
+
+  it("stays ok when ElevenLabs answers without usable credit numbers", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.includes("elevenlabs")
+          ? new Response(JSON.stringify({ tier: "payg" }), { status: 200 })
+          : new Response(JSON.stringify({ data: { balance: "250.00", currency: "USD" } }), { status: 200 }),
+      ),
+    );
+    const el = byId(await runStatusChecks(), "elevenlabs");
+    expect(el.state).toBe("ok");
+  });
+
+  it("calls a rejected ElevenLabs key 'down', and never echoes the key", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.includes("elevenlabs")
+          ? new Response("unauthorized", { status: 401 })
+          : new Response(JSON.stringify({ data: { balance: "250.00", currency: "USD" } }), { status: 200 }),
+      ),
+    );
+    const el = byId(await runStatusChecks(), "elevenlabs");
+    expect(el.state).toBe("down");
+    expect(el.detail).toContain("401");
+    expect(JSON.stringify(el)).not.toContain(SECRET);
   });
 
   it("surfaces a Supabase query error instead of throwing", async () => {

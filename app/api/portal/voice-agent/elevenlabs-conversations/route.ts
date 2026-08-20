@@ -19,8 +19,15 @@ export const dynamic = "force-dynamic";
 
 const BASE = "https://api.elevenlabs.io";
 
+/** Timeout so a slow ElevenLabs cannot hang the panel to the platform limit. */
+const TIMEOUT_MS = 8000;
+
 async function el(path: string, apiKey: string): Promise<Response> {
-  return fetch(`${BASE}${path}`, { headers: { "xi-api-key": apiKey }, cache: "no-store" });
+  return fetch(`${BASE}${path}`, {
+    headers: { "xi-api-key": apiKey },
+    cache: "no-store",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
 }
 
 type TranscriptTurn = {
@@ -90,7 +97,11 @@ export async function GET(req: Request) {
   };
   return Response.json({
     conversations: ((conversations ?? []) as Row[])
-      .filter((c) => c.status !== "failed")
+      // A row without a usable start time would reach
+      // new Date(NaN).toISOString() and throw, and the panel's catch turns
+      // any failure into "Ingen samtaler ennå" — an admin would read a broken
+      // API as a quiet day.
+      .filter((c) => c.status !== "failed" && Number.isFinite(c.start_time_unix_secs))
       .map((c) => ({
         id: c.conversation_id,
         startedAt: new Date(c.start_time_unix_secs * 1000).toISOString(),

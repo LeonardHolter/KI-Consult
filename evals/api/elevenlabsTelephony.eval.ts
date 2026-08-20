@@ -22,6 +22,8 @@ import { execBookingTool } from "@/lib/bookingTools";
 // pilot fixture since the map is hardcoded.
 
 const PILOT_CLIENT = "18c22e0d-95f6-4a34-aac6-621281771364";
+/** Handz On — the production line, on ElevenLabs since 2026-08-20. */
+const PILOT_CLIENT_HANDZ = "ad19951e-00e1-4293-8975-6c6bb1dbdad7";
 const SECRET = "eval-secret";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -42,6 +44,60 @@ describe("ElevenLabs pilot TeXML routing", () => {
     expect(xml).not.toContain("sip.api.openai.com");
     // The recording panel must keep working for pilot calls.
     expect(xml).toContain('record="record-from-answer"');
+  });
+
+  // Telnyx has been seen to send To as a full SIP URI. normalizeNumber strips
+  // non-digits from the WHOLE string, so the host's digits would be glued onto
+  // the number and ElevenLabs could not match the call to an agent — the
+  // caller hears the pre-roll, then the line drops.
+  it("uses only the number as the SIP user part, even from a SIP-URI To", () => {
+    const xml = dialTexml({
+      base: "https://www.kiconsult.no",
+      dialed: "sip:+4732994223@sip1.telnyx.com;tag=99213",
+      clientId: PILOT_CLIENT_HANDZ,
+      record: true,
+    });
+    // Only the <Sip> target matters here; the untouched original still rides
+    // along in the dial-done query string, which is intentional.
+    const sipElement = /<Sip[^>]*>([^<]*)<\/Sip>/.exec(xml)![1];
+    expect(sipElement).toBe("sip:+4732994223@sip.rtc.elevenlabs.io");
+    expect(sipElement).not.toContain("99213");
+    expect(sipElement).not.toContain("sip1");
+  });
+
+  // The outage that killed both lines once already: an unescaped character in
+  // TeXML makes the whole document invalid and Telnyx answers every call with
+  // «an application error has occurred». Credentials are the newest dynamic
+  // values in the document, and a generated password can contain any of these.
+  it("XML-escapes SIP credentials so a special character cannot break the document", () => {
+    vi.stubEnv("ELEVENLABS_SIP_USERNAME", 'user&"name');
+    vi.stubEnv("ELEVENLABS_SIP_PASSWORD", 'p<a>ss&"1');
+    const xml = dialTexml({
+      base: "https://www.kiconsult.no",
+      dialed: "+4732994223",
+      clientId: PILOT_CLIENT_HANDZ,
+      record: true,
+    });
+    expect(xml).toContain('username="user&amp;&quot;name"');
+    expect(xml).toContain('password="p&lt;a&gt;ss&amp;&quot;1"');
+    // No bare & survives — the exact shape of the original outage.
+    expect(xml.replace(/&(amp|lt|gt|quot);/g, "")).not.toContain("&");
+  });
+
+  // Telnyx sending no To at all resolves to the default client, which IS on
+  // ElevenLabs. Falling back to the OpenAI agent keeps the call alive on the
+  // other platform, which is survivable — but must never be silent.
+  it("falls back to OpenAI, loudly, for a pilot client with no dialed number", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const xml = dialTexml({
+      base: "https://www.kiconsult.no",
+      dialed: null,
+      clientId: PILOT_CLIENT_HANDZ,
+      record: true,
+    });
+    expect(xml).toContain("sip.api.openai.com");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("uten kjent nummer"));
+    warn.mockRestore();
   });
 
   it("keeps every non-pilot client on the OpenAI SIP URI, auth attrs absent", () => {
