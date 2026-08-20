@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/telephony/numbers", () => ({ clientForNumber: vi.fn(async () => null) }));
+vi.mock("@/lib/telephony/numbers", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/telephony/numbers")>()),
+  clientForNumber: vi.fn(async () => null),
+}));
 import { GET, POST } from "@/app/api/telephony/telnyx-inbound/route";
 import { OPENAI_SIP_URI } from "@/lib/telephony/config";
 import { clientForNumber } from "@/lib/telephony/numbers";
@@ -35,6 +38,9 @@ describe("telnyx-inbound TeXML", () => {
   // INVITE addresses the project, not the line), every call looks unrouted,
   // and each new client's number reaches the fallback client's agent.
   it("passes the dialed number along as an X- SIP header, from the POST body", async () => {
+    // Namsos: fortsatt OpenAI-stien. Standardlinjen (Handz On) dialer nå
+    // ElevenLabs, der identiteten ligger i SIP-user-parten, ikke i X-headere.
+    vi.mocked(clientForNumber).mockResolvedValueOnce("fe264dcd-84e0-4e59-8efb-cbb5e39c8125");
     const form = new URLSearchParams({ To: "+4723509651", From: "+4791234567" });
     const res = await POST(
       new Request("https://www.kiconsult.no/api/telephony/telnyx-inbound", {
@@ -49,6 +55,7 @@ describe("telnyx-inbound TeXML", () => {
   });
 
   it("passes the dialed number along from the GET query string too", async () => {
+    vi.mocked(clientForNumber).mockResolvedValueOnce("fe264dcd-84e0-4e59-8efb-cbb5e39c8125");
     const res = await GET(
       new Request("https://www.kiconsult.no/api/telephony/telnyx-inbound?To=%2B4723509651", {
         headers: { host: "www.kiconsult.no" },

@@ -77,7 +77,7 @@ describe("ElevenLabs webhook endpoints", () => {
   it("rejects non-pilot clients even with a valid secret", async () => {
     vi.stubEnv("ELEVENLABS_TOOLS_SECRET", SECRET);
     const res = await toolsPost(
-      toolsReq({ "x-tools-secret": SECRET }, "ad19951e-00e1-4293-8975-6c6bb1dbdad7"),
+      toolsReq({ "x-tools-secret": SECRET }, "fe264dcd-84e0-4e59-8efb-cbb5e39c8125"), // Namsos
     );
     expect(res.status).toBe(403);
     expect(execBookingTool).not.toHaveBeenCalled();

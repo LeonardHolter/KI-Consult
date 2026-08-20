@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/telephony/numbers", () => ({ clientForNumber: vi.fn(async () => "fe264dcd-84e0-4e59-8efb-cbb5e39c8125") }));
+vi.mock("@/lib/telephony/numbers", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/telephony/numbers")>()),
+  clientForNumber: vi.fn(async () => "fe264dcd-84e0-4e59-8efb-cbb5e39c8125"),
+}));
 
 import { GET as inboundGET } from "@/app/api/telephony/telnyx-inbound/route";
 import { POST as gatherPOST } from "@/app/api/telephony/gather/route";
