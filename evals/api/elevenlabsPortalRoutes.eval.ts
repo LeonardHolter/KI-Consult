@@ -117,6 +117,34 @@ describe("GET /api/portal/voice-agent/elevenlabs-conversations", () => {
     expect(res.status).toBe(403);
   });
 
+  it("tags each conversation with what it ended in, and returns no summary", async () => {
+    asAdmin();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            conversations: [
+              { conversation_id: "booked", start_time_unix_secs: 1787306400, call_duration_secs: 150, message_count: 30, status: "done", call_successful: "success", termination_reason: "end_call tool was called.", tool_names: ["get_available_demo_slots", "book_demo_slot", "end_call"] },
+              { conversation_id: "gaveup", start_time_unix_secs: 1787306500, call_duration_secs: 40, message_count: 9, status: "done", call_successful: "success", termination_reason: "Client disconnected: 1005", tool_names: ["get_available_demo_slots"] },
+              { conversation_id: "asked", start_time_unix_secs: 1787306600, call_duration_secs: 60, message_count: 12, status: "done", call_successful: "success", termination_reason: "end_call tool was called.", tool_names: ["end_call"] },
+            ],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const { conversations } = await (await conversationsGet(listReq())).json();
+    expect(conversations.map((c: { status: { label: string } }) => c.status.label)).toEqual([
+      "Booking",
+      "Avbrutt",
+      "Informasjon",
+    ]);
+    // Summaries arrive half in English; the tag replaced them entirely.
+    expect(conversations.every((c: Record<string, unknown>) => !("summary" in c))).toBe(true);
+  });
+
   it("lists finished conversations, dropping failed ones", async () => {
     asAdmin();
     vi.stubGlobal(
@@ -142,7 +170,6 @@ describe("GET /api/portal/voice-agent/elevenlabs-conversations", () => {
       id: "c1",
       durationSeconds: 120,
       messageCount: 12,
-      summary: "Booket vask",
     });
     expect(conversations[0].startedAt).toBe(new Date(1787306400 * 1000).toISOString());
   });
@@ -193,11 +220,10 @@ describe("GET /api/portal/voice-agent/elevenlabs-conversations", () => {
 
     const res = await conversationsGet(listReq(`?clientId=${PILOT}&conversation=c1`));
     expect(res.status).toBe(200);
-    const { transcript, summary } = await res.json();
+    const { transcript } = await res.json();
     expect(transcript).toHaveLength(3);
     expect(transcript[1]).toMatchObject({ role: "user", message: "Hei, jeg vil booke" });
     expect(transcript[2].toolCalls).toEqual(["book_demo_slot"]);
-    expect(summary).toBe("Kunden booket");
   });
 
   it("rejects a malformed conversation id instead of putting it in a URL", async () => {

@@ -14,8 +14,39 @@ type ConversationMeta = {
   startedAt: string;
   durationSeconds: number;
   messageCount: number;
-  summary: string | null;
+  status: { label: string; tone: "booking" | "info" | "warn" | "error" };
 };
+
+/** One glanceable colour per outcome. Booking is the only green one on
+ *  purpose: everything that is not green is a call worth a second look, and
+ *  the amber ones are the follow-up list. */
+const TONE: Record<string, { fg: string; bg: string }> = {
+  booking: { fg: "#0d6b47", bg: "#15c07c22" },
+  info: { fg: "#5c5f52", bg: "#9a9a8c22" },
+  warn: { fg: "#8a5a00", bg: "#e8a13322" },
+  error: { fg: "#c2562c", bg: "#c2562c1f" },
+};
+
+function StatusTag({ status }: { status: ConversationMeta["status"] }) {
+  const tone = TONE[status?.tone] ?? TONE.info;
+  return (
+    <span
+      style={{
+        fontSize: 10.5,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: ".07em",
+        color: tone.fg,
+        background: tone.bg,
+        borderRadius: 4,
+        padding: "3px 8px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {status?.label ?? "Ukjent"}
+    </span>
+  );
+}
 
 type Turn = {
   role: "user" | "agent";
@@ -118,8 +149,9 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
       </div>
       {!folded && (<>
       <p style={{ margin: "6px 0 12px", fontSize: 12.5, color: MUTED, lineHeight: 1.5 }}>
-        Full tekst av hver samtale med pilot-agenten — både telefon og nettleser. Hentes
-        direkte fra ElevenLabs; en fersk samtale kan bruke et halvt minutt på å dukke opp.
+        Full tekst av hver samtale med agenten — både telefon og nettleser. Merket viser
+        hva samtalen endte i; alt som ikke er grønt er verdt et blikk. En fersk samtale kan
+        bruke et halvt minutt på å dukke opp.
       </p>
 
       {conversations === null ? (
@@ -144,7 +176,10 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
                     flexWrap: "wrap",
                   }}
                 >
-                  <span style={{ fontSize: 13.5, color: INK }}>{fmtWhen(c.startedAt)}</span>
+                  <span style={{ fontSize: 13.5, color: INK, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <StatusTag status={c.status} />
+                    {fmtWhen(c.startedAt)}
+                  </span>
                   <span style={{ fontSize: 12.5, color: MUTED }}>
                     {fmtDuration(c.durationSeconds)} · {c.messageCount} replikker
                   </span>
@@ -164,11 +199,6 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
                     {open ? "Lukk" : "Les"}
                   </button>
                 </div>
-                {c.summary && (
-                  <p style={{ margin: "8px 0 0", fontSize: 12.5, color: MUTED, lineHeight: 1.5 }}>
-                    {c.summary}
-                  </p>
-                )}
                 {open && (
                   <div style={{ marginTop: 10, borderTop: `1px solid ${MUTED}33`, paddingTop: 10 }}>
                     {t === "loading" || t === undefined ? (

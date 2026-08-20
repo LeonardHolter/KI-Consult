@@ -14,6 +14,7 @@
 
 import { getProfile } from "@/lib/portal/data";
 import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
+import { conversationStatus } from "@/lib/voiceDemo/conversationStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,9 @@ export async function GET(req: Request) {
       // Real conversation, wrong client — reveal nothing beyond "no".
       return Response.json({ error: "not_found" }, { status: 404 });
     }
+    // No summary: ElevenLabs writes it in whatever language it lands on, so
+    // half of them arrive in English. The status tag carries the same "what
+    // happened" signal, in Norwegian, at a glance.
     return Response.json({
       transcript: ((conv.transcript ?? []) as TranscriptTurn[])
         .filter((t) => t.message || t.tool_calls?.length)
@@ -74,14 +78,10 @@ export async function GET(req: Request) {
           timeInCallSecs: t.time_in_call_secs ?? null,
           toolCalls: (t.tool_calls ?? []).map((c) => c.tool_name).filter(Boolean),
         })),
-      summary: conv.analysis?.transcript_summary ?? null,
     });
   }
 
-  const res = await el(
-    `/v1/convai/conversations?agent_id=${agentId}&page_size=30&summary_mode=include`,
-    apiKey,
-  );
+  const res = await el(`/v1/convai/conversations?agent_id=${agentId}&page_size=30`, apiKey);
   if (!res.ok) {
     console.error(`[elevenlabs-conversations] list failed: ${res.status} ${await res.text()}`);
     return Response.json({ error: "elevenlabs_error" }, { status: 502 });
@@ -93,7 +93,9 @@ export async function GET(req: Request) {
     call_duration_secs: number;
     message_count: number;
     status: string;
-    transcript_summary?: string | null;
+    call_successful?: string | null;
+    termination_reason?: string | null;
+    tool_names?: string[] | null;
   };
   return Response.json({
     conversations: ((conversations ?? []) as Row[])
@@ -107,7 +109,12 @@ export async function GET(req: Request) {
         startedAt: new Date(c.start_time_unix_secs * 1000).toISOString(),
         durationSeconds: c.call_duration_secs ?? 0,
         messageCount: c.message_count ?? 0,
-        summary: c.transcript_summary ?? null,
+        status: conversationStatus({
+          toolNames: c.tool_names,
+          callSuccessful: c.call_successful,
+          terminationReason: c.termination_reason,
+          durationSeconds: c.call_duration_secs,
+        }),
       })),
   });
 }
