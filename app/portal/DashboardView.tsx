@@ -6,6 +6,7 @@ import { signOut } from "@/app/login/actions";
 import VoiceAgentCard from "@/components/VoiceAgentCard";
 import ElevenLabsAgentCard from "@/components/ElevenLabsAgentCard";
 import ElevenLabsTranscriptsPanel from "@/components/ElevenLabsTranscriptsPanel";
+import { FoldButton, FoldSection, useFolded } from "@/components/fold";
 import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
 import VoiceRecordingsPanel from "@/components/VoiceRecordingsPanel";
 import CustomerListPanel from "@/components/CustomerListPanel";
@@ -138,6 +139,7 @@ export default function PortalDashboard({
   // calendar connected has no real bookings to show, only test ones, and
   // opening on an empty "Ekte" grid made a working agent look broken.
   const [calScope, setCalScope] = useState<"live" | "sandbox">(defaultCalScope);
+  const [calFolded, toggleCalFolded] = useFolded("kalender");
 
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
@@ -511,6 +513,7 @@ export default function PortalDashboard({
             without a number keep the WebRTC caller — they have nothing to
             dial yet. */}
         <KpiTiles clientId={clientId} />
+        <FoldSection foldKey="taleagent" title="Taleagent">
         {phoneNumber ? (
           <div className="ctp-card" style={{ textAlign: "center", padding: "30px 20px 26px" }}>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".08em", color: "#9a9a8c", textTransform: "uppercase" }}>
@@ -537,6 +540,7 @@ export default function PortalDashboard({
         ) : (
           <VoiceAgentCard clientId={clientId} variant={overviewHref ? "full" : "minimal"} />
         )}
+        </FoldSection>
         {clientId && (
           <VoiceRecordingsPanel clientId={clientId} showOrigin={Boolean(overviewHref)} />
         )}
@@ -629,9 +633,10 @@ export default function PortalDashboard({
                     : "Demo-modus"}
               </span>
             </div>
+            <FoldButton folded={calFolded} onToggle={toggleCalFolded} />
           </div>
 
-          {days.length === 0 ? (
+          {!calFolded && (days.length === 0 ? (
             // A failed load used to look exactly like a slow one — the panel sat
             // on "Laster kalender…" forever while the request 401'd every ten
             // seconds. Say which it is.
@@ -720,7 +725,7 @@ export default function PortalDashboard({
                 </tbody>
               </table>
             </div>
-          )}
+          ))}
         </div>
 
         {showChatWidget && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { FoldButton, useFolded } from "@/components/fold";
 
 // Admin review panel for the ElevenLabs pilot: the transcript of every
 // conversation with the pilot agent (phone AND dashboard browser calls),
@@ -45,6 +46,7 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
   const [conversations, setConversations] = useState<ConversationMeta[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<Record<string, Turn[] | "loading" | "error">>({});
+  const [folded, toggleFolded] = useFolded("transkripsjoner");
 
   const load = useCallback(async () => {
     try {
@@ -95,6 +97,7 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
             ElevenLabs-pilot
           </span>
         </h3>
+        <span style={{ display: "inline-flex", gap: 6 }}>
         <button
           onClick={() => void load().then(setConversations)}
           style={{
@@ -110,7 +113,10 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
         >
           Oppdater
         </button>
+        <FoldButton folded={folded} onToggle={toggleFolded} />
+        </span>
       </div>
+      {!folded && (<>
       <p style={{ margin: "6px 0 12px", fontSize: 12.5, color: MUTED, lineHeight: 1.5 }}>
         Full tekst av hver samtale med pilot-agenten — både telefon og nettleser. Hentes
         direkte fra ElevenLabs; en fersk samtale kan bruke et halvt minutt på å dukke opp.
@@ -204,6 +210,7 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
           })}
         </ul>
       )}
+      </>)}
     </section>
   );
 }

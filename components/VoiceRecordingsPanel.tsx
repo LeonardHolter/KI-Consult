@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { FoldButton, useFolded } from "@/components/fold";
 
 // Admin review panel for voice-call recordings. Lists what the recordings
 // API has stored for this client and plays each one through the
@@ -49,6 +50,7 @@ export default function VoiceRecordingsPanel({
   const [openId, setOpenId] = useState<string | null>(null);
   // id of the recording whose delete button is in its "Sikker?" stage.
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [folded, toggleFolded] = useFolded("opptak");
 
   const handleDelete = async (id: string) => {
     try {
@@ -105,6 +107,7 @@ export default function VoiceRecordingsPanel({
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <h3 style={{ margin: 0, fontSize: 15, color: INK }}>Samtaleopptak</h3>
+        <span style={{ display: "inline-flex", gap: 6 }}>
         <button
           onClick={() => void load().then(setRecordings)}
           style={{
@@ -120,7 +123,10 @@ export default function VoiceRecordingsPanel({
         >
           Oppdater
         </button>
+        <FoldButton folded={folded} onToggle={toggleFolded} />
+        </span>
       </div>
+      {!folded && (<>
       <p style={{ margin: "6px 0 12px", fontSize: 12.5, color: MUTED, lineHeight: 1.5 }}>
         Hver samtale med taleagenten tas opp og kan spilles av her.
       </p>
@@ -259,6 +265,7 @@ export default function VoiceRecordingsPanel({
           ))}
         </ul>
       )}
+      </>)}
     </section>
   );
 }

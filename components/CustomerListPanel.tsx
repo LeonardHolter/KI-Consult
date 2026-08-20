@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { FoldButton, useFolded } from "@/components/fold";
 
 // The customer list card on the dashboard: everyone the agent has booked,
 // one row per phone number, with the booking history inline and a CSV
@@ -46,6 +47,8 @@ export default function CustomerListPanel({ clientId }: { clientId?: string }) {
     };
   }, [fetchRows]);
 
+  const [folded, toggleFolded] = useFolded("kundeliste");
+
   return (
     <div className="clp-card">
       <style>{`
@@ -69,7 +72,11 @@ export default function CustomerListPanel({ clientId }: { clientId?: string }) {
             Last ned CSV
           </a>
         )}
+        <span style={{ marginLeft: rows !== null && rows.length > 0 ? undefined : "auto" }}>
+          <FoldButton folded={folded} onToggle={toggleFolded} />
+        </span>
       </div>
+      {!folded && (<>
       <p className="clp-sub">
         Alle kunder agentene har booket, med historikk. Felter agenten ikke fikk vite står tomme.
       </p>
@@ -111,6 +118,7 @@ export default function CustomerListPanel({ clientId }: { clientId?: string }) {
           </table>
         </div>
       )}
+      </>)}
     </div>
   );
 }
