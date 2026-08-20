@@ -8,6 +8,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadSettings, type Settings } from "@/lib/settings";
 import { listAgentBookings, type AgentBookingRecord } from "@/lib/slots";
+import { syncElevenLabsVoiceUsage } from "@/lib/voiceDemo/elevenlabsUsage";
 
 /** First entry whose every whitespace-separated token appears (lowercased,
  *  substring) in the service string wins — order in the list IS the
@@ -139,6 +140,10 @@ export function computeKpis(input: {
  *  client account to its own client) — this uses the service client because
  *  voice_usage is admin-select-only under RLS. */
 export async function buildClientKpis(clientId: string): Promise<Kpis> {
+  // ElevenLabs pilot clients: their calls never touch our servers, so pull
+  // the call ledger from ElevenLabs before reading voice_usage. No-op (and
+  // never throwing) for everyone else.
+  await syncElevenLabsVoiceUsage(clientId);
   const supabase = createServiceClient();
   const [settings, bookings, usage, client] = await Promise.all([
     loadSettings(clientId),

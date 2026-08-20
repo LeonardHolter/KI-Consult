@@ -10,7 +10,9 @@ import { useEffect, useState, type ReactNode } from "react";
 // hydration warnings).
 
 export function useFolded(key: string): [boolean, () => void] {
-  const [folded, setFolded] = useState(false);
+  // Folded is the DEFAULT (per Leonard): the dashboard opens compact and the
+  // owner expands what they care about — only an explicit open ("0") sticks.
+  const [folded, setFolded] = useState(true);
   useEffect(() => {
     // Async setState (never synchronous in the effect body — house rule, see
     // CustomerListPanel), with a cancelled-flag so a remount can't race.
@@ -18,9 +20,9 @@ export function useFolded(key: string): [boolean, () => void] {
     void Promise.resolve().then(() => {
       if (cancelled) return;
       try {
-        setFolded(localStorage.getItem(`fold:${key}`) === "1");
+        setFolded(localStorage.getItem(`fold:${key}`) !== "0");
       } catch {
-        /* private mode etc. — stay open */
+        /* private mode etc. — stay folded */
       }
     });
     return () => {
