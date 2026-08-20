@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FoldSection } from "@/components/fold";
 
 // The money row at the top of the client dashboard: estimated booking value,
 // rescued calls, hours saved, ROI. Values come from /api/portal/kpi, which
@@ -67,7 +66,6 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
   if (!month || !total) return null;
 
   return (
-    <FoldSection foldKey="kpi" title="Nøkkeltall">
     <div className="kpi-row">
       <style>{`
         .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -118,6 +116,5 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
         </div>
       )}
     </div>
-    </FoldSection>
   );
 }

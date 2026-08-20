@@ -545,9 +545,11 @@ export default function PortalDashboard({
         {clientId && (
           <VoiceRecordingsPanel clientId={clientId} showOrigin={Boolean(overviewHref)} />
         )}
-        {/* ElevenLabs-pilot: transkripsjonene bor hos ElevenLabs og leses
-            derfra — admin-visningen får dem ved siden av lydopptakene. */}
-        {clientId && Boolean(overviewHref) && elevenlabsAgentIdFor(clientId) && (
+        {/* ElevenLabs-klienter: transkripsjonene bor hos ElevenLabs og leses
+            derfra, ved siden av lydopptakene. Kunden ser dem selv — det er
+            deres egne samtaler, og det er de som skal ringe tilbake til dem
+            som la på uten å booke. */}
+        {clientId && elevenlabsAgentIdFor(clientId) && (
           <ElevenLabsTranscriptsPanel clientId={clientId} />
         )}
         <CustomerListPanel clientId={clientId} />
