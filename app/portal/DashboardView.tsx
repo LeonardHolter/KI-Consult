@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import VoiceAgentCard from "@/components/VoiceAgentCard";
 import ElevenLabsAgentCard from "@/components/ElevenLabsAgentCard";
+import ElevenLabsTranscriptsPanel from "@/components/ElevenLabsTranscriptsPanel";
 import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
 import VoiceRecordingsPanel from "@/components/VoiceRecordingsPanel";
 import CustomerListPanel from "@/components/CustomerListPanel";
@@ -538,6 +539,11 @@ export default function PortalDashboard({
         )}
         {clientId && (
           <VoiceRecordingsPanel clientId={clientId} showOrigin={Boolean(overviewHref)} />
+        )}
+        {/* ElevenLabs-pilot: transkripsjonene bor hos ElevenLabs og leses
+            derfra — admin-visningen får dem ved siden av lydopptakene. */}
+        {clientId && Boolean(overviewHref) && elevenlabsAgentIdFor(clientId) && (
+          <ElevenLabsTranscriptsPanel clientId={clientId} />
         )}
         <CustomerListPanel clientId={clientId} />
         <div style={{ height: 20 }} />
