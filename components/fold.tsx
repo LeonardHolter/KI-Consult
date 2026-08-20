@@ -9,10 +9,12 @@ import { useEffect, useState, type ReactNode } from "react";
 // cost is a brief flash for folded sections, which beats a console full of
 // hydration warnings).
 
-export function useFolded(key: string): [boolean, () => void] {
+export function useFolded(key: string, defaultFolded = true): [boolean, () => void] {
   // Folded is the DEFAULT (per Leonard): the dashboard opens compact and the
-  // owner expands what they care about — only an explicit open ("0") sticks.
-  const [folded, setFolded] = useState(true);
+  // owner expands what they care about — only an explicit choice sticks.
+  // Exception via defaultFolded=false for the panel that IS the page
+  // (the booking calendar).
+  const [folded, setFolded] = useState(defaultFolded);
   useEffect(() => {
     // Async setState (never synchronous in the effect body — house rule, see
     // CustomerListPanel), with a cancelled-flag so a remount can't race.
@@ -20,7 +22,8 @@ export function useFolded(key: string): [boolean, () => void] {
     void Promise.resolve().then(() => {
       if (cancelled) return;
       try {
-        setFolded(localStorage.getItem(`fold:${key}`) !== "0");
+        const stored = localStorage.getItem(`fold:${key}`);
+        setFolded(stored === null ? defaultFolded : stored === "1");
       } catch {
         /* private mode etc. — stay folded */
       }
@@ -28,7 +31,7 @@ export function useFolded(key: string): [boolean, () => void] {
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, defaultFolded]);
   const toggle = () =>
     setFolded((f) => {
       try {

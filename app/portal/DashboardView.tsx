@@ -139,7 +139,8 @@ export default function PortalDashboard({
   // calendar connected has no real bookings to show, only test ones, and
   // opening on an empty "Ekte" grid made a working agent look broken.
   const [calScope, setCalScope] = useState<"live" | "sandbox">(defaultCalScope);
-  const [calFolded, toggleCalFolded] = useFolded("kalender");
+  // Kalenderen ER siden — alltid åpen som standard (per Leonard).
+  const [calFolded, toggleCalFolded] = useFolded("kalender", false);
 
   // Load the bot's real embed script so the chat here is the same widget the
   // customers use. It self-injects a bubble into document.body.
