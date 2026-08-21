@@ -287,7 +287,11 @@ describe("execBookingTool honours the scope it is given", () => {
       "real-calendar@handzon.no",
       "evt-1",
       expect.objectContaining({
-        summary: "Motorvask + Kunden ønsker vurdering/pris av PDR/bulk – Sabah Ali",
+        // Sabah reads the calendar grid, not the event detail — see
+        // lib/calendarTitle.ts. The note has to survive into the title too:
+        // it is the one thing the shop must remember at drop-off.
+        summary:
+          "Sabah Ali · 91 78 78 01 · Motorvask · + Kunden ønsker vurdering/pris av PDR/bulk",
         extendedProperties: {
           private: expect.objectContaining({
             hzAgent: "1",

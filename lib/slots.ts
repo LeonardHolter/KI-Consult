@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { osloParts, osloToUTC, osloToday, type GcalEvent } from "@/lib/google-calendar";
 import { calendarConfigured, getCalendarProvider } from "@/lib/calendar/provider";
 import { loadSettings, type Settings } from "@/lib/settings";
+import { calendarEventTitle } from "@/lib/calendarTitle";
 
 /* ------------------------------------------------------------------ */
 /* Slot templates — the store's bookable-time grid, derived from       */
@@ -270,7 +271,7 @@ async function calendarBook(
 
   const bookedAt = new Date().toISOString();
   const event = await getCalendarProvider(settings).insertEvent(settings.calendarId!, {
-    summary: `${service} – ${customerName}`,
+    summary: calendarEventTitle({ customerName, customerPhone, service }),
     description: `Booket av AI-chatbot.\nKunde: ${customerName}\nTelefon: ${customerPhone}\nTjeneste: ${service}`,
     start: { dateTime: `${slot.date}T${slot.time}:00`, timeZone: "Europe/Oslo" },
     end: { dateTime: `${slot.date}T${slot.endTime}:00`, timeZone: "Europe/Oslo" },
@@ -592,7 +593,11 @@ export async function appendBookingNote(
     if (service.includes(trimmedNote)) return { ok: true, service };
     const newService = service ? `${service} + ${trimmedNote}` : trimmedNote;
     await getCalendarProvider(settings).patchEvent(settings.calendarId!, match.id, {
-      summary: `${newService} – ${priv.customerName ?? ""}`.trim(),
+      summary: calendarEventTitle({
+        customerName: priv.customerName,
+        customerPhone: priv.customerPhone,
+        service: newService,
+      }),
       extendedProperties: { private: { ...priv, service: newService } },
     });
     return { ok: true, service: newService };
