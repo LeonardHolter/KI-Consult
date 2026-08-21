@@ -4,7 +4,7 @@ vi.mock("@/lib/portal/data", () => ({ getProfile: vi.fn() }));
 
 import { getProfile } from "@/lib/portal/data";
 import { POST as sessionPost } from "@/app/api/portal/voice-agent/elevenlabs-session/route";
-import { GET as conversationsGet } from "@/app/api/portal/voice-agent/elevenlabs-conversations/route";
+import { GET as conversationsGet, DELETE as conversationsDelete } from "@/app/api/portal/voice-agent/elevenlabs-conversations/route";
 
 // The two portal routes that talk to ElevenLabs on a logged-in user's behalf.
 // The boundary they enforce is the same one the rest of the portal has: a
@@ -244,5 +244,89 @@ describe("GET /api/portal/voice-agent/elevenlabs-conversations", () => {
     const res = await conversationsGet(listReq(`?clientId=${NON_PILOT}`));
     expect(res.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+
+// Deleting a conversation erases the transcript AND the recording of what
+// the agent said to a customer, at ElevenLabs, with no copy on our side.
+// Same rule as the recordings route: admin only, and never another client's.
+describe("DELETE /api/portal/voice-agent/elevenlabs-conversations", () => {
+  const delReq = (query: string) =>
+    new Request(`http://localhost/api/portal/voice-agent/elevenlabs-conversations${query}`, {
+      method: "DELETE",
+    });
+
+  it("refuses a client account — they may read their calls, not remove them", async () => {
+    asClient(PILOT);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await conversationsDelete(delReq(`?conversation=c1`));
+    expect(res.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a logged-out visitor", async () => {
+    vi.mocked(getProfile).mockResolvedValue(null);
+    const res = await conversationsDelete(delReq(`?clientId=${PILOT}&conversation=c1`));
+    expect(res.status).toBe(403);
+  });
+
+  // The dangerous one: ids are short and the workspace key can delete any
+  // conversation in the account, so ownership must be proven before deleting.
+  it("never deletes a conversation belonging to another client's agent", async () => {
+    asAdmin();
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ agent_id: "agent_someone_else" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await conversationsDelete(delReq(`?clientId=${PILOT}&conversation=c1`));
+    expect(res.status).toBe(404);
+    // Only the ownership lookup ran — no DELETE was ever issued.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.method).toBeUndefined();
+  });
+
+  it("deletes a conversation that belongs to this client's agent", async () => {
+    asAdmin();
+    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) =>
+      init?.method === "DELETE"
+        ? new Response("{}", { status: 200 })
+        : new Response(JSON.stringify({ agent_id: PILOT_AGENT }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await conversationsDelete(delReq(`?clientId=${PILOT}&conversation=c1`));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const deleteCall = fetchMock.mock.calls.find((c) => c[1]?.method === "DELETE");
+    expect(deleteCall?.[0]).toContain("/v1/convai/conversations/c1");
+  });
+
+  it("rejects a malformed id instead of putting it in a URL", async () => {
+    asAdmin();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await conversationsDelete(delReq(`?clientId=${PILOT}&conversation=../secrets`));
+    expect(res.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed upstream delete as 502, not as success", async () => {
+    asAdmin();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: { method?: string }) =>
+        init?.method === "DELETE"
+          ? new Response("nope", { status: 500 })
+          : new Response(JSON.stringify({ agent_id: PILOT_AGENT }), { status: 200 }),
+      ),
+    );
+
+    const res = await conversationsDelete(delReq(`?clientId=${PILOT}&conversation=c1`));
+    expect(res.status).toBe(502);
   });
 });

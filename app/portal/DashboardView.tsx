@@ -550,7 +550,7 @@ export default function PortalDashboard({
             deres egne samtaler, og det er de som skal ringe tilbake til dem
             som la på uten å booke. */}
         {clientId && elevenlabsAgentIdFor(clientId) && (
-          <ElevenLabsTranscriptsPanel clientId={clientId} />
+          <ElevenLabsTranscriptsPanel clientId={clientId} canDelete={Boolean(overviewHref)} />
         )}
         <CustomerListPanel clientId={clientId} />
         <div style={{ height: 20 }} />

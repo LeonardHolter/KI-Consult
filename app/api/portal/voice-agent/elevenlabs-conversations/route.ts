@@ -5,6 +5,7 @@
 //
 // GET                  -> list of recent conversations (id, when, duration…)
 // GET ?conversation=id -> that conversation's transcript
+// DELETE ?conversation=id -> removes it AT ElevenLabs, permanently
 //
 // Same access model as the other portal voice-agent routes: a client user is
 // pinned to their own client, an admin picks one via ?clientId=. Both only
@@ -37,6 +38,72 @@ type TranscriptTurn = {
   time_in_call_secs?: number;
   tool_calls?: Array<{ tool_name?: string }>;
 };
+
+/** Resolves the client this request may touch, and that client's agent.
+ *  Same rule as everywhere else in the portal: a client account is pinned to
+ *  its own client, an admin names one, and neither can reach a client that
+ *  is not on ElevenLabs. */
+async function resolveAgent(
+  req: Request,
+  profile: { role: string; client_id: string | null },
+): Promise<{ agentId: string } | { error: Response }> {
+  const clientId =
+    profile.role === "admin" ? new URL(req.url).searchParams.get("clientId") : profile.client_id;
+  if (!clientId) return { error: Response.json({ error: "no_client" }, { status: 400 }) };
+  const agentId = elevenlabsAgentIdFor(clientId);
+  if (!agentId) return { error: Response.json({ error: "not_elevenlabs_client" }, { status: 404 }) };
+  return { agentId };
+}
+
+/**
+ * Deletes one conversation at ElevenLabs — transcript and recording of what
+ * the agent said to a customer, gone for good; there is no copy on our side.
+ * So it mirrors the recordings route exactly: ADMIN ONLY. A client can read
+ * their own calls but not remove review material.
+ *
+ * The conversation is fetched first and its agent_id checked, because ids are
+ * short and the workspace key can delete any conversation in the account —
+ * without that check a crafted id could erase another client's call.
+ */
+export async function DELETE(req: Request) {
+  const profile = await getProfile();
+  if (!profile || profile.role !== "admin") {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const resolved = await resolveAgent(req, profile);
+  if ("error" in resolved) return resolved.error;
+
+  const conversationId = new URL(req.url).searchParams.get("conversation");
+  if (!conversationId || !/^[a-zA-Z0-9_-]+$/.test(conversationId)) {
+    return Response.json({ error: "bad_id" }, { status: 400 });
+  }
+
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return Response.json({ error: "elevenlabs_not_configured" }, { status: 500 });
+
+  try {
+    const check = await el(`/v1/convai/conversations/${conversationId}`, apiKey);
+    if (!check.ok) return Response.json({ error: "not_found" }, { status: 404 });
+    if ((await check.json()).agent_id !== resolved.agentId) {
+      return Response.json({ error: "not_found" }, { status: 404 });
+    }
+
+    const res = await fetch(`${BASE}/v1/convai/conversations/${conversationId}`, {
+      method: "DELETE",
+      headers: { "xi-api-key": apiKey },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      console.error(`[elevenlabs-conversations] delete failed: ${res.status} ${await res.text()}`);
+      return Response.json({ error: "elevenlabs_error" }, { status: 502 });
+    }
+    return Response.json({ ok: true });
+  } catch (err) {
+    console.error(`[elevenlabs-conversations] delete: ${err instanceof Error ? err.message : err}`);
+    return Response.json({ error: "elevenlabs_error" }, { status: 502 });
+  }
+}
 
 export async function GET(req: Request) {
   const profile = await getProfile();

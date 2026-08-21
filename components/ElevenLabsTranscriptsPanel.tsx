@@ -73,11 +73,21 @@ function fmtDuration(s: number): string {
   return m > 0 ? `${m} min ${sec} s` : `${sec} s`;
 }
 
-export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: string }) {
+export default function ElevenLabsTranscriptsPanel({
+  clientId,
+  canDelete,
+}: {
+  clientId: string;
+  /** Admin view only — same rule as the recordings panel: a client reads
+   *  their own calls but does not remove review material. */
+  canDelete?: boolean;
+}) {
   const [conversations, setConversations] = useState<ConversationMeta[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<Record<string, Turn[] | "loading" | "error">>({});
   const [folded, toggleFolded] = useFolded("transkripsjoner");
+  // id of the conversation whose delete button is in its "Sikker?" stage.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +104,20 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
   useEffect(() => {
     void load().then(setConversations);
   }, [load]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(
+        `/api/portal/voice-agent/elevenlabs-conversations?clientId=${clientId}&conversation=${id}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) return;
+      setConversations((prev) => prev?.filter((c) => c.id !== id) ?? prev);
+      if (openId === id) setOpenId(null);
+    } finally {
+      setConfirmDeleteId(null);
+    }
+  };
 
   const openTranscript = async (id: string) => {
     setOpenId(id);
@@ -183,21 +207,61 @@ export default function ElevenLabsTranscriptsPanel({ clientId }: { clientId: str
                   <span style={{ fontSize: 12.5, color: MUTED }}>
                     {fmtDuration(c.durationSeconds)} · {c.messageCount} replikker
                   </span>
-                  <button
-                    onClick={() => (open ? setOpenId(null) : void openTranscript(c.id))}
-                    style={{
-                      border: `1px solid ${MUTED}66`,
-                      background: "transparent",
-                      borderRadius: 4,
-                      padding: "4px 12px",
-                      fontSize: 12.5,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      color: INK,
-                    }}
-                  >
-                    {open ? "Lukk" : "Les"}
-                  </button>
+                  <span style={{ display: "inline-flex", gap: 6 }}>
+                    <button
+                      onClick={() => (open ? setOpenId(null) : void openTranscript(c.id))}
+                      style={{
+                        border: `1px solid ${MUTED}66`,
+                        background: "transparent",
+                        borderRadius: 4,
+                        padding: "4px 12px",
+                        fontSize: 12.5,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        color: INK,
+                      }}
+                    >
+                      {open ? "Lukk" : "Les"}
+                    </button>
+                    {canDelete &&
+                      (confirmDeleteId === c.id ? (
+                        <button
+                          onClick={() => void handleDelete(c.id)}
+                          onBlur={() => setConfirmDeleteId(null)}
+                          autoFocus
+                          style={{
+                            border: "1px solid #c2562c66",
+                            background: "#c2562c",
+                            color: "#fff",
+                            borderRadius: 4,
+                            padding: "4px 12px",
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Sikker?
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(c.id)}
+                          title="Slett samtalen hos ElevenLabs"
+                          style={{
+                            border: "1px solid #c2562c66",
+                            background: "transparent",
+                            color: "#c2562c",
+                            borderRadius: 4,
+                            padding: "4px 12px",
+                            fontSize: 12.5,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Slett
+                        </button>
+                      ))}
+                  </span>
                 </div>
                 {open && (
                   <div style={{ marginTop: 10, borderTop: `1px solid ${MUTED}33`, paddingTop: 10 }}>
