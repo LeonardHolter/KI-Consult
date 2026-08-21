@@ -277,7 +277,7 @@ describe("DELETE /api/portal/voice-agent/elevenlabs-conversations", () => {
   // conversation in the account, so ownership must be proven before deleting.
   it("never deletes a conversation belonging to another client's agent", async () => {
     asAdmin();
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string, _init?: { method?: string }) =>
       new Response(JSON.stringify({ agent_id: "agent_someone_else" }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -291,7 +291,7 @@ describe("DELETE /api/portal/voice-agent/elevenlabs-conversations", () => {
 
   it("deletes a conversation that belongs to this client's agent", async () => {
     asAdmin();
-    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) =>
+    const fetchMock = vi.fn(async (_url: string, init?: { method?: string }) =>
       init?.method === "DELETE"
         ? new Response("{}", { status: 200 })
         : new Response(JSON.stringify({ agent_id: PILOT_AGENT }), { status: 200 }),
@@ -319,7 +319,7 @@ describe("DELETE /api/portal/voice-agent/elevenlabs-conversations", () => {
     asAdmin();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string, init?: { method?: string }) =>
+      vi.fn(async (_url: string, init?: { method?: string }) =>
         init?.method === "DELETE"
           ? new Response("nope", { status: 500 })
           : new Response(JSON.stringify({ agent_id: PILOT_AGENT }), { status: 200 }),
