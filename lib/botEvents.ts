@@ -11,7 +11,15 @@ const KEY = process.env.SUPABASE_SECRET_KEY;
 
 export const botEventsEnabled = Boolean(URL && KEY);
 
-export type BotEventType = "deflection" | "error" | "rate_limited" | "cors_rejected" | "tool_error";
+export type BotEventType =
+  | "deflection"
+  | "error"
+  | "rate_limited"
+  | "cors_rejected"
+  | "tool_error"
+  /** Outcome of a shop notification — see supabase/010. */
+  | "notify_sent"
+  | "notify_failed";
 
 export async function logBotEvent(params: {
   clientId: string;

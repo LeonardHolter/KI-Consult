@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/portal/data";
 import { overallState, runStatusChecks, type CheckState } from "@/lib/status/checks";
+import { getNotifyStats24h } from "@/lib/admin/data";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function StatusPage() {
   }
 
   const results = await runStatusChecks();
+  const notify = await getNotifyStats24h();
   const overall = overallState(results);
   const checkedAt = new Date().toLocaleTimeString("nb-NO", { timeZone: "Europe/Oslo" });
 
@@ -110,6 +112,47 @@ export default async function StatusPage() {
         <p style={{ color: MUTED, fontSize: 14, margin: "0 0 22px 25px" }}>
           Sjekket {checkedAt} · alle tjenester pinget direkte, ingen bufring
         </p>
+
+        {/* Shop notifications get their own panel rather than a probe: Resend
+            exposes no quota endpoint, so the only honest measure of "are the
+            e-mails getting out?" is what we ourselves sent and what failed.
+            The free tier's 100-a-day cap is per ACCOUNT, so this is counted
+            across every client. */}
+        <div
+          style={{
+            background: "#fff",
+            border: `1px solid ${notify.failed > 0 ? "#c2562c66" : `${MUTED}44`}`,
+            borderRadius: 12,
+            padding: "14px 16px",
+            marginBottom: 10,
+          }}
+        >
+          <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+            <strong style={{ fontSize: 15.5 }}>E-postvarsler</strong>
+            <span style={{ fontSize: 13, color: MUTED }}>siste døgn, alle kunder</span>
+          </div>
+          <div style={{ fontSize: 13.5, marginTop: 4 }}>
+            <strong>{notify.sent}</strong> sendt
+            {notify.failed > 0 ? (
+              <>
+                {" · "}
+                <strong style={{ color: "#c2562c" }}>{notify.failed} feilet</strong>
+              </>
+            ) : (
+              " · ingen feilet"
+            )}
+          </div>
+          {notify.lastFailure && (
+            <div style={{ fontSize: 13, color: "#c2562c", marginTop: 3 }}>
+              Siste feil: {notify.lastFailure}
+            </div>
+          )}
+          <div style={{ fontSize: 13, color: MUTED, marginTop: 3, lineHeight: 1.45 }}>
+            {notify.failed > 0
+              ? "En booking som ikke varsles er usynlig for verkstedet — kunden møter opp til en time ingen visste om."
+              : "Gratisplanen hos Resend tar 100 e-poster per døgn for hele kontoen."}
+          </div>
+        </div>
 
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
           {results.map((r) => {

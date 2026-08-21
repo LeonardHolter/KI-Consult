@@ -105,6 +105,32 @@ export type VoiceUsageStats = {
   | "legacyCacheReadInputTokens"
 >;
 
+/** Shop-notification delivery over the last 24 hours, across ALL clients —
+ *  because Resend's cap is per account, not per client. `failed` is the
+ *  number that matters: a shop that stopped hearing from us has no other
+ *  way of telling, and the most likely cause (the free tier's 100-a-day
+ *  limit) arrives without warning. */
+export type NotifyStats = { sent: number; failed: number; lastFailure?: string };
+
+export async function getNotifyStats24h(): Promise<NotifyStats> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { data } = await supabase
+    .from("bot_events")
+    .select("type, detail, created_at")
+    .in("type", ["notify_sent", "notify_failed"])
+    .gte("created_at", since)
+    .order("created_at", { ascending: false });
+
+  const rows = data ?? [];
+  const failures = rows.filter((r) => r.type === "notify_failed");
+  return {
+    sent: rows.length - failures.length,
+    failed: failures.length,
+    lastFailure: (failures[0]?.detail as { reason?: string } | undefined)?.reason,
+  };
+}
+
 export async function getVoiceUsageStats(): Promise<Map<string, VoiceUsageStats>> {
   const supabase = await createClient();
   const { data } = await supabase.from("client_voice_usage_stats").select("*");
