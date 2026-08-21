@@ -7,7 +7,7 @@ import { DEFAULT_PHONE_NUMBER, PHONE_CLIENT_ID } from "@/lib/telephony/config";
 import { formatNumber, numberForClient } from "@/lib/telephony/numbers";
 import AdminOverview from "./AdminOverview";
 import { loadSettings } from "@/lib/settings";
-import { dashboardScope } from "@/lib/slots";
+import { defaultDashboardScope } from "@/lib/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -39,15 +39,13 @@ async function chatWidgetShown(clientId: string): Promise<boolean> {
   return (await loadSettings(clientId)).showChatWidget !== false;
 }
 
-/** Which calendar the dashboard opens on. The viewer's usual default — the
- *  real calendar for an admin, the sandbox for a client account — but never
- *  the real one for a client with no calendar connected, where it is empty by
- *  construction and hides the voice agent's bookings entirely. */
-async function defaultCalScope(
-  clientId: string,
-  preferred: "live" | "sandbox",
-): Promise<"live" | "sandbox"> {
-  return dashboardScope(await loadSettings(clientId), preferred);
+/** Which calendar the dashboard opens on: the one the agent is booking into
+ *  right now, so a call taken a minute ago is visible without switching. See
+ *  defaultDashboardScope — it still refuses to open a client with no
+ *  connected calendar on the real grid, which would be empty by construction
+ *  and make a working agent look broken. */
+async function defaultCalScope(clientId: string): Promise<"live" | "sandbox"> {
+  return defaultDashboardScope(await loadSettings(clientId));
 }
 
 export default async function PortalPage({
@@ -86,7 +84,7 @@ export default async function PortalPage({
       <DashboardView
         clientId={profile.client_id ?? undefined}
         phoneNumber={profile.client_id ? await clientPhoneNumber(profile.client_id) : null}
-        defaultCalScope={profile.client_id ? await defaultCalScope(profile.client_id, "sandbox") : "sandbox"}
+        defaultCalScope={profile.client_id ? await defaultCalScope(profile.client_id) : "sandbox"}
         showChatWidget={profile.client_id ? await chatWidgetShown(profile.client_id) : true}
       />
     );
@@ -107,7 +105,7 @@ export default async function PortalPage({
         samtalerHref={`/portal/samtaler?client=${selectedClient.id}`}
         overviewHref="/portal"
         phoneNumber={await clientPhoneNumber(selectedClient.id)}
-        defaultCalScope={await defaultCalScope(selectedClient.id, "live")}
+        defaultCalScope={await defaultCalScope(selectedClient.id)}
         showChatWidget={await chatWidgetShown(selectedClient.id)}
       />
     );

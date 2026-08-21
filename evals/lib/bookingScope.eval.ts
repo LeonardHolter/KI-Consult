@@ -62,6 +62,7 @@ import {
   bookSlot,
   cancelBooking,
   clearSandboxBookings,
+  defaultDashboardScope,
   loadSlots,
 } from "@/lib/slots";
 import { execBookingTool } from "@/lib/bookingTools";
@@ -149,6 +150,29 @@ describe("the two stores are isolated from each other", () => {
     // The live store is a different blob key and was never written.
     expect(blobStore.has(`${CLIENT}/demo-bookings.json`)).toBe(false);
     expect(blobStore.has(`${CLIENT}/voice-sandbox-bookings.json`)).toBe(true);
+  });
+});
+
+// Which calendar the dashboard OPENS on. The rule is "wherever the agent is
+// booking right now", so an owner who just took a call finds it without
+// touching the switch — with one guard that outranks it.
+describe("defaultDashboardScope", () => {
+  const settings = (over: Record<string, unknown>) =>
+    ({ voiceBookingMode: "sandbox", calendarId: "", ...over }) as never;
+
+  it("opens on the real calendar for a client whose agent books live", () => {
+    expect(defaultDashboardScope(settings({ voiceBookingMode: "live", calendarId: "cal@x" }))).toBe("live");
+  });
+
+  it("opens on the sandbox while the agent is still booking there", () => {
+    expect(defaultDashboardScope(settings({ voiceBookingMode: "sandbox", calendarId: "cal@x" }))).toBe("sandbox");
+  });
+
+  // The guard that outranks everything: an empty real grid makes a working
+  // agent look broken, so a client with no connected calendar never lands on
+  // it — even if someone flipped them to live booking.
+  it("never opens on the real calendar when none is connected", () => {
+    expect(defaultDashboardScope(settings({ voiceBookingMode: "live", calendarId: "" }))).toBe("sandbox");
   });
 });
 

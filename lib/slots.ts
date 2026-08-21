@@ -104,6 +104,22 @@ export function dashboardScope(settings: Settings, preferred: BookingScope): Boo
   return preferred === "live" && calendarConnected(settings) ? "live" : "sandbox";
 }
 
+/**
+ * Which calendar a dashboard opens on, for any viewer.
+ *
+ * The honest answer is "the one the agent is booking into right now" — that
+ * is where a call taken thirty seconds ago will appear, and where the owner
+ * is looking for it. So it follows voiceBookingMode rather than who is
+ * logged in: a client still testing opens on the sandbox their agent writes
+ * to, and a client live in production opens on the real calendar.
+ *
+ * dashboardScope still has the last word, so a client whose calendar is not
+ * connected never lands on an empty real grid.
+ */
+export function defaultDashboardScope(settings: Settings): BookingScope {
+  return dashboardScope(settings, settings.voiceBookingMode === "live" ? "live" : "sandbox");
+}
+
 /* ------------------------------------------------------------------ */
 /* Public types                                                        */
 /* ------------------------------------------------------------------ */
