@@ -32,6 +32,7 @@ export const ADD_NOTE_TOOL = "add_booking_note";
 export const LOOKUP_VEHICLE_TOOL = "lookup_vehicle";
 export const FIND_BOOKINGS_TOOL = "find_my_bookings";
 export const RESCHEDULE_TOOL = "reschedule_booking";
+export const REQUEST_CALLBACK_TOOL = "request_callback";
 
 const WEEKDAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
 
@@ -213,6 +214,43 @@ export const VOICE_ONLY_BOOKING_TOOL_SCHEMAS = {
  * the browser intercepts it and ends the WebRTC call locally (after the
  * farewell audio finishes playing).
  */
+/**
+ * Takes a message for a human to ring back — the answer to "can I speak to
+ * a person?" when the agent cannot transfer the call. Sabah's ask
+ * (2026-08-21): the agent should say it cannot put anyone through, but can
+ * take the number and the errand so the shop can call back.
+ *
+ * Deliberately NOT in BOOKING_TOOL_SCHEMAS or the voice-only set: those are
+ * registered wholesale, and a client whose agent CAN transfer should offer
+ * that instead. This is attached per agent, alongside a prompt that
+ * describes it.
+ */
+export const REQUEST_CALLBACK_SCHEMA = {
+  description:
+    "Tar imot en beskjed slik at en medarbeider kan ringe kunden tilbake. Bruk når kunden ber om å snakke med et menneske, eller når du ikke kan hjelpe med det de spør om. Si tydelig at du ikke kan sette over, men at du gjerne tar imot beskjeden. Si aldri at noen vil ringe før verktøyet har svart success: true.",
+  parameters: {
+    type: "object",
+    properties: {
+      customer_phone: {
+        type: "string",
+        description:
+          "Telefonnummeret kunden skal ringes tilbake på. Ringer kunden fra et nummer som er oppgitt i SYSTEMINFO, bruk det — ellers spør kunden og les nummeret tilbake siffer for siffer først.",
+      },
+      message: {
+        type: "string",
+        description:
+          "Kort beskrivelse av hva kunden ønsker, slik at den som ringer tilbake vet hva det gjelder. F.eks. 'Vil ha pris på lakkforsegling til en varebil'.",
+      },
+      customer_name: {
+        type: "string",
+        description: "Kundens fornavn, hvis oppgitt.",
+      },
+    },
+    required: ["customer_phone", "message"],
+    additionalProperties: false,
+  },
+};
+
 export const FINISH_SESSION_TOOL = "finish_session";
 
 /** The hangup tool's Realtime definition, exported separately so surfaces
@@ -471,6 +509,37 @@ export async function execBookingTool(
           service: result.booking.service ?? null,
         },
       };
+    }
+
+    if (name === REQUEST_CALLBACK_TOOL) {
+      const { customer_phone, message, customer_name } = (input ?? {}) as {
+        customer_phone?: string;
+        message?: string;
+        customer_name?: string;
+      };
+      if (!customer_phone || !message) {
+        return { success: false, error: "Mangler telefonnummer eller beskjed." };
+      }
+      const now = osloParts(new Date().toISOString());
+      // Awaited, unlike a booking's notification: here the e-mail IS the
+      // outcome. There is nothing else written down, so promising the caller
+      // a call back before knowing it was sent would be a promise to nobody.
+      const sent = await notifyShop(clientId, {
+        kind: "callback",
+        date: now.date,
+        time: now.time,
+        customerName: customer_name,
+        customerPhone: customer_phone,
+        note: message,
+        scope,
+      });
+      return sent.sent
+        ? { success: true, note: "Beskjeden er sendt til avdelingen. Bekreft til kunden at noen ringer tilbake." }
+        : {
+            success: false,
+            error:
+              "Klarte ikke sende beskjeden. Be kunden ringe avdelingen direkte i stedet.",
+          };
     }
 
     return { error: `Ukjent verktøy: ${name}` };
