@@ -17,6 +17,30 @@ const HANDZON_PRICES: Settings["servicePrices"] = [
 ];
 
 describe("priceForService", () => {
+  // The 890-instead-of-1590 dashboard bug, pinned: the agent phrased the
+  // service "Premium inn- og utvendig vask" while the price list says
+  // "vask ut- og innvendig premium". Every token of an entry must appear in
+  // the booking string, and the token "ut-" does not occur in "inn- og
+  // utvendig" — so the combined-wash entries failed and the fallthrough hit
+  // "vask utvendig premium". Alias entries for the spoken word order are the
+  // fix, and they must sit BEFORE the exterior-only entries (order is
+  // precedence). The agents are also told to copy names verbatim from the
+  // price list, but data must not depend on prompts being obeyed.
+  it("matches the spoken word order «inn- og utvendig» via its alias entries", () => {
+    const prices = [
+      { match: "inn- og utvendig premium", priceNok: 1590 },
+      { match: "inn- og utvendig", priceNok: 1090 },
+      { match: "vask ut- og innvendig premium", priceNok: 1590 },
+      { match: "vask ut- og innvendig", priceNok: 1090 },
+      { match: "vask utvendig premium", priceNok: 890 },
+      { match: "vask utvendig", priceNok: 590 },
+    ];
+    expect(priceForService("Premium inn- og utvendig vask — Tesla Model Y, EE 53545", prices)).toBe(1590);
+    expect(priceForService("Vask ut- og innvendig Premium — VW Golf", prices)).toBe(1590);
+    expect(priceForService("Vask ut- og innvendig Basic", prices)).toBe(1090);
+    expect(priceForService("Vask utvendig Premium", prices)).toBe(890);
+  });
+
   it("first match wins, so specific entries must beat generic ones", () => {
     expect(priceForService("Lakkrens pluss Polering Pro — VW Golf", HANDZON_PRICES)).toBe(4990);
     expect(priceForService("Lakkrens pluss Polering Basic", HANDZON_PRICES)).toBe(3990);
