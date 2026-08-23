@@ -110,23 +110,44 @@ export type GcalEvent = {
   extendedProperties?: { private?: Record<string, string> };
 };
 
+/** Google caps a page at 250 events and orders them oldest-first, so a single
+ *  request over a wide window returns the OLDEST 250 and silently drops the
+ *  rest. That is how the KPI tiles reported "0 bookinger" for a client whose
+ *  agent had booked all week: the year-wide lookup filled its page with last
+ *  autumn's events before reaching a single one of them. Pages are followed
+ *  to the end; `privateExtendedProperty` lets a caller that only wants agent
+ *  bookings have Google do the filtering, so the pages stay few. */
 export async function listEvents(
   calendarId: string,
   timeMinISO: string,
-  timeMaxISO: string
+  timeMaxISO: string,
+  opts?: { privateExtendedProperty?: string },
 ): Promise<GcalEvent[]> {
-  const params = new URLSearchParams({
-    singleEvents: "true",
-    orderBy: "startTime",
-    timeMin: timeMinISO,
-    timeMax: timeMaxISO,
-    maxResults: "250",
-  });
-  const data = await gcal(
-    "GET",
-    `/calendars/${encodeURIComponent(calendarId)}/events?${params}`
-  );
-  return (data.items ?? []) as GcalEvent[];
+  const events: GcalEvent[] = [];
+  let pageToken: string | undefined;
+  // A calendar with more than 5 000 events in the window is a runaway, not a
+  // workshop — stop rather than page forever.
+  for (let page = 0; page < 20; page++) {
+    const params = new URLSearchParams({
+      singleEvents: "true",
+      orderBy: "startTime",
+      timeMin: timeMinISO,
+      timeMax: timeMaxISO,
+      maxResults: "250",
+    });
+    if (opts?.privateExtendedProperty) {
+      params.set("privateExtendedProperty", opts.privateExtendedProperty);
+    }
+    if (pageToken) params.set("pageToken", pageToken);
+    const data = await gcal(
+      "GET",
+      `/calendars/${encodeURIComponent(calendarId)}/events?${params}`
+    );
+    events.push(...((data.items ?? []) as GcalEvent[]));
+    pageToken = data.nextPageToken as string | undefined;
+    if (!pageToken) break;
+  }
+  return events;
 }
 
 export async function insertEvent(

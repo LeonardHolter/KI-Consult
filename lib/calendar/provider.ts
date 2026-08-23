@@ -48,7 +48,12 @@ export interface CalendarProvider {
   /** Verifies we can reach the calendar; returns its display name. Throws
    *  with a human-readable message when we can't. */
   testAccess(calendarId: string): Promise<string>;
-  listEvents(calendarId: string, timeMinISO: string, timeMaxISO: string): Promise<CalendarEvent[]>;
+  listEvents(
+    calendarId: string,
+    timeMinISO: string,
+    timeMaxISO: string,
+    opts?: { privateExtendedProperty?: string },
+  ): Promise<CalendarEvent[]>;
   insertEvent(calendarId: string, event: CalendarEventInput): Promise<CalendarEvent>;
   patchEvent(calendarId: string, eventId: string, patch: CalendarEventInput): Promise<CalendarEvent>;
   getEvent(calendarId: string, eventId: string): Promise<CalendarEvent>;

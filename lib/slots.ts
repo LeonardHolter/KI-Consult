@@ -84,6 +84,10 @@ function upcomingDates(settings: Settings): string[] {
   return dates;
 }
 
+/** The extendedProperty that marks an event as made by the agent. Also used
+ *  as a server-side filter when listing them (see listAgentBookings). */
+const AGENT_EVENT_KEY = "hzAgent";
+
 export function calendarConnected(settings: Settings): boolean {
   return calendarConfigured(settings);
 }
@@ -964,10 +968,14 @@ export async function listAgentBookings(clientId: string): Promise<AgentBookingR
       const now = Date.now();
       const timeMin = new Date(now - 365 * 24 * 3600 * 1000).toISOString();
       const timeMax = new Date(now + 60 * 24 * 3600 * 1000).toISOString();
+      // Ask Google for ONLY the agent's own events. Without this the year-wide
+      // window fills its first page with the shop's ordinary calendar and the
+      // agent bookings never arrive — the KPI tiles then report zero forever.
       const events = await getCalendarProvider(settings).listEvents(
         settings.calendarId!,
         timeMin,
         timeMax,
+        { privateExtendedProperty: `${AGENT_EVENT_KEY}=1` },
       );
       return events
         .filter(
