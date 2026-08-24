@@ -1,0 +1,55 @@
+<svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <rect width="800" height="420" fill="#0B2118"/>
+
+  <text x="400" y="40" text-anchor="middle" fill="#EFEDE2" font-size="21" font-weight="600">KI-booking vs. tradisjonelt bookingsystem</text>
+  <text x="400" y="64" text-anchor="middle" fill="#9FB3A7" font-size="13">Det ene venter pa kunden. Det andre tar imot ham.</text>
+
+  <!-- Left card: tradisjonelt bookingsystem -->
+  <rect x="40" y="88" width="332" height="212" rx="14" fill="#F3EFE4" stroke="#E6E0D0" stroke-width="1"/>
+  <rect x="40" y="88" width="332" height="44" rx="14" fill="#9FB3A7"/>
+  <rect x="40" y="118" width="332" height="14" fill="#9FB3A7"/>
+  <text x="64" y="117" fill="#0B2118" font-size="16" font-weight="700">Tradisjonelt bookingsystem</text>
+
+  <text x="64" y="158" fill="#16190F" font-size="12" font-weight="600" letter-spacing="0.5">SELVBETJENING</text>
+  <line x1="64" y1="168" x2="348" y2="168" stroke="#E6E0D0" stroke-width="1"/>
+
+  <circle cx="71" cy="190" r="4" fill="#15A06A"/>
+  <text x="86" y="195" fill="#16190F" font-size="13">Nettskjema, apent dognet rundt</text>
+  <circle cx="71" cy="216" r="4" fill="#15A06A"/>
+  <text x="86" y="221" fill="#16190F" font-size="13">Kunden gjor jobben selv</text>
+  <circle cx="71" cy="242" r="4" fill="#15A06A"/>
+  <text x="86" y="247" fill="#16190F" font-size="13">Lav pris: 0-400 kr/mnd</text>
+  <circle cx="71" cy="268" r="4" fill="#9FB3A7"/>
+  <text x="86" y="273" fill="#16190F" font-size="13">Svarer ikke pa telefonen</text>
+
+  <!-- Right card: KI-booking -->
+  <rect x="428" y="88" width="332" height="212" rx="14" fill="#F3EFE4" stroke="#E6E0D0" stroke-width="1"/>
+  <rect x="428" y="88" width="332" height="44" rx="14" fill="#15C07C"/>
+  <rect x="428" y="118" width="332" height="14" fill="#15C07C"/>
+  <text x="452" y="117" fill="#0B2118" font-size="16" font-weight="700">KI-booking</text>
+
+  <text x="452" y="158" fill="#16190F" font-size="12" font-weight="600" letter-spacing="0.5">MOTTAK</text>
+  <line x1="452" y1="168" x2="736" y2="168" stroke="#E6E0D0" stroke-width="1"/>
+
+  <circle cx="459" cy="190" r="4" fill="#15A06A"/>
+  <text x="474" y="195" fill="#16190F" font-size="13">Telefon, chat og skjema</text>
+  <circle cx="459" cy="216" r="4" fill="#15A06A"/>
+  <text x="474" y="221" fill="#16190F" font-size="13">Svarer pa sporsmal forst</text>
+  <circle cx="459" cy="242" r="4" fill="#15A06A"/>
+  <text x="474" y="247" fill="#16190F" font-size="13">Booker pa kundens vegne</text>
+  <circle cx="459" cy="268" r="4" fill="#15A06A"/>
+  <text x="474" y="273" fill="#16190F" font-size="13">Fanger den som ikke booker selv</text>
+
+  <!-- Arrows down into shared calendar -->
+  <path d="M206 300 L206 330" stroke="#3FE0A0" stroke-width="2" fill="none"/>
+  <path d="M206 338 l-5 -9 h10 z" fill="#3FE0A0"/>
+  <path d="M594 300 L594 330" stroke="#3FE0A0" stroke-width="2" fill="none"/>
+  <path d="M594 338 l-5 -9 h10 z" fill="#3FE0A0"/>
+
+  <!-- Shared calendar bar -->
+  <rect x="40" y="344" width="720" height="52" rx="12" fill="#0B2118" stroke="#15C07C" stroke-width="2"/>
+  <rect x="62" y="358" width="24" height="24" rx="4" fill="none" stroke="#3FE0A0" stroke-width="2"/>
+  <line x1="62" y1="366" x2="86" y2="366" stroke="#3FE0A0" stroke-width="2"/>
+  <text x="102" y="376" fill="#EFEDE2" font-size="14" font-weight="600">EN felles kalender - ingen dobbeltbooking</text>
+  <text x="738" y="376" text-anchor="end" fill="#15C07C" font-size="13" font-weight="700">KI Consult</text>
+</svg>
