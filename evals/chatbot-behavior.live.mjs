@@ -209,6 +209,20 @@ console.log("\n-- Stability (Leonard, 2026-07-13: long-conversation crash fixed)
   }
 }
 
+// --- Mattevask: Sabahs test 2026-08-26 — boten sa «fra 140 kr, lik uansett
+// bilstørrelse». Fasit fra Sabah: LB 140 / MB 180 / SB 220. Prisen skal følge
+// bilstørrelsen og aldri presenteres som størrelsesuavhengig.
+await test(
+  "mattevask VW Golf = 180 (mellomstor), aldri «uansett størrelse»",
+  "Hva koster mattevask på en VW Golf?",
+  (text) => contains("180")(text) && !contains("uansett")(text),
+);
+await test(
+  "mattevask Fiat 500 = 140 (liten)",
+  "Hva koster det å få vasket mattene på en Fiat 500?",
+  (text) => contains("140")(text) && !contains("uansett")(text),
+);
+
 console.log(`\n${pass} passed, ${fail} failed, ${pending} pending (known gaps, not regressions)`);
 
 // Clean up the test conversations this run created so production logs stay
