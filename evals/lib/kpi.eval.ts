@@ -103,20 +103,78 @@ describe("computeKpis", () => {
     });
 
     expect(k.month).toEqual({
-      bookings: 3, valueNok: 890 + 3490, unpriced: 1,
+      bookings: 3, valueNok: 890 + 3490, unpriced: 1, cancelled: 0,
       calls: 2, callSeconds: 180, callsOutsideHours: 1,
+      chats: 0, chatsOutsideHours: 0,
     });
     expect(k.total).toEqual({
-      bookings: 4, valueNok: 890 + 3490 + 590, unpriced: 1,
+      bookings: 4, valueNok: 890 + 3490 + 590, unpriced: 1, cancelled: 0,
       calls: 3, callSeconds: 480, callsOutsideHours: 1,
+      chats: 0, chatsOutsideHours: 0,
     });
     // ROI uses the MONTH value: 4380/2990 = 1.464... -> 1.5
     expect(k.roiMultiple).toBe(1.5);
   });
 
+  // The dashboard-shrink bug, pinned: a 4 590 kr booking was cancelled the
+  // day before the appointment and «estimert verdi siden oppstart» silently
+  // dropped from ~9 600 to 7 540 — which reads as a calculation error. A
+  // cancelled booking keeps its full value and count; the tiles show
+  // «N avbestilt» instead of shrinking.
+  it("cancelled bookings keep their value and are counted, never subtracted", () => {
+    const k = computeKpis({
+      now,
+      settings: s,
+      monthlyPriceNok: null,
+      bookings: [
+        { date: "2026-08-24", time: "08:00", service: "Vask utvendig Premium" }, // 890
+        { date: "2026-08-25", time: "09:00", service: "Polering Pro", cancelled: true }, // 3490, avbestilt
+        { date: "2026-07-01", time: "10:00", service: "Vask utvendig Basic", cancelled: true }, // 590, kun totalt
+      ],
+      calls: [],
+    });
+
+    expect(k.month.valueNok).toBe(890 + 3490);
+    expect(k.month.bookings).toBe(2);
+    expect(k.month.cancelled).toBe(1);
+    expect(k.total.valueNok).toBe(890 + 3490 + 590);
+    expect(k.total.bookings).toBe(3);
+    expect(k.total.cancelled).toBe(2);
+  });
+
   it("no subscription price -> no ROI multiple at all", () => {
     const k = computeKpis({ now, settings: s, monthlyPriceNok: null, bookings: [], calls: [] });
     expect(k.roiMultiple).toBeNull();
+  });
+
+  // The chat tile («Samtaler besvart denne måneden» + «X utenfor åpningstid»):
+  // a conversations row only exists once the bot replied, so counting rows IS
+  // counting answered chats. Same Oslo-month bucketing and opening-hours
+  // logic as calls — the whole point of the tile is the after-hours share.
+  it("counts answered chats per period with the outside-hours split", () => {
+    const k = computeKpis({
+      now, settings: s, monthlyPriceNok: null, bookings: [],
+      calls: [],
+      chats: [
+        { startedAt: "2026-08-19T08:00:00Z" }, // onsdag 10:00 Oslo — innenfor
+        { startedAt: "2026-08-19T17:00:00Z" }, // onsdag 19:00 Oslo — utenfor
+        { startedAt: "2026-08-22T09:00:00Z" }, // lørdag (stengt) — utenfor
+        { startedAt: "2026-07-06T08:00:00Z" }, // forrige måned, innenfor — kun totalt
+      ],
+    });
+    expect(k.month.chats).toBe(3);
+    expect(k.month.chatsOutsideHours).toBe(2);
+    expect(k.total.chats).toBe(4);
+    expect(k.total.chatsOutsideHours).toBe(2);
+    // Chats alone don't invent call or booking numbers.
+    expect(k.month.calls).toBe(0);
+    expect(k.month.bookings).toBe(0);
+  });
+
+  it("omitting chats entirely keeps voice-only callers at zero, not NaN", () => {
+    const k = computeKpis({ now, settings: s, monthlyPriceNok: null, bookings: [], calls: [] });
+    expect(k.month.chats).toBe(0);
+    expect(k.total.chatsOutsideHours).toBe(0);
   });
 
   it("osloMonth buckets by Oslo calendar, not UTC", () => {
@@ -147,6 +205,17 @@ describe("kpiSince epoch", () => {
     expect(k.total.valueNok).toBe(590);
     expect(k.total.calls).toBe(1);
     expect(k.total.callSeconds).toBe(60);
+  });
+
+  it("chats before the epoch vanish too", () => {
+    const k = computeKpis({
+      now, settings: s, monthlyPriceNok: null, bookings: [], calls: [],
+      chats: [
+        { startedAt: "2026-08-14T10:00:00Z" }, // før reset
+        { startedAt: "2026-08-18T10:00:00Z" }, // etter
+      ],
+    });
+    expect(k.total.chats).toBe(1);
   });
 
   it("no epoch set counts everything, and showKpis=false flips show", () => {

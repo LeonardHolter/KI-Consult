@@ -61,6 +61,7 @@ import {
   appendBookingNote,
   bookSlot,
   cancelBooking,
+  findBookingsByPhone,
   clearSandboxBookings,
   defaultDashboardScope,
   loadSlots,
@@ -126,6 +127,9 @@ describe("sandbox scope never reaches Google Calendar", () => {
 
     const after = await loadSlots(CLIENT, "sandbox");
     expect(after.find((s) => s.id === slotId)?.bookedCount).toBe(0);
+    // Soft-delete: the slot is free and the booking is gone from lookups —
+    // a cancelled time must not be findable or movable by the voice agent.
+    expect(await findBookingsByPhone(CLIENT, "99999999", "sandbox")).toEqual([]);
     expect(insertEvent).not.toHaveBeenCalled();
   });
 });

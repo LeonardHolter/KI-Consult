@@ -63,7 +63,7 @@ describe("listAgentBookings", () => {
 
     expect(bookings).toHaveLength(1);
     const [, , , opts] = vi.mocked(listEvents).mock.calls[0];
-    expect(opts).toEqual({ privateExtendedProperty: "hzAgent=1" });
+    expect(opts).toEqual({ privateExtendedProperty: "hzAgent=1", showDeleted: false });
   });
 
   it("still ignores anything that is not an agent booking", async () => {
@@ -84,6 +84,25 @@ describe("listAgentBookings", () => {
       { ...agentEvent("2026-08-26", "Sonja"), status: "cancelled" },
     ]);
     expect(await listAgentBookings(CLIENT)).toHaveLength(0);
+  });
+
+  // The KPI tiles' view: a cancelled booking is still work the agent did, so
+  // its value must not vanish from «siden oppstart» (that silent shrink got
+  // reported as a dashboard bug). includeCancelled asks Google for deleted
+  // events too and marks them rather than dropping them.
+  it("includeCancelled keeps cancelled events, marked, and requests them from Google", async () => {
+    vi.mocked(listEvents).mockResolvedValue([
+      agentEvent("2026-08-26", "Sonja"),
+      { ...agentEvent("2026-09-08", "Odd"), status: "cancelled" },
+    ]);
+
+    const bookings = await listAgentBookings(CLIENT, { includeCancelled: true });
+
+    expect(bookings).toHaveLength(2);
+    expect(bookings.find((b) => b.customerName === "Sonja")?.cancelled).toBeUndefined();
+    expect(bookings.find((b) => b.customerName === "Odd")?.cancelled).toBe(true);
+    const [, , , opts] = vi.mocked(listEvents).mock.calls[0];
+    expect(opts).toEqual({ privateExtendedProperty: "hzAgent=1", showDeleted: true });
   });
 
   it("carries bookedAt through, since the KPI epoch is measured against it", async () => {

@@ -121,7 +121,7 @@ export async function listEvents(
   calendarId: string,
   timeMinISO: string,
   timeMaxISO: string,
-  opts?: { privateExtendedProperty?: string },
+  opts?: { privateExtendedProperty?: string; showDeleted?: boolean },
 ): Promise<GcalEvent[]> {
   const events: GcalEvent[] = [];
   let pageToken: string | undefined;
@@ -138,6 +138,7 @@ export async function listEvents(
     if (opts?.privateExtendedProperty) {
       params.set("privateExtendedProperty", opts.privateExtendedProperty);
     }
+    if (opts?.showDeleted) params.set("showDeleted", "true");
     if (pageToken) params.set("pageToken", pageToken);
     const data = await gcal(
       "GET",

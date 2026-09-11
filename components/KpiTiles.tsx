@@ -11,9 +11,12 @@ type Period = {
   bookings: number;
   valueNok: number;
   unpriced: number;
+  cancelled?: number;
   calls: number;
   callSeconds: number;
   callsOutsideHours: number;
+  chats?: number;
+  chatsOutsideHours?: number;
 };
 
 type Kpis = {
@@ -60,7 +63,7 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
   // Hidden by the admin, not loaded yet, or nothing to brag about — render
   // nothing rather than a row of zeros.
   if (!kpis || kpis.show === false || !kpis.month || !kpis.total) return null;
-  if (kpis.total.bookings === 0 && kpis.total.calls === 0) return null;
+  if (kpis.total.bookings === 0 && kpis.total.calls === 0 && (kpis.total.chats ?? 0) === 0) return null;
 
   const { month, total, monthlyPriceNok, roiMultiple } = kpis;
   if (!month || !total) return null;
@@ -82,6 +85,7 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
         <p className="kpi-sub">
           Estimert verdi ~{nok(month.valueNok)}
           {month.unpriced > 0 ? ` · ${month.unpriced} uten fastpris` : ""}
+          {(month.cancelled ?? 0) > 0 ? ` · ${month.cancelled} avbestilt` : ""}
         </p>
       </div>
 
@@ -91,6 +95,7 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
         <p className="kpi-sub">
           Estimert verdi ~{nok(total.valueNok)}
           {total.unpriced > 0 ? ` · ${total.unpriced} uten fastpris` : ""}
+          {(total.cancelled ?? 0) > 0 ? ` · ${total.cancelled} avbestilt` : ""}
         </p>
       </div>
 
@@ -99,6 +104,14 @@ export default function KpiTiles({ clientId }: { clientId?: string }) {
         <p className="kpi-value">{month.calls}</p>
         <p className="kpi-sub">{month.callsOutsideHours} utenfor åpningstid</p>
       </div>
+
+      {(total.chats ?? 0) > 0 && (
+        <div className="kpi-tile">
+          <p className="kpi-label">Samtaler besvart denne måneden</p>
+          <p className="kpi-value">{month.chats ?? 0}</p>
+          <p className="kpi-sub">{month.chatsOutsideHours ?? 0} utenfor åpningstid</p>
+        </div>
+      )}
 
       <div className="kpi-tile">
         <p className="kpi-label">Telefontid spart</p>

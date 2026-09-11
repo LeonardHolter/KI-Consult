@@ -358,7 +358,19 @@ const bookingsBlobPath = (clientId: string, scope: BookingScope) =>
 
 const blobConfigured = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
-type DemoBooking = Booking & { slotId: string; date: string; time: string };
+type DemoBooking = Booking & {
+  slotId: string;
+  date: string;
+  time: string;
+  /** Soft-delete: set when the booking is cancelled. Cancelled bookings stay
+   *  in the store so the KPI tiles keep their value — work the agent did
+   *  doesn't unhappen because the customer later called it off. Every
+   *  consumer that means "occupies a slot / can be found or moved" must go
+   *  through activeOnly(). */
+  cancelledAt?: string;
+};
+
+const activeOnly = (bookings: DemoBooking[]) => bookings.filter((b) => !b.cancelledAt);
 
 async function demoReadBookings(clientId: string, scope: BookingScope): Promise<DemoBooking[]> {
   let raw: DemoBooking[];
@@ -411,7 +423,7 @@ async function demoSlotViews(
   for (const date of dates) {
     for (const tmpl of templates) {
       const id = `${date}-${tmpl.time.replace(":", "")}`;
-      const bookings = allBookings.filter((b) => b.slotId === id);
+      const bookings = activeOnly(allBookings).filter((b) => b.slotId === id);
       views.push(toSlotView(date, tmpl, settings.locationName, bookings));
     }
   }
@@ -480,9 +492,11 @@ async function demoCancel(
   scope: BookingScope,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const all = await demoReadBookings(clientId, scope);
-  const idx = all.findIndex((b) => b.id === bookingId);
+  const idx = all.findIndex((b) => b.id === bookingId && !b.cancelledAt);
   if (idx === -1) return { ok: false, error: "Fant ikke bookingen." };
-  all.splice(idx, 1);
+  // Soft-delete: the slot is freed (activeOnly hides it from the grid) but
+  // the record keeps its KPI value — see the DemoBooking comment.
+  all[idx] = { ...all[idx], cancelledAt: new Date().toISOString() };
   await demoWriteBookings(clientId, scope, all);
   return { ok: true };
 }
@@ -610,6 +624,7 @@ export async function appendBookingNote(
   const bookings = await demoReadBookings(clientId, scope);
   const idx = bookings.findIndex(
     (b) =>
+      !b.cancelledAt &&
       b.date === date &&
       b.time === time &&
       phoneKey(b.customerPhone ?? "") === phoneKey(customerPhone),
@@ -710,7 +725,7 @@ export async function findBookingsByPhone(
       .sort(byDateTime);
   }
 
-  return (await demoReadBookings(clientId, scope))
+  return activeOnly(await demoReadBookings(clientId, scope))
     .filter((b) => phoneKey(b.customerPhone ?? "") === phone)
     .map((b) => ({ date: b.date, time: b.time, service: b.service, customerName: b.customerName }))
     .filter((b) => isUpcoming(b, now))
@@ -798,6 +813,7 @@ export async function rescheduleBooking(
   const bookings = await demoReadBookings(clientId, scope);
   const idx = bookings.findIndex(
     (b) =>
+      !b.cancelledAt &&
       b.date === date &&
       b.time === time &&
       phoneKey(b.customerPhone ?? "") === phoneKey(customerPhone),
@@ -949,6 +965,9 @@ export type AgentBookingRecord = {
   customerPhone?: string;
   service?: string;
   bookedAt?: string;
+  /** True when the booking was later cancelled (calendar event cancelled, or
+   *  demo-store soft delete). Only present with includeCancelled. */
+  cancelled?: boolean;
 };
 
 /**
@@ -960,8 +979,18 @@ export type AgentBookingRecord = {
  * not everything humans put in the calendar. Demo mode reads the live store,
  * which keeps all bookings regardless of date. The voice SANDBOX is
  * deliberately excluded — test calls are not customers.
+ *
+ * includeCancelled keeps bookings that were later cancelled (marked with
+ * `cancelled: true`) — the KPI tiles use it so a cancellation doesn't erase
+ * the value the agent already produced. Calendar mode gets them from Google
+ * with showDeleted (cancelled events keep their extendedProperties), demo
+ * mode from the soft-deleted store records.
  */
-export async function listAgentBookings(clientId: string): Promise<AgentBookingRecord[]> {
+export async function listAgentBookings(
+  clientId: string,
+  opts?: { includeCancelled?: boolean },
+): Promise<AgentBookingRecord[]> {
+  const includeCancelled = opts?.includeCancelled === true;
   const settings = await loadSettings(clientId);
   if (calendarConnected(settings)) {
     try {
@@ -975,12 +1004,12 @@ export async function listAgentBookings(clientId: string): Promise<AgentBookingR
         settings.calendarId!,
         timeMin,
         timeMax,
-        { privateExtendedProperty: `${AGENT_EVENT_KEY}=1` },
+        { privateExtendedProperty: `${AGENT_EVENT_KEY}=1`, showDeleted: includeCancelled },
       );
       return events
         .filter(
           (e) =>
-            e.status !== "cancelled" &&
+            (includeCancelled || e.status !== "cancelled") &&
             e.start?.dateTime &&
             e.extendedProperties?.private?.hzAgent === "1",
         )
@@ -994,6 +1023,7 @@ export async function listAgentBookings(clientId: string): Promise<AgentBookingR
             customerPhone: priv.customerPhone,
             service: priv.service ?? e.summary,
             bookedAt: priv.bookedAt,
+            ...(e.status === "cancelled" ? { cancelled: true } : {}),
           };
         });
     } catch (err) {
@@ -1001,12 +1031,14 @@ export async function listAgentBookings(clientId: string): Promise<AgentBookingR
       return [];
     }
   }
-  return (await demoReadBookings(clientId, "live")).map((b) => ({
+  const stored = await demoReadBookings(clientId, "live");
+  return (includeCancelled ? stored : activeOnly(stored)).map((b) => ({
     date: b.date,
     time: b.time,
     customerName: b.customerName,
     customerPhone: b.customerPhone,
     service: b.service,
     bookedAt: b.bookedAt,
+    ...(b.cancelledAt ? { cancelled: true } : {}),
   }));
 }

@@ -52,7 +52,7 @@ export interface CalendarProvider {
     calendarId: string,
     timeMinISO: string,
     timeMaxISO: string,
-    opts?: { privateExtendedProperty?: string },
+    opts?: { privateExtendedProperty?: string; showDeleted?: boolean },
   ): Promise<CalendarEvent[]>;
   insertEvent(calendarId: string, event: CalendarEventInput): Promise<CalendarEvent>;
   patchEvent(calendarId: string, eventId: string, patch: CalendarEventInput): Promise<CalendarEvent>;

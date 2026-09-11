@@ -28,15 +28,26 @@ export function priceForService(
 
 export type VoiceCall = { startedAt: string; durationSeconds: number };
 
+/** One answered website-chat conversation — a row exists only after the bot
+ *  actually replied to a first message (see lib/portal-log.ts logTurn). */
+export type ChatConversation = { startedAt: string };
+
 export type KpiPeriod = {
   bookings: number;
   /** Sum of matched prices, integer NOK. */
   valueNok: number;
   /** Bookings no price entry matched — shown, never guessed at. */
   unpriced: number;
+  /** Bookings later cancelled. They stay in `bookings` and `valueNok` — the
+   *  agent did the work and the value must not silently shrink afterwards
+   *  (a dropping «siden oppstart» reads as a bug) — but the count is shown
+   *  so the math stays honest. */
+  cancelled: number;
   calls: number;
   callSeconds: number;
   callsOutsideHours: number;
+  chats: number;
+  chatsOutsideHours: number;
 };
 
 export type Kpis = {
@@ -78,12 +89,16 @@ export function osloMonth(now: Date = new Date()): string {
 }
 
 const emptyPeriod = (): KpiPeriod => ({
-  bookings: 0, valueNok: 0, unpriced: 0, calls: 0, callSeconds: 0, callsOutsideHours: 0,
+  bookings: 0, valueNok: 0, unpriced: 0, cancelled: 0,
+  calls: 0, callSeconds: 0, callsOutsideHours: 0,
+  chats: 0, chatsOutsideHours: 0,
 });
 
 export function computeKpis(input: {
   bookings: AgentBookingRecord[];
   calls: VoiceCall[];
+  /** Website-chat conversations; optional so voice-only callers stay as-is. */
+  chats?: ChatConversation[];
   settings: Settings;
   monthlyPriceNok: number | null;
   now?: Date;
@@ -101,12 +116,16 @@ export function computeKpis(input: {
     ? input.bookings.filter((b) => (b.bookedAt ?? `${b.date}T00:00:00`) >= since)
     : input.bookings;
   const calls = since ? input.calls.filter((c) => c.startedAt >= since) : input.calls;
+  const chats = since
+    ? (input.chats ?? []).filter((c) => c.startedAt >= since)
+    : (input.chats ?? []);
 
   for (const b of bookings) {
     const price = priceForService(b.service, input.settings.servicePrices);
     const inMonth = b.date.slice(0, 7) === month;
     for (const p of inMonth ? [m, t] : [t]) {
       p.bookings += 1;
+      if (b.cancelled) p.cancelled += 1;
       if (price === null) p.unpriced += 1;
       else p.valueNok += price;
     }
@@ -119,6 +138,15 @@ export function computeKpis(input: {
       p.calls += 1;
       p.callSeconds += Math.max(0, c.durationSeconds);
       if (outside) p.callsOutsideHours += 1;
+    }
+  }
+
+  for (const c of chats) {
+    const outside = isOutsideHours(c.startedAt, input.settings);
+    const inMonth = osloParts(c.startedAt).date.slice(0, 7) === month;
+    for (const p of inMonth ? [m, t] : [t]) {
+      p.chats += 1;
+      if (outside) p.chatsOutsideHours += 1;
     }
   }
 
@@ -145,12 +173,18 @@ export async function buildClientKpis(clientId: string): Promise<Kpis> {
   // never throwing) for everyone else.
   await syncElevenLabsVoiceUsage(clientId);
   const supabase = createServiceClient();
-  const [settings, bookings, usage, client] = await Promise.all([
+  const [settings, bookings, usage, convs, client] = await Promise.all([
     loadSettings(clientId),
-    listAgentBookings(clientId),
+    listAgentBookings(clientId, { includeCancelled: true }),
     supabase
       .from("voice_usage")
       .select("started_at, duration_seconds")
+      .eq("client_id", clientId)
+      .order("started_at", { ascending: false })
+      .limit(5000),
+    supabase
+      .from("conversations")
+      .select("started_at")
       .eq("client_id", clientId)
       .order("started_at", { ascending: false })
       .limit(5000),
@@ -162,9 +196,14 @@ export async function buildClientKpis(clientId: string): Promise<Kpis> {
     durationSeconds: r.duration_seconds ?? 0,
   }));
 
+  const chats: ChatConversation[] = (convs.data ?? []).map((r) => ({
+    startedAt: r.started_at,
+  }));
+
   return computeKpis({
     bookings,
     calls,
+    chats,
     settings,
     monthlyPriceNok: client.data?.monthly_price_nok ?? null,
   });
