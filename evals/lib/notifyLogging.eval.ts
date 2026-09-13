@@ -8,7 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // without warning.
 
 const { send, logBotEvent, loadSettings } = vi.hoisted(() => ({
-  send: vi.fn(async () => ({ error: null as { name: string; message: string } | null })),
+  // Typed with the payload so assertions can read back what was sent —
+  // notably `to`, which carries every recipient.
+  send: vi.fn(async (_payload: { to: string | string[] }) => ({
+    error: null as { name: string; message: string } | null,
+  })),
   logBotEvent: vi.fn(async () => {}),
   loadSettings: vi.fn(async () => ({ notificationEmail: "sa@handzon.no" })),
 }));
@@ -39,6 +43,35 @@ beforeEach(() => {
   send.mockResolvedValue({ error: null });
   logBotEvent.mockClear();
   loadSettings.mockResolvedValue({ notificationEmail: "sa@handzon.no" });
+});
+
+describe("recipients", () => {
+  it("sends one mail addressed to every listed recipient", async () => {
+    loadSettings.mockResolvedValue({
+      notificationEmail: "leonard@kiconsult.no, william@kiconsult.no",
+    });
+    const result = await notifyShop(CLIENT, booking);
+    expect(result.sent).toBe(true);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: ["leonard@kiconsult.no", "william@kiconsult.no"],
+    });
+  });
+
+  it("skips a junk entry rather than failing the whole send", async () => {
+    loadSettings.mockResolvedValue({ notificationEmail: "leonard@kiconsult.no, rot" });
+    const result = await notifyShop(CLIENT, booking);
+    expect(result.sent).toBe(true);
+    expect(send.mock.calls[0][0]).toMatchObject({ to: ["leonard@kiconsult.no"] });
+  });
+
+  it("de-dupes the same inbox listed twice", async () => {
+    loadSettings.mockResolvedValue({
+      notificationEmail: "Leonard@kiconsult.no; leonard@kiconsult.no",
+    });
+    await notifyShop(CLIENT, booking);
+    expect(send.mock.calls[0][0]).toMatchObject({ to: ["Leonard@kiconsult.no"] });
+  });
 });
 
 describe("notification outcomes are recorded", () => {

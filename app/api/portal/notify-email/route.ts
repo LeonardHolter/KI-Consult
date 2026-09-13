@@ -4,7 +4,7 @@
 // exception, and this one is not calendar-shaped either.
 
 import { getProfile } from "@/lib/portal/data";
-import { looksLikeEmail } from "@/lib/notify";
+import { validRecipientList } from "@/lib/notify";
 import { loadSettings, saveSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +32,11 @@ export async function POST(req: Request) {
   }
 
   const email = body.email.trim();
-  // Empty clears the address — that is how a shop opts back out.
-  if (email !== "" && !looksLikeEmail(email)) {
+  // Empty clears the address — that is how a shop opts back out. A non-empty
+  // value may list several addresses (comma/semicolon separated); every one
+  // of them must be valid, so a typo fails loudly instead of quietly
+  // dropping that recipient from the booking mails.
+  if (email !== "" && !validRecipientList(email)) {
     return Response.json({ error: "Ugyldig e-postadresse." }, { status: 400 });
   }
 

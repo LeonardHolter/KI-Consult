@@ -51,6 +51,36 @@ export function looksLikeEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 200;
 }
 
+/**
+ * notificationEmail holds one OR several addresses, comma/semicolon separated
+ * — a shop that wants the service manager and the owner both on the booking
+ * mails should not need two settings. Stored as the raw string so every
+ * existing single-address value keeps working untouched; split only here.
+ */
+export function parseRecipients(raw: string | undefined | null): string[] {
+  if (!raw) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(/[,;]/)) {
+    const addr = part.trim();
+    if (!addr || !looksLikeEmail(addr)) continue;
+    // Case-insensitive de-dupe: the same inbox listed twice would otherwise
+    // get two copies of every booking.
+    const key = addr.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(addr);
+  }
+  return out;
+}
+
+/** True when every non-empty entry is a valid address — what the admin route
+ *  checks before saving, so a typo can't silently drop one recipient. */
+export function validRecipientList(raw: string): boolean {
+  const parts = raw.split(/[,;]/).map((p) => p.trim()).filter(Boolean);
+  return parts.length > 0 && parts.every(looksLikeEmail);
+}
+
 /** The outcome is for diagnostics (the admin notify-test route shows it);
  *  every production caller ignores it — fire-and-forget stays the contract. */
 export async function notifyShop(
@@ -65,12 +95,15 @@ export async function notifyShop(
     }
 
     const settings = await loadSettings(clientId);
-    const to = settings.notificationEmail;
-    if (!to || !looksLikeEmail(to)) {
+    const recipients = parseRecipients(settings.notificationEmail);
+    if (recipients.length === 0) {
       const reason = "ingen notificationEmail satt for klienten";
       await logNotify(clientId, n, false, reason);
       return { sent: false, reason };
     }
+    // Diagnostics show every recipient, so "who got it?" is answerable from
+    // the admin notify-test result alone.
+    const to = recipients.join(", ");
 
     let clientName = "kunden";
     try {
@@ -88,7 +121,7 @@ export async function notifyShop(
     const resend = new Resend(key);
     const { error } = await resend.emails.send({
       from: process.env.NOTIFY_FROM ?? DEFAULT_FROM,
-      to,
+      to: recipients,
       subject,
       html,
       text,

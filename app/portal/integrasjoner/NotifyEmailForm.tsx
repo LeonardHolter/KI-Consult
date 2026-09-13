@@ -64,17 +64,20 @@ export default function NotifyEmailForm({ clientId }: { clientId: string }) {
       <label className="ccm-label" htmlFor="notify-email">
         Verkstedets e-postadresse
       </label>
+      {/* type="text", not "email": the browser's built-in e-mail validation
+          rejects a comma-separated list, which this field accepts. */}
       <input
         id="notify-email"
         className="ccm-input"
-        type="email"
+        type="text"
         value={email}
         placeholder="f.eks. post@verkstedet.no"
         onChange={(e) => setEmail(e.target.value)}
       />
       <p className="ccm-hint">
-        Hver booking, flytting og hvert notat fra agentene sendes hit. Tøm feltet og lagre for å
-        skru av. Testbookinger fra testkalenderen merkes tydelig med [TEST].
+        Hver booking, flytting og hvert notat fra agentene sendes hit. Flere mottakere skilles
+        med komma. Tøm feltet og lagre for å skru av. Testbookinger fra testkalenderen merkes
+        tydelig med [TEST].
       </p>
       <div className="ccm-actions">
         <button type="button" className="ccm-btn primary" onClick={save} disabled={busy}>

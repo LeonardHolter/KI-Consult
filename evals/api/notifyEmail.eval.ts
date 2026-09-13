@@ -56,6 +56,24 @@ describe("notify-email admin route", () => {
     expect(saved).toEqual([]);
   });
 
+  it("stores several addresses so a shop can put two people on the mails", async () => {
+    const res = await post({
+      clientId: CLIENT,
+      email: "leonard@kiconsult.no, william@kiconsult.no",
+    });
+    expect(await res.json()).toEqual({
+      ok: true,
+      notificationEmail: "leonard@kiconsult.no, william@kiconsult.no",
+    });
+  });
+
+  it("rejects the whole list when one address is junk", async () => {
+    // Storing it would silently drop that recipient from every future mail.
+    const res = await post({ clientId: CLIENT, email: "leonard@kiconsult.no, ikke-epost" });
+    expect(res.status).toBe(400);
+    expect(saved).toEqual([]);
+  });
+
   it("an empty string clears the address", async () => {
     await post({ clientId: CLIENT, email: "leonard@kiconsult.no" });
     const res = await post({ clientId: CLIENT, email: "" });
