@@ -97,6 +97,7 @@ export default function PortalDashboard({
   phoneNumber,
   defaultCalScope = "sandbox",
   showChatWidget = true,
+  showCalendar = true,
 }: {
   /** Set only when an admin is viewing a specific client; omitted for a client
    *  account, which the /api/bot proxy pins to its own client regardless. */
@@ -119,6 +120,9 @@ export default function PortalDashboard({
    *  the Integrasjoner page; the widget on the client's own website is a
    *  separate embed and is not affected. */
   showChatWidget?: boolean;
+  /** Whether the booking calendar (grid, scope switch, customer list) is
+   *  rendered at all. Off for intake-only agents that never book. */
+  showCalendar?: boolean;
 }) {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [calConnected, setCalConnected] = useState(false);
@@ -197,6 +201,8 @@ export default function PortalDashboard({
   }, [clientId, calScope]);
 
   useEffect(() => {
+    // No calendar on this dashboard — don't poll a grid nobody sees.
+    if (!showCalendar) return;
     let cancelled = false;
     async function poll() {
       const d = await fetchCalendarView();
@@ -220,7 +226,7 @@ export default function PortalDashboard({
     // Re-poll on clientId change: an admin switching clients keeps this same
     // component mounted (only the ?client= search param changes), so without
     // this dependency the interval would keep polling the previous client.
-  }, [fetchCalendarView]);
+  }, [fetchCalendarView, showCalendar]);
 
   // Manual refresh: the grid already polls every 10s, but after a test call
   // books something you want to see it NOW, not up to ten seconds later.
@@ -500,9 +506,11 @@ export default function PortalDashboard({
       </div>
 
       <div className="ctp-main">
-        <h1 className="ctp-title">Bookingkalender</h1>
+        <h1 className="ctp-title">{showCalendar ? "Bookingkalender" : "Dashbord"}</h1>
         <p className="ctp-sub">
-          Kalenderen speiler Google Calendar i sanntid.
+          {showCalendar
+            ? "Kalenderen speiler Google Calendar i sanntid."
+            : "Her ser du samtalene taleagenten har tatt, og henvendelsene den har sendt videre."}
           {showChatWidget
             ? " Chat med boten nede til høyre — det er nøyaktig samme bot som kundene dine snakker med."
             : ""}
@@ -552,9 +560,10 @@ export default function PortalDashboard({
         {clientId && elevenlabsAgentIdFor(clientId) && (
           <ElevenLabsTranscriptsPanel clientId={clientId} canDelete={Boolean(overviewHref)} />
         )}
-        <CustomerListPanel clientId={clientId} />
+        {showCalendar && <CustomerListPanel clientId={clientId} />}
         <div style={{ height: 20 }} />
 
+        {showCalendar && (
         <div className="ctp-card">
           <div className="ctp-card-head">
             <h2>Ledige tider</h2>
@@ -730,8 +739,9 @@ export default function PortalDashboard({
             </div>
           ))}
         </div>
+        )}
 
-        {showChatWidget && (
+        {showChatWidget && showCalendar && (
           <p className="ctp-hint">
             <b>Tips:</b> book en time i chatten, så dukker den opp i kalenderen her
             i løpet av sekunder — akkurat slik den gjør når en ekte kunde booker.

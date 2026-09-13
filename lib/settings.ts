@@ -40,6 +40,11 @@ export type Settings = {
   notificationEmail?: string;
   /** Whether the client's dashboard shows the KPI tiles. Absent = shown. */
   showKpis?: boolean;
+  /** Whether the client's dashboard shows the booking calendar (grid, scope
+   *  switch, customer list). Absent = shown. Off for clients whose agent
+   *  never books — an intake-only agent has no calendar to mirror, and an
+   *  empty grid reads as broken. */
+  showCalendar?: boolean;
   /** KPI epoch: tiles only count activity at/after this ISO timestamp.
    *  "Nullstill KPI-er" sets it to now — a non-destructive reset that keeps
    *  the underlying usage rows (the admin cost figures need them). Doubles

@@ -39,6 +39,13 @@ async function chatWidgetShown(clientId: string): Promise<boolean> {
   return (await loadSettings(clientId)).showChatWidget !== false;
 }
 
+/** Whether this client's dashboard shows the booking calendar. Absent =
+ *  shown; turned off per client from the Integrasjoner page for agents that
+ *  only take messages and never book. */
+async function calendarShown(clientId: string): Promise<boolean> {
+  return (await loadSettings(clientId)).showCalendar !== false;
+}
+
 /** Which calendar the dashboard opens on: the one the agent is booking into
  *  right now, so a call taken a minute ago is visible without switching. See
  *  defaultDashboardScope — it still refuses to open a client with no
@@ -86,6 +93,7 @@ export default async function PortalPage({
         phoneNumber={profile.client_id ? await clientPhoneNumber(profile.client_id) : null}
         defaultCalScope={profile.client_id ? await defaultCalScope(profile.client_id) : "sandbox"}
         showChatWidget={profile.client_id ? await chatWidgetShown(profile.client_id) : true}
+        showCalendar={profile.client_id ? await calendarShown(profile.client_id) : true}
       />
     );
   }
@@ -107,6 +115,7 @@ export default async function PortalPage({
         phoneNumber={await clientPhoneNumber(selectedClient.id)}
         defaultCalScope={await defaultCalScope(selectedClient.id)}
         showChatWidget={await chatWidgetShown(selectedClient.id)}
+        showCalendar={await calendarShown(selectedClient.id)}
       />
     );
   }

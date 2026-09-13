@@ -7,6 +7,7 @@ import { numberForClient } from "@/lib/telephony/numbers";
 import GoogleCalendarConnect from "../GoogleCalendarConnect";
 import TelnyxNumberConnect from "./TelnyxNumberConnect";
 import ChatWidgetToggle from "./ChatWidgetToggle";
+import CalendarVisibilityToggle from "./CalendarVisibilityToggle";
 import KpiControls from "./KpiControls";
 import NotifyEmailForm from "./NotifyEmailForm";
 
@@ -66,6 +67,7 @@ export default async function IntegrasjonerPage({
   const settings = await loadSettings(activeClientId);
   const googleConnected = calendarConfigured(settings);
   const chatWidgetShown = settings.showChatWidget !== false;
+  const calendarShown = settings.showCalendar !== false;
   const kpisShown = settings.showKpis !== false;
   const notifyEmail = settings.notificationEmail ?? null;
   // Connected = a mapped number, or being the default line's client.
@@ -245,6 +247,34 @@ export default async function IntegrasjonerPage({
               på nettsiden deres styres av deres eget embed-script.
             </p>
             <ChatWidgetToggle clientId={activeClientId} />
+          </section>
+
+          {/* Booking calendar on the client dashboard — off for intake-only
+              agents, whose empty grid would read as a broken product. */}
+          <section
+            style={{
+              background: "#fff", border: `1px solid ${MUTED}44`, borderRadius: 12,
+              padding: "20px 22px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 11, height: 11, borderRadius: "50%",
+                  background: calendarShown ? GREEN : MUTED, flexShrink: 0,
+                }}
+              />
+              <h2 style={{ fontSize: 17, margin: 0 }}>📅 Kalender i portalen</h2>
+              <span style={{ fontSize: 13, color: calendarShown ? "#0d6b47" : MUTED, fontWeight: 600 }}>
+                {calendarShown ? "Vises" : "Skjult"}
+              </span>
+            </div>
+            <p style={{ fontSize: 13.5, color: MUTED, margin: "0 0 6px", lineHeight: 1.5 }}>
+              Om kunden ser bookingkalenderen på sitt eget dashbord. Skru av for agenter som
+              bare tar imot henvendelser og aldri booker.
+            </p>
+            <CalendarVisibilityToggle clientId={activeClientId} />
           </section>
 
           {/* KPI-fliser — show/hide on the client dashboard + the
