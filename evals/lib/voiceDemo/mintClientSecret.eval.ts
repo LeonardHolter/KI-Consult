@@ -91,6 +91,7 @@ describe("mintRealtimeClientSecret", () => {
         "finish_session",
         "get_available_demo_slots",
         "lookup_vehicle",
+        "request_callback",
         "reschedule_booking",
       ]);
       // Realtime wants `parameters`, not Anthropic's `input_schema`.

@@ -9,6 +9,11 @@ export type ShopNotification = {
   time: string; // HH:MM
   customerName?: string;
   customerPhone: string;
+  /** callback-kind: collected only by agents whose prompt asks for it (an
+   *  intake agent that hands the whole request to a service desk). */
+  customerEmail?: string;
+  /** callback-kind: «merke modell, reg.nr» when the caller gave it. */
+  vehicle?: string;
   /** The service string as booked — includes car and reg.nr when collected. */
   service?: string;
   /** note-kind: the note text appended to the booking.
@@ -69,6 +74,8 @@ export function buildShopEmail(
     rows.push(["Ringte", when]);
     if (n.customerName) rows.push(["Navn", n.customerName]);
     rows.push(["Telefon", n.customerPhone]);
+    if (n.customerEmail) rows.push(["E-post", n.customerEmail]);
+    if (n.vehicle) rows.push(["Bil", n.vehicle]);
     if (n.note) rows.push(["Beskjed", n.note]);
   } else if (n.kind === "reschedule" && n.oldDate && n.oldTime) {
     rows.push(["Flyttet fra", labelFor(n.oldDate, n.oldTime)]);
@@ -89,7 +96,7 @@ export function buildShopEmail(
       : n.kind === "reschedule"
         ? "KI-resepsjonisten har flyttet en eksisterende booking."
         : n.kind === "callback"
-          ? "En kunde ba om å snakke med en person. KI-resepsjonisten kan ikke sette over, så den tok imot beskjeden — ring kunden tilbake."
+          ? "KI-resepsjonisten tok imot en henvendelse som trenger oppfølging fra dere — ring kunden tilbake."
           : "KI-resepsjonisten har lagt et notat på en eksisterende booking.";
 
   const testWarning = test

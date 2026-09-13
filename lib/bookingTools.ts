@@ -157,6 +157,12 @@ export const BOOKING_TOOL_SCHEMAS = {
  * only via realtimeToolDefs().
  */
 export const VOICE_ONLY_BOOKING_TOOL_SCHEMAS = {
+  // Defined further down; hoisted here by reference so the roster stays in one
+  // place. Voice-only for the same reason as the lookup tools: the ring-back
+  // number is grounded by caller ID on a phone call.
+  get [REQUEST_CALLBACK_TOOL]() {
+    return REQUEST_CALLBACK_SCHEMA;
+  },
   [FIND_BOOKINGS_TOOL]: {
     description:
       "Finner kundens kommende bookinger ut fra telefonnummeret bookingen ble gjort med. Bruk når kunden vil endre eller flytte en eksisterende time. Bekreft alltid med kunden HVILKEN booking det gjelder før du endrer noe.",
@@ -227,7 +233,7 @@ export const VOICE_ONLY_BOOKING_TOOL_SCHEMAS = {
  */
 export const REQUEST_CALLBACK_SCHEMA = {
   description:
-    "Tar imot en beskjed slik at en medarbeider kan ringe kunden tilbake. Bruk når kunden ber om å snakke med et menneske, eller når du ikke kan hjelpe med det de spør om. Si tydelig at du ikke kan sette over, men at du gjerne tar imot beskjeden. Si aldri at noen vil ringe før verktøyet har svart success: true.",
+    "Sender en beskjed til avdelingen slik at en medarbeider kan følge opp kunden. Bruk når kunden ber om å snakke med et menneske, når du ikke kan hjelpe med det de spør om, eller når instruksene dine sier at henvendelsen skal sendes videre som en oppsummering. Si aldri at noen vil ta kontakt før verktøyet har svart success: true.",
   parameters: {
     type: "object",
     properties: {
@@ -239,14 +245,24 @@ export const REQUEST_CALLBACK_SCHEMA = {
       message: {
         type: "string",
         description:
-          "Kort beskrivelse av hva kunden ønsker, slik at den som ringer tilbake vet hva det gjelder. F.eks. 'Vil ha pris på lakkforsegling til en varebil'.",
+          "Kort beskrivelse av hva kunden ønsker, slik at den som følger opp vet hva det gjelder. F.eks. 'Vil ha pris på lakkforsegling til en varebil' eller 'Motorlampe lyser, ønsker feilsøking'.",
       },
       customer_name: {
-        type: "string",
-        description: "Kundens fornavn, hvis oppgitt.",
+        type: ["string", "null"],
+        description: "Kundens navn, hvis oppgitt. Null hvis ikke.",
+      },
+      customer_email: {
+        type: ["string", "null"],
+        description:
+          "Kundens e-postadresse, hvis instruksene dine ber deg samle den og kunden har bekreftet den. Null hvis ikke.",
+      },
+      vehicle: {
+        type: ["string", "null"],
+        description:
+          "Bilen det gjelder — merke og modell, og registreringsnummer når kunden har oppgitt det, f.eks. 'Volkswagen Golf, EB 10001'. Null hvis ikke aktuelt.",
       },
     },
-    required: ["customer_phone", "message"],
+    required: ["customer_phone", "message", "customer_name", "customer_email", "vehicle"],
     additionalProperties: false,
   },
 };
@@ -512,10 +528,12 @@ export async function execBookingTool(
     }
 
     if (name === REQUEST_CALLBACK_TOOL) {
-      const { customer_phone, message, customer_name } = (input ?? {}) as {
+      const { customer_phone, message, customer_name, customer_email, vehicle } = (input ?? {}) as {
         customer_phone?: string;
         message?: string;
-        customer_name?: string;
+        customer_name?: string | null;
+        customer_email?: string | null;
+        vehicle?: string | null;
       };
       if (!customer_phone || !message) {
         return { success: false, error: "Mangler telefonnummer eller beskjed." };
@@ -528,13 +546,15 @@ export async function execBookingTool(
         kind: "callback",
         date: now.date,
         time: now.time,
-        customerName: customer_name,
+        customerName: customer_name?.trim() || undefined,
         customerPhone: customer_phone,
+        customerEmail: customer_email?.trim() || undefined,
+        vehicle: vehicle?.trim() || undefined,
         note: message,
         scope,
       });
       return sent.sent
-        ? { success: true, note: "Beskjeden er sendt til avdelingen. Bekreft til kunden at noen ringer tilbake." }
+        ? { success: true, note: "Beskjeden er sendt til avdelingen. Bekreft til kunden at noen tar kontakt." }
         : {
             success: false,
             error:

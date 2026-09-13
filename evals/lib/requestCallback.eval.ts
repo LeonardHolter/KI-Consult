@@ -110,6 +110,68 @@ describe("request_callback", () => {
   });
 });
 
+// The intake use (Hedin Automotive Haugesund, 2026-09-13): an agent whose
+// whole job is to collect the errand, the car and how to reach the customer,
+// then hand it to the service desk as one summary. E-mail and vehicle are
+// optional so the message-taking agents stay exactly as they were.
+describe("request_callback as an intake summary", () => {
+  it("passes e-mail and vehicle through to the shop mail", async () => {
+    const result = await execBookingTool(
+      CLIENT,
+      REQUEST_CALLBACK_TOOL,
+      {
+        customer_phone: "+4798361774",
+        message: "Motorlampe lyser, ønsker feilsøking",
+        customer_name: "Kari Nordmann",
+        customer_email: "kari@example.com",
+        vehicle: "Volkswagen Golf, EB 10001",
+      },
+      "live",
+    );
+    expect(result.success).toBe(true);
+    expect(notifyShop).toHaveBeenCalledWith(
+      CLIENT,
+      expect.objectContaining({
+        kind: "callback",
+        customerEmail: "kari@example.com",
+        vehicle: "Volkswagen Golf, EB 10001",
+        note: "Motorlampe lyser, ønsker feilsøking",
+      }),
+    );
+  });
+
+  it("treats null/blank e-mail and vehicle as absent, not as literal text", async () => {
+    await execBookingTool(
+      CLIENT,
+      REQUEST_CALLBACK_TOOL,
+      { customer_phone: "98361774", message: "Vil ha pris", customer_name: null, customer_email: "  ", vehicle: null },
+      "live",
+    );
+    const sent = vi.mocked(notifyShop).mock.calls[0][1];
+    expect(sent.customerEmail).toBeUndefined();
+    expect(sent.vehicle).toBeUndefined();
+    expect(sent.customerName).toBeUndefined();
+  });
+
+  it("the mail lists e-post and bil when present", async () => {
+    const { buildShopEmail } = await import("@/lib/notifyEmail");
+    const mail = buildShopEmail("Hedin Automotive Haugesund", {
+      kind: "callback",
+      date: "2026-09-13",
+      time: "10:12",
+      customerPhone: "+4798361774",
+      customerName: "Kari Nordmann",
+      customerEmail: "kari@example.com",
+      vehicle: "Volkswagen Golf, EB 10001",
+      note: "Motorlampe lyser, ønsker feilsøking",
+      scope: "live",
+    });
+    expect(mail.text).toContain("E-post: kari@example.com");
+    expect(mail.text).toContain("Bil: Volkswagen Golf, EB 10001");
+    expect(mail.text).toContain("Beskjed: Motorlampe lyser");
+  });
+});
+
 describe("the callback e-mail itself", () => {
   it("puts the number in the subject and the errand in the body", async () => {
     const { buildShopEmail } = await import("@/lib/notifyEmail");
