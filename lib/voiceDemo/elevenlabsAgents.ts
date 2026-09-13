@@ -10,6 +10,11 @@ export const ELEVENLABS_VOICE_AGENTS: Record<string, string> = {
   // etter pilotuka. Linjen +47 32 99 42 23 og verktøyene svitsjer med denne
   // linjen; fjern den for øyeblikkelig rollback til OpenAI-agenten.
   "ad19951e-00e1-4293-8975-6c6bb1dbdad7": "agent_6301m0fs6p40feyaev39cv3qnn6c",
+  // Hedin Automotive Haugesund — serviceavdelingens intake-agent (2026-09-13).
+  // Linjen +47 23 50 96 52 (overtatt fra test_kunde) og de to webhook-
+  // verktøyene (lookup_vehicle, request_callback) følger denne linjen.
+  // Agenten bygges/oppdateres med scripts/setup-hedin.mjs i ellevenlabs-test.
+  "9c17e3d8-0fef-41d5-bb0b-7abcd7741029": "agent_2101m2dtfrgqek6as9aypd2wsrpb",
 };
 
 export function elevenlabsAgentIdFor(clientId: string | null | undefined): string | null {
