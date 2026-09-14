@@ -5,6 +5,7 @@ vi.mock("@/lib/settings", () => ({
 }));
 vi.mock("@/lib/bookingTools", () => ({
   execBookingTool: vi.fn(async () => ({ success: true, echo: true })),
+  LOOKUP_VEHICLE_TOOL: "lookup_vehicle",
 }));
 vi.mock("@/lib/botEvents", () => ({ logBotEvent: vi.fn(async () => {}) }));
 
@@ -13,6 +14,7 @@ import { OPENAI_SIP_URI } from "@/lib/telephony/config";
 import { POST as toolsPost } from "@/app/api/telephony/elevenlabs-tools/route";
 import { POST as initPost } from "@/app/api/telephony/elevenlabs-init/route";
 import { execBookingTool } from "@/lib/bookingTools";
+import { loadSettings } from "@/lib/settings";
 
 // The ElevenLabs pilot must be surgically scoped: ONLY clients in the
 // ELEVENLABS_VOICE_AGENTS map may be dialed to ElevenLabs or execute tools
@@ -150,6 +152,39 @@ describe("ElevenLabs webhook endpoints", () => {
       {},
       "sandbox",
     );
+  });
+
+  // The caller hears this one: they confirm their plate, say yes, and the
+  // agent's next turn is a silent tool call. A settings round trip in front
+  // of a lookup that never reads settings is pure dead air.
+  it("skips the settings round trip for lookup_vehicle, which never uses scope", async () => {
+    vi.stubEnv("ELEVENLABS_TOOLS_SECRET", SECRET);
+    vi.mocked(loadSettings).mockClear();
+    const res = await toolsPost(
+      new Request(
+        `https://www.kiconsult.no/api/telephony/elevenlabs-tools?client=${PILOT_CLIENT}&tool=lookup_vehicle`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-tools-secret": SECRET },
+          body: JSON.stringify({ registration_number: "EB10001" }),
+        },
+      ),
+    );
+    expect(res.status).toBe(200);
+    expect(loadSettings).not.toHaveBeenCalled();
+    expect(execBookingTool).toHaveBeenCalledWith(
+      PILOT_CLIENT,
+      "lookup_vehicle",
+      { registration_number: "EB10001" },
+      expect.any(String),
+    );
+  });
+
+  it("still reads the scope from settings for booking tools", async () => {
+    vi.stubEnv("ELEVENLABS_TOOLS_SECRET", SECRET);
+    vi.mocked(loadSettings).mockClear();
+    await toolsPost(toolsReq({ "x-tools-secret": SECRET }));
+    expect(loadSettings).toHaveBeenCalledWith(PILOT_CLIENT);
   });
 
   it("init webhook returns date context and the SYSTEMINFO block for plausible callers only", async () => {

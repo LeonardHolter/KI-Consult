@@ -10,10 +10,11 @@
 // no matter what the URL says. The booking scope is decided server-side from
 // the client's saved settings, exactly like /api/portal/voice-agent/tools.
 
-import { execBookingTool } from "@/lib/bookingTools";
+import { execBookingTool, LOOKUP_VEHICLE_TOOL } from "@/lib/bookingTools";
 import { loadSettings } from "@/lib/settings";
 import { logBotEvent } from "@/lib/botEvents";
 import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
+import type { BookingScope } from "@/lib/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,19 @@ export async function POST(req: Request) {
   }
 
   const args = await req.json().catch(() => ({}));
-  const settings = await loadSettings(clientId);
-  const scope = settings.voiceBookingMode === "live" ? "live" : "sandbox";
+
+  // lookup_vehicle is a read-only registry lookup: it never reads or writes a
+  // booking, so the scope it would be handed goes unused. Loading settings
+  // anyway costs a Blob round trip on the ONE call the caller sits through in
+  // silence — the agent confirms the plate, the customer says yes, and the
+  // next turn opens with a tool call and no speech. Every hop removed there
+  // is heard. Scope still decides live-vs-sandbox for every booking tool.
+  const needsScope = tool !== LOOKUP_VEHICLE_TOOL;
+  const scope: BookingScope = needsScope
+    ? (await loadSettings(clientId)).voiceBookingMode === "live"
+      ? "live"
+      : "sandbox"
+    : "live";
 
   const result = await execBookingTool(clientId, tool, args, scope);
 
@@ -42,7 +54,14 @@ export async function POST(req: Request) {
       clientId,
       surface: "voice",
       type: "tool_error",
-      detail: { tool, scope, error: String(result.error ?? "unknown"), via: "elevenlabs-webhook" },
+      // Scope is omitted where it was never consulted, so the log does not
+      // claim a booking mode this call never had.
+      detail: {
+        tool,
+        ...(needsScope ? { scope } : {}),
+        error: String(result.error ?? "unknown"),
+        via: "elevenlabs-webhook",
+      },
     });
   }
 
