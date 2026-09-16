@@ -3,7 +3,7 @@
 // and body that production sends, without dragging in Supabase/Blob config.
 
 export type ShopNotification = {
-  kind: "booking" | "note" | "reschedule" | "callback";
+  kind: "booking" | "note" | "reschedule" | "callback" | "transcript";
   /** For callback-kind this is when the CALL came in, not an appointment. */
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
@@ -22,6 +22,12 @@ export type ShopNotification = {
   /** reschedule-kind only: where the booking moved from. */
   oldDate?: string;
   oldTime?: string;
+  /** transcript-kind: the finished conversation, one line per turn, already
+   *  formatted by lib/telephony/postCall.ts. Only ever set post-call — the
+   *  summary mail goes out mid-call, when no full transcript exists yet. */
+  transcript?: string[];
+  /** transcript-kind: how long the call lasted, in seconds. */
+  durationSecs?: number;
   /** Sandbox bookings are test traffic and must never read as real customers. */
   scope: "live" | "sandbox";
 };
@@ -67,10 +73,23 @@ export function buildShopEmail(
             // belongs in the subject line where it can be acted on from a
             // phone's lock screen.
             `Ønsker å bli oppringt: ${n.customerPhone}`
-          : `Notat på booking ${when}`);
+          : n.kind === "transcript"
+            ? // Deliberately echoes the callback subject's number: in an inbox
+              // sorted by time the two mails for one call land together, and
+              // the adviser can see at a glance which enquiry this belongs to.
+              `Samtale med ${n.customerPhone} — hele samtalen`
+            : `Notat på booking ${when}`);
 
   const rows: [string, string][] = [];
-  if (n.kind === "callback") {
+  if (n.kind === "transcript") {
+    rows.push(["Ringte", when]);
+    rows.push(["Telefon", n.customerPhone]);
+    if (n.durationSecs !== undefined) {
+      const m = Math.floor(n.durationSecs / 60);
+      const s = n.durationSecs % 60;
+      rows.push(["Varighet", m ? `${m} min ${s} sek` : `${s} sek`]);
+    }
+  } else if (n.kind === "callback") {
     rows.push(["Ringte", when]);
     if (n.customerName) rows.push(["Navn", n.customerName]);
     rows.push(["Telefon", n.customerPhone]);
@@ -83,7 +102,7 @@ export function buildShopEmail(
   } else {
     rows.push(["Tidspunkt", when]);
   }
-  if (n.kind !== "callback") {
+  if (n.kind !== "callback" && n.kind !== "transcript") {
     if (n.service) rows.push(["Tjeneste", n.service]);
     if (n.customerName) rows.push(["Kunde", n.customerName]);
     rows.push(["Telefon", n.customerPhone]);
@@ -97,7 +116,9 @@ export function buildShopEmail(
         ? "KI-resepsjonisten har flyttet en eksisterende booking."
         : n.kind === "callback"
           ? "KI-resepsjonisten tok imot en henvendelse som trenger oppfølging fra dere — ring kunden tilbake."
-          : "KI-resepsjonisten har lagt et notat på en eksisterende booking.";
+          : n.kind === "transcript"
+            ? "Her er hele samtalen, ord for ord. Selve henvendelsen er allerede sendt i en egen e-post."
+            : "KI-resepsjonisten har lagt et notat på en eksisterende booking.";
 
   const testWarning = test
     ? n.kind === "callback"
@@ -105,11 +126,14 @@ export function buildShopEmail(
       : "Dette er en TESTBOOKING fra testkalenderen — ikke en ekte kunde. Den krever ingen handling."
     : "";
 
+  const lines = n.kind === "transcript" ? (n.transcript ?? []) : [];
+
   const text = [
     ...(testWarning ? [testWarning, ""] : []),
     intro,
     "",
     ...rows.map(([k, v]) => `${k}: ${v}`),
+    ...(lines.length ? ["", "--- SAMTALEN ---", ...lines] : []),
     "",
     `Alle detaljer og samtaleopptak: https://www.kiconsult.no/login`,
     "",
@@ -127,6 +151,21 @@ export function buildShopEmail(
         )
         .join("\n      ")}
     </table>
+    ${
+      lines.length
+        ? `<h3 style="margin:22px 0 8px;font-size:15px">Samtalen</h3>
+    <div style="border-left:3px solid #15c07c;padding-left:14px">
+      ${lines
+        // The caller's own words are the ones an adviser scans for, so they
+        // carry the weight; the agent's turns stay grey and recede.
+        .map((l) => {
+          const isCustomer = /^(\[\d{2}:\d{2}\]\s*)?Kunde:/.test(l);
+          return `<p style="margin:0 0 6px;line-height:1.45;color:${isCustomer ? "#16190f" : "#6b6b6b"}">${escapeHtml(l)}</p>`;
+        })
+        .join("\n      ")}
+    </div>`
+        : ""
+    }
     <p>Alle detaljer og samtaleopptak finner dere i <a href="https://www.kiconsult.no/login">portalen</a>.</p>
     <p style="color:#888">— KI Consult, på vegne av ${escapeHtml(clientName)}</p>`;
 

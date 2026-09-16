@@ -20,3 +20,12 @@ export const ELEVENLABS_VOICE_AGENTS: Record<string, string> = {
 export function elevenlabsAgentIdFor(clientId: string | null | undefined): string | null {
   return clientId ? (ELEVENLABS_VOICE_AGENTS[clientId] ?? null) : null;
 }
+
+/** The reverse: which client does an agent belong to. The post-call webhook
+ *  is identified by agent, not client — ElevenLabs knows nothing about our
+ *  client ids — so this is how a finished conversation finds its shop. */
+export function clientIdForElevenlabsAgent(agentId: string | null | undefined): string | null {
+  if (!agentId) return null;
+  const hit = Object.entries(ELEVENLABS_VOICE_AGENTS).find(([, id]) => id === agentId);
+  return hit ? hit[0] : null;
+}
