@@ -16,6 +16,7 @@ import {
   verifyElevenLabsWebhook,
   formatTranscript,
   hasCallback,
+  callbackDetails,
   type TranscriptTurn,
 } from "@/lib/telephony/postCall";
 import { clientIdForElevenlabsAgent } from "@/lib/voiceDemo/elevenlabsAgents";
@@ -85,14 +86,25 @@ export async function POST(req: Request) {
   const settings = await loadSettings(clientId);
   const now = osloParts(new Date().toISOString());
   const external = data.metadata?.phone_call?.external_number;
+  // On the combined mail this is the ONLY notification the shop gets, so the
+  // enquiry rides along with the transcript. The agent's own arguments are
+  // the source — the same ones the mid-call mail would have used.
+  const details = settings.combinedCallEmail ? callbackDetails(data.transcript) : null;
 
   await notifyShop(clientId, {
     kind: "transcript",
     date: now.date,
     time: now.time,
-    // Browser sessions have no external number; say so rather than printing
-    // an empty field the reader has to interpret.
-    customerPhone: external ? normalizeNumber(external) : "nettleser-demo",
+    // Prefer the number the agent confirmed with the caller: on a call
+    // forwarded from another line, the number to ring back is the one the
+    // customer gave, not the one the call arrived on.
+    customerPhone:
+      details?.customerPhone ??
+      (external ? normalizeNumber(external) : "nettleser-demo"),
+    customerName: details?.customerName,
+    customerEmail: details?.customerEmail,
+    vehicle: details?.vehicle,
+    note: details?.message,
     transcript: lines,
     durationSecs: data.metadata?.call_duration_secs,
     scope: settings.voiceBookingMode === "live" ? "live" : "sandbox",

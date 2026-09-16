@@ -68,8 +68,50 @@ export type TranscriptTurn = {
   role?: string;
   message?: string | null;
   time_in_call_secs?: number;
-  tool_calls?: Array<{ tool_name?: string }> | null;
+  tool_calls?: Array<{ tool_name?: string; params_as_json?: string | null }> | null;
 };
+
+export type CallbackDetails = {
+  customerPhone?: string;
+  customerName?: string;
+  customerEmail?: string;
+  vehicle?: string;
+  message?: string;
+};
+
+/**
+ * The enquiry itself, read back out of the request_callback tool call.
+ * ElevenLabs replays the arguments the agent filled in — the same values the
+ * mid-call mail was built from — so a client on the combined mail loses
+ * nothing by not sending one while the call is still running.
+ *
+ * Takes the LAST such call: a caller who corrects themselves triggers a
+ * second, and the correction is the one that counts.
+ */
+export function callbackDetails(
+  turns: TranscriptTurn[] | null | undefined,
+): CallbackDetails | null {
+  if (!Array.isArray(turns)) return null;
+  const calls = turns
+    .flatMap((t) => t.tool_calls ?? [])
+    .filter((c) => c?.tool_name === "request_callback");
+  const last = calls[calls.length - 1];
+  if (!last?.params_as_json) return null;
+  try {
+    const p = JSON.parse(last.params_as_json) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+    return {
+      customerPhone: str(p.customer_phone),
+      customerName: str(p.customer_name),
+      customerEmail: str(p.customer_email),
+      vehicle: str(p.vehicle),
+      message: str(p.message),
+    };
+  } catch {
+    // Malformed arguments must not cost the shop the transcript.
+    return null;
+  }
+}
 
 /** mm:ss — a caller saying "three minutes in she got it wrong" should be able
  *  to find the spot without counting lines. */

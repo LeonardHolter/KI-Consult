@@ -38,6 +38,14 @@ export type Settings = {
   /** Where the shop wants booking/message e-mails (lib/notify.ts). Absent or
    *  empty = no e-mails for this client. */
   notificationEmail?: string;
+  /** Send ONE e-mail per call — enquiry and full transcript together, after
+   *  the call — instead of a summary mid-call plus a transcript after.
+   *
+   *  Only safe for a client whose agent has ElevenLabs' post-call webhook
+   *  wired up (lib/telephony/postCall.ts): without it nothing would ever be
+   *  sent, because the mid-call mail is the one being suppressed. Absent =
+   *  today's two-mail behaviour, so no existing client changes. */
+  combinedCallEmail?: boolean;
   /** Whether the client's dashboard shows the KPI tiles. Absent = shown. */
   showKpis?: boolean;
   /** Whether the client's dashboard shows the booking calendar (grid, scope

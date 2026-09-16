@@ -74,16 +74,25 @@ export function buildShopEmail(
             // phone's lock screen.
             `Ønsker å bli oppringt: ${n.customerPhone}`
           : n.kind === "transcript"
-            ? // Deliberately echoes the callback subject's number: in an inbox
-              // sorted by time the two mails for one call land together, and
-              // the adviser can see at a glance which enquiry this belongs to.
-              `Samtale med ${n.customerPhone} — hele samtalen`
+            ? n.note
+              ? // Carrying the enquiry makes this the only mail for the call,
+                // so it has to read as the to-do the callback subject was —
+                // phone number first, actionable from a lock screen.
+                `Ønsker å bli oppringt: ${n.customerPhone}`
+              : // Transcript only: the enquiry went out separately. Echoes
+                // that subject's number so the two land together in an inbox
+                // sorted by time.
+                `Samtale med ${n.customerPhone} — hele samtalen`
             : `Notat på booking ${when}`);
 
   const rows: [string, string][] = [];
   if (n.kind === "transcript") {
     rows.push(["Ringte", when]);
+    if (n.customerName) rows.push(["Navn", n.customerName]);
     rows.push(["Telefon", n.customerPhone]);
+    if (n.customerEmail) rows.push(["E-post", n.customerEmail]);
+    if (n.vehicle) rows.push(["Bil", n.vehicle]);
+    if (n.note) rows.push(["Beskjed", n.note]);
     if (n.durationSecs !== undefined) {
       const m = Math.floor(n.durationSecs / 60);
       const s = n.durationSecs % 60;
@@ -117,7 +126,9 @@ export function buildShopEmail(
         : n.kind === "callback"
           ? "KI-resepsjonisten tok imot en henvendelse som trenger oppfølging fra dere — ring kunden tilbake."
           : n.kind === "transcript"
-            ? "Her er hele samtalen, ord for ord. Selve henvendelsen er allerede sendt i en egen e-post."
+            ? n.note
+              ? "KI-resepsjonisten tok imot en henvendelse som trenger oppfølging fra dere — ring kunden tilbake. Hele samtalen står nederst."
+              : "Her er hele samtalen, ord for ord. Selve henvendelsen er allerede sendt i en egen e-post."
             : "KI-resepsjonisten har lagt et notat på en eksisterende booking.";
 
   const testWarning = test

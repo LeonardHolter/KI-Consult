@@ -8,13 +8,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { notifyShop, loadSettings } = vi.hoisted(() => ({
   notifyShop: vi.fn(async () => ({ sent: true })),
-  loadSettings: vi.fn(async () => ({ voiceBookingMode: "live" })),
+  // Typed wider than the default so a test can flip combinedCallEmail on.
+  loadSettings: vi.fn(
+    async (): Promise<{ voiceBookingMode?: string; combinedCallEmail?: boolean }> => ({
+      voiceBookingMode: "live",
+    }),
+  ),
 }));
 vi.mock("@/lib/notify", () => ({ notifyShop }));
 vi.mock("@/lib/settings", () => ({ loadSettings }));
 
 import { POST } from "@/app/api/telephony/elevenlabs-post-call/route";
-import { formatTranscript, hasCallback, verifyElevenLabsWebhook } from "@/lib/telephony/postCall";
+import {
+  callbackDetails,
+  formatTranscript,
+  hasCallback,
+  verifyElevenLabsWebhook,
+} from "@/lib/telephony/postCall";
 
 const SECRET = "wsec_eval";
 /** Hedin Automotive Haugesund — the agent this was built for. */
@@ -26,7 +36,22 @@ const turns = [
   { role: "user", message: "Jeg trenger EU-kontroll.", time_in_call_secs: 4 },
   { role: "agent", message: "", time_in_call_secs: 9, tool_calls: [{ tool_name: "lookup_vehicle" }] },
   { role: "user", message: "BS 12345.", time_in_call_secs: 12 },
-  { role: "agent", message: "Takk, jeg sender dette videre.", time_in_call_secs: 70, tool_calls: [{ tool_name: "request_callback" }] },
+  {
+    role: "agent",
+    message: "Takk, jeg sender dette videre.",
+    time_in_call_secs: 70,
+    tool_calls: [
+      {
+        tool_name: "request_callback",
+        params_as_json: JSON.stringify({
+          customer_phone: "+4748435330",
+          message: "Bytte vindusviskere.",
+          customer_name: "William",
+          vehicle: "Porsche Cayenne Turbo S E-Hybrid, DR 74619",
+        }),
+      },
+    ],
+  },
 ];
 
 const payload = (over: Record<string, unknown> = {}) =>
@@ -124,6 +149,54 @@ describe("post-call webhook delivery", () => {
     await POST(signed(raw));
     const [, n] = notifyShop.mock.calls[0] as unknown as [string, Record<string, unknown>];
     expect(n.customerPhone).toBe("nettleser-demo");
+  });
+});
+
+describe("combined mail (one per call)", () => {
+  it("carries the enquiry so the single mail is the whole record", async () => {
+    loadSettings.mockResolvedValueOnce({ voiceBookingMode: "live", combinedCallEmail: true });
+    await POST(signed(payload()));
+    const [, n] = notifyShop.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(n.customerName).toBe("William");
+    expect(n.vehicle).toBe("Porsche Cayenne Turbo S E-Hybrid, DR 74619");
+    expect(n.note).toBe("Bytte vindusviskere.");
+    // The number the caller confirmed wins over the line the call arrived on.
+    expect(n.customerPhone).toBe("+4748435330");
+  });
+
+  it("leaves the enquiry out when the shop still gets the mid-call mail", async () => {
+    loadSettings.mockResolvedValueOnce({ voiceBookingMode: "live" });
+    await POST(signed(payload()));
+    const [, n] = notifyShop.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(n.note).toBeUndefined();
+    expect(n.customerName).toBeUndefined();
+  });
+
+  it("takes the caller's correction, not their first answer", () => {
+    const corrected = [
+      ...turns,
+      {
+        role: "agent",
+        message: "Oppdatert.",
+        time_in_call_secs: 90,
+        tool_calls: [
+          {
+            tool_name: "request_callback",
+            params_as_json: JSON.stringify({
+              customer_phone: "+4799999999",
+              message: "OPPDATERT: bytte vindusviskere og EU-kontroll.",
+            }),
+          },
+        ],
+      },
+    ];
+    expect(callbackDetails(corrected)?.customerPhone).toBe("+4799999999");
+  });
+
+  it("keeps the transcript even when the arguments are malformed", () => {
+    const broken = [{ role: "agent", tool_calls: [{ tool_name: "request_callback", params_as_json: "{ikke json" }] }];
+    expect(callbackDetails(broken)).toBeNull();
+    expect(hasCallback(broken)).toBe(true);
   });
 });
 

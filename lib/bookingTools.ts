@@ -24,6 +24,7 @@ import {
 } from "@/lib/slots";
 import { osloParts } from "@/lib/google-calendar";
 import { notifyShop } from "@/lib/notify";
+import { loadSettings } from "@/lib/settings";
 import { lookupVehicle, vegvesenConfigured } from "@/lib/vehicleLookup";
 
 export const GET_SLOTS_TOOL = "get_available_demo_slots";
@@ -539,6 +540,19 @@ export async function execBookingTool(
         return { success: false, error: "Mangler telefonnummer eller beskjed." };
       }
       const now = osloParts(new Date().toISOString());
+
+      // Clients on the combined mail get nothing here: the post-call webhook
+      // sends one mail with this enquiry AND the full transcript, which does
+      // not exist yet while the agent is still on the line. The enquiry is
+      // not lost by skipping — ElevenLabs stores the tool call with these
+      // exact arguments, and that is what the webhook reads back.
+      if ((await loadSettings(clientId)).combinedCallEmail) {
+        return {
+          success: true,
+          note: "Beskjeden er registrert. Bekreft til kunden at noen tar kontakt.",
+        };
+      }
+
       // Awaited, unlike a booking's notification: here the e-mail IS the
       // outcome. There is nothing else written down, so promising the caller
       // a call back before knowing it was sent would be a promise to nobody.
