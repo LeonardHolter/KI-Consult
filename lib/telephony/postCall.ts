@@ -127,14 +127,49 @@ function stamp(seconds: number | undefined): string {
  * nothing a service adviser can read, and they break the back-and-forth
  * rhythm that makes a transcript skimmable.
  */
+/**
+ * Strips the hesitation sounds speech-to-text writes down verbatim — «eh»,
+ * «øh», «hmm». Nobody reading back an enquiry needs them, and they make a
+ * caller look less articulate than they sounded.
+ *
+ * Whole words only: «eh» must not eat the «eh» inside «behandling», and the
+ * list stays short on purpose. «Ja» and «nei» are answers, never filler.
+ */
+export function stripFillers(text: string): string {
+  // \b is ASCII-only, so it finds no boundary before «ø» or «æ» and would
+  // leave «øh» untouched. Unicode lookarounds work for Norwegian letters.
+  const F = "(?<![\\p{L}\\p{N}])(?:e+h+m?|ø+h+m?|æ+h+|hm+|mm+)(?![\\p{L}\\p{N}])";
+  const cleaned = text
+    // Leading fillers, with whatever comma or dash trails them.
+    .replace(new RegExp(`^(?:\\s*${F}[\\s,.\\-–—]*)+`, "giu"), "")
+    // Mid-sentence: swallow the commas that framed the filler, so
+    // «Ja, ehh, de, eh, bruker» does not become «Ja, , de, , bruker».
+    .replace(new RegExp(`[\\s,]*${F}[\\s,]*`, "giu"), " ")
+    .replace(/\s{2,}/g, " ")
+    // Tidy punctuation left stranded by a removal.
+    .replace(/\s+([,.!?])/g, "$1")
+    .replace(/,\s*([,.!?])/g, "$1")
+    .trim()
+    // A turn that was nothing but filler should not come back as «, .»
+    .replace(/^[,.\-–—\s]+/, "");
+  // Removing a leading «Eh,» must not leave the sentence in lower case.
+  return cleaned && cleaned[0] !== text[0]
+    ? cleaned[0].toLocaleUpperCase("no") + cleaned.slice(1)
+    : cleaned;
+}
+
 export function formatTranscript(turns: TranscriptTurn[] | null | undefined): string[] {
   if (!Array.isArray(turns)) return [];
   return turns
-    .filter((t) => typeof t.message === "string" && t.message.trim().length > 0)
+    .map((t) => ({ ...t, clean: typeof t.message === "string" ? stripFillers(t.message) : "" }))
+    // Drop turns that held nothing but hesitation — an «Eh.» line is noise
+    // in a written record, and dropping it after cleaning is the only way to
+    // catch the ones that were never anything else.
+    .filter((t) => t.clean.length > 0)
     .map((t) => {
       const who = t.role === "user" ? "Kunde" : "Agent";
       const at = stamp(t.time_in_call_secs);
-      return `${at ? `[${at}] ` : ""}${who}: ${(t.message as string).trim()}`;
+      return `${at ? `[${at}] ` : ""}${who}: ${t.clean}`;
     });
 }
 

@@ -22,6 +22,7 @@ import { POST } from "@/app/api/telephony/elevenlabs-post-call/route";
 import {
   callbackDetails,
   formatTranscript,
+  stripFillers,
   hasCallback,
   verifyElevenLabsWebhook,
 } from "@/lib/telephony/postCall";
@@ -219,5 +220,33 @@ describe("transcript shaping", () => {
     const v0 = crypto.createHmac("sha256", SECRET).update(`${t}.${raw}`).digest("hex");
     const tampered = raw.replace("EU-kontroll", "noe helt annet");
     expect(verifyElevenLabsWebhook(tampered, `t=${t},v0=${v0}`, SECRET).ok).toBe(false);
+  });
+});
+
+describe("hesitation sounds", () => {
+  it("strips them without touching words that merely contain the letters", () => {
+    expect(stripFillers("Ja, ehh, de, eh, bruker IF-forsikring.")).toBe("Ja de bruker IF-forsikring.");
+    expect(stripFillers("Vi trenger et dekkhotell, øh, til vinteren.")).toBe(
+      "Vi trenger et dekkhotell til vinteren.",
+    );
+    // «eh» lives inside both of these; neither may lose it.
+    expect(stripFillers("Behandlingen var grei.")).toBe("Behandlingen var grei.");
+    expect(stripFillers("Jeg heter Mehmet.")).toBe("Jeg heter Mehmet.");
+    // Answers are not filler, however short.
+    expect(stripFillers("Ja.")).toBe("Ja.");
+    expect(stripFillers("Nei, det går bra.")).toBe("Nei, det går bra.");
+  });
+
+  it("keeps the sentence capitalised when the filler led it", () => {
+    expect(stripFillers("Eh, jeg vil bytte vindusviskere.")).toBe("Jeg vil bytte vindusviskere.");
+    expect(stripFillers("Hmm, det stemmer.")).toBe("Det stemmer.");
+  });
+
+  it("drops a turn that was nothing but hesitation", () => {
+    const lines = formatTranscript([
+      { role: "user", message: "Eh.", time_in_call_secs: 5 },
+      { role: "user", message: "Ja, eh, det stemmer.", time_in_call_secs: 71 },
+    ]);
+    expect(lines).toEqual(["[01:11] Kunde: Ja det stemmer."]);
   });
 });
