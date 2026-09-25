@@ -10,7 +10,7 @@
 // no matter what the URL says. The booking scope is decided server-side from
 // the client's saved settings, exactly like /api/portal/voice-agent/tools.
 
-import { execBookingTool, LOOKUP_VEHICLE_TOOL } from "@/lib/bookingTools";
+import { execBookingTool, LOOKUP_VEHICLE_TOOL, SEND_RECALL_LINK_TOOL } from "@/lib/bookingTools";
 import { loadSettings } from "@/lib/settings";
 import { logBotEvent } from "@/lib/botEvents";
 import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   // silence — the agent confirms the plate, the customer says yes, and the
   // next turn opens with a tool call and no speech. Every hop removed there
   // is heard. Scope still decides live-vs-sandbox for every booking tool.
-  const needsScope = tool !== LOOKUP_VEHICLE_TOOL;
+  const needsScope = tool !== LOOKUP_VEHICLE_TOOL && tool !== SEND_RECALL_LINK_TOOL;
   const scope: BookingScope = needsScope
     ? (await loadSettings(clientId)).voiceBookingMode === "live"
       ? "live"

@@ -6,6 +6,7 @@ vi.mock("@/lib/settings", () => ({
 vi.mock("@/lib/bookingTools", () => ({
   execBookingTool: vi.fn(async () => ({ success: true, echo: true })),
   LOOKUP_VEHICLE_TOOL: "lookup_vehicle",
+  SEND_RECALL_LINK_TOOL: "send_recall_link",
 }));
 vi.mock("@/lib/botEvents", () => ({ logBotEvent: vi.fn(async () => {}) }));
 

@@ -26,6 +26,7 @@ import { osloParts } from "@/lib/google-calendar";
 import { notifyShop } from "@/lib/notify";
 import { loadSettings } from "@/lib/settings";
 import { lookupVehicle, vegvesenConfigured } from "@/lib/vehicleLookup";
+import { sendSms } from "@/lib/telephony/sms";
 
 export const GET_SLOTS_TOOL = "get_available_demo_slots";
 export const BOOK_SLOT_TOOL = "book_demo_slot";
@@ -34,6 +35,12 @@ export const LOOKUP_VEHICLE_TOOL = "lookup_vehicle";
 export const FIND_BOOKINGS_TOOL = "find_my_bookings";
 export const RESCHEDULE_TOOL = "reschedule_booking";
 export const REQUEST_CALLBACK_TOOL = "request_callback";
+export const SEND_RECALL_LINK_TOOL = "send_recall_link";
+
+/** The BMW technical-recall form. One link, one audience — kept here rather
+ *  than in the agent prompt so a changed URL is a code change with a diff,
+ *  not a silent edit in a vendor dashboard. */
+export const RECALL_FORM_URL = "https://forms.gle/1q5gYcVJTccBvY797";
 
 const WEEKDAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
 
@@ -573,6 +580,24 @@ export async function execBookingTool(
             success: false,
             error:
               "Klarte ikke sende beskjeden. Be kunden ringe avdelingen direkte i stedet.",
+          };
+    }
+
+    if (name === SEND_RECALL_LINK_TOOL) {
+      const { customer_phone } = (input ?? {}) as { customer_phone?: string };
+      if (!customer_phone) return { success: false, error: "Mangler telefonnummer." };
+      const result = await sendSms(
+        customer_phone,
+        `Hei! Her er skjemaet for teknisk innkalling hos Hedin Automotive Haugesund: ${RECALL_FORM_URL}`,
+      );
+      // The agent is standing in a conversation telling someone a text is on
+      // its way. It may only say that after Telnyx has taken the message.
+      return result.sent
+        ? { success: true, note: "Lenken er sendt på SMS. Bekreft til kunden at den er på vei." }
+        : {
+            success: false,
+            error:
+              "Klarte ikke sende SMS-en. Si at serviceavdelingen sender lenken når de tar kontakt — lov ALDRI en SMS som ikke gikk.",
           };
     }
 
