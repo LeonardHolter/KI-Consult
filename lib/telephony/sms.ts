@@ -53,9 +53,23 @@ export async function sendSms(to: string, text: string): Promise<SmsResult> {
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
-      const detail = (await res.text()).slice(0, 300);
-      console.warn(`[sms] Telnyx ${res.status}: ${detail}`);
-      return { sent: false, reason: `Telnyx ${res.status}` };
+      const body = (await res.text()).slice(0, 500);
+      console.warn(`[sms] Telnyx ${res.status}: ${body}`);
+      // Telnyx explains the refusal in errors[]; a bare status code leaves
+      // "profile has no sender for this route" and "duplicate message"
+      // looking identical, and they need different fixes.
+      let why = "";
+      try {
+        const parsed = JSON.parse(body) as {
+          errors?: Array<{ code?: string; title?: string; detail?: string }>;
+        };
+        why = (parsed.errors ?? [])
+          .map((e) => [e.code, e.title, e.detail].filter(Boolean).join(" "))
+          .join("; ");
+      } catch {
+        why = body;
+      }
+      return { sent: false, reason: `Telnyx ${res.status}${why ? `: ${why}` : ""}` };
     }
     const body = (await res.json()) as { data?: { id?: string } };
     return { sent: true, id: body.data?.id };

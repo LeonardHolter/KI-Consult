@@ -68,3 +68,23 @@ describe("outbound SMS", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("refusal reasons", () => {
+  it("carries Telnyx's own explanation, not just the status code", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () =>
+        JSON.stringify({ errors: [{ code: "40300", title: "Sender not eligible", detail: "No sender for destination" }] }),
+    });
+    const r = await sendSms("48435330", "hei");
+    const reason = (r as { reason: string }).reason;
+    expect(reason).toContain("409");
+    expect(reason).toContain("Sender not eligible");
+  });
+
+  it("falls back to the raw body when it is not the usual shape", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500, text: async () => "upstream exploded" });
+    expect((await sendSms("48435330", "hei") as { reason: string }).reason).toContain("upstream exploded");
+  });
+});
