@@ -90,6 +90,9 @@ describe("refusal reasons", () => {
     const reason = (r as { reason: string }).reason;
     expect(reason).toContain("409");
     expect(reason).toContain("Sender not eligible");
+    // Says which sender fields went out, so a refusal can be told apart
+    // from configuration that never reached production.
+    expect(reason).toContain("messaging_profile_id");
   });
 
   it("falls back to the raw body when it is not the usual shape", async () => {

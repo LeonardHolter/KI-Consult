@@ -79,7 +79,11 @@ export async function sendSms(to: string, text: string): Promise<SmsResult> {
       } catch {
         why = body;
       }
-      return { sent: false, reason: `Telnyx ${res.status}${why ? `: ${why}` : ""}` };
+      // Which sender fields we actually sent. Without this, a refusal looks
+      // the same whether the alpha sender never reached production or
+      // reached it and was rejected — and those need opposite fixes.
+      const sent = Object.keys(sender).join("+") || "ingen";
+      return { sent: false, reason: `Telnyx ${res.status} [avsender: ${sent}]${why ? `: ${why}` : ""}` };
     }
     const body = (await res.json()) as { data?: { id?: string } };
     return { sent: true, id: body.data?.id };
