@@ -33,15 +33,24 @@ describe("outbound SMS", () => {
     expect(bodyOf().to).toBe("+4748435330");
   });
 
-  it("prefers the messaging profile, and falls back to a plain from-number", async () => {
+  it("sends the profile and the sender together, which is what 40321 needs", async () => {
+    // Profile alone: Telnyx has to pick a number off the profile, and a
+    // Norwegian voice line cannot be SMS-enabled, so there is none.
     await sendSms("48435330", "hei");
-    expect(bodyOf().messaging_profile_id).toBe("prof_1");
+    expect(bodyOf()).toMatchObject({ messaging_profile_id: "prof_1" });
+    expect(bodyOf().from).toBeUndefined();
 
-    delete process.env.TELNYX_MESSAGING_PROFILE_ID;
-    process.env.TELNYX_SMS_FROM = "+4723509652";
+    process.env.TELNYX_SMS_FROM = "HedinAuto";
     fetchMock.mockClear();
     await sendSms("48435330", "hei");
-    expect(bodyOf().from).toBe("+4723509652");
+    expect(bodyOf()).toMatchObject({ messaging_profile_id: "prof_1", from: "HedinAuto" });
+  });
+
+  it("still works with only a from-number, for an SMS-enabled line", async () => {
+    delete process.env.TELNYX_MESSAGING_PROFILE_ID;
+    process.env.TELNYX_SMS_FROM = "+4723509652";
+    await sendSms("48435330", "hei");
+    expect(bodyOf()).toMatchObject({ from: "+4723509652" });
   });
 
   it("reports a refusal instead of throwing, so the agent can stay honest", async () => {

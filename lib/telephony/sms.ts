@@ -13,14 +13,24 @@ export function smsConfigured(): boolean {
   return Boolean(process.env.TELNYX_API_KEY) && Boolean(smsSender());
 }
 
-/** The From the message goes out as. A messaging profile lets Telnyx pick the
- *  best sender itself, which is what Norwegian A2P traffic wants; a plain
- *  number works too where the line is SMS-enabled. */
-function smsSender(): { messaging_profile_id: string } | { from: string } | null {
+/**
+ * Who the message goes out as.
+ *
+ * The profile alone is not enough when it has no SMS-enabled number on it:
+ * Telnyx answers 40321 «No usable numbers on messaging profile», because it
+ * picks the sender from the profile's numbers and there are none. Norwegian
+ * geographic numbers usually cannot be SMS-enabled at all, so the sender for
+ * this traffic is an alphanumeric ID — and that has to be named explicitly
+ * in `from`, alongside the profile that routes it.
+ */
+function smsSender(): Record<string, string> | null {
   const profile = process.env.TELNYX_MESSAGING_PROFILE_ID;
-  if (profile) return { messaging_profile_id: profile };
   const from = process.env.TELNYX_SMS_FROM;
-  return from ? { from } : null;
+  if (!profile && !from) return null;
+  return {
+    ...(profile ? { messaging_profile_id: profile } : {}),
+    ...(from ? { from } : {}),
+  };
 }
 
 export type SmsResult = { sent: true; id?: string } | { sent: false; reason: string };
