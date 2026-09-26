@@ -598,6 +598,10 @@ export async function execBookingTool(
             success: false,
             error:
               "Klarte ikke sende SMS-en. Si at serviceavdelingen sender lenken når de tar kontakt — lov ALDRI en SMS som ikke gikk.",
+            // Why it failed, for logs and the admin test call. Kept out of
+            // `error` on purpose: that string is read aloud to a caller, and
+            // "Telnyx 422" is not something anyone should hear on the phone.
+            detail: result.reason,
           };
     }
 

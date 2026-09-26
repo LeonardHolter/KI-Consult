@@ -60,6 +60,8 @@ export async function POST(req: Request) {
         tool,
         ...(needsScope ? { scope } : {}),
         error: String(result.error ?? "unknown"),
+        // The agent-facing error is deliberately vague; this is the cause.
+        ...(result.detail ? { detail: String(result.detail) } : {}),
         via: "elevenlabs-webhook",
       },
     });
