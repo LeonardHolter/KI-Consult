@@ -11,6 +11,7 @@ import { elevenlabsAgentIdFor } from "@/lib/voiceDemo/elevenlabsAgents";
 import VoiceRecordingsPanel from "@/components/VoiceRecordingsPanel";
 import CustomerListPanel from "@/components/CustomerListPanel";
 import KpiTiles from "@/components/KpiTiles";
+import CallActivityChart from "@/components/CallActivityChart";
 
 /**
  * The client-facing view of their bot: the live booking calendar plus the chat
@@ -522,6 +523,7 @@ export default function PortalDashboard({
             without a number keep the WebRTC caller — they have nothing to
             dial yet. */}
         <KpiTiles clientId={clientId} />
+        <CallActivityChart clientId={clientId} />
         <FoldSection foldKey="taleagent" title="Taleagent">
         {phoneNumber ? (
           <div className="ctp-card" style={{ textAlign: "center", padding: "30px 20px 26px" }}>
