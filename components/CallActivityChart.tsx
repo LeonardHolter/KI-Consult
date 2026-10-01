@@ -20,10 +20,14 @@ const INK = "#16190f";
 const MUTED = "#9a9a8c";
 const GRID = "#E6E0D0";
 const VOICE = "#0d6b47";
+/** The hovered bar only — lighter than the series green, so the day under
+ *  the cursor reads as lit rather than as a different kind of data. */
+const VOICE_LIT = "#15a06a";
+const BAND = "rgba(22,25,15,0.05)";
 
 const W = 640;
-const H = 170;
-const PAD = { top: 16, right: 8, bottom: 24, left: 38 };
+const H = 182;
+const PAD = { top: 16, right: 8, bottom: 34, left: 38 };
 
 function topRoundedBar(x: number, y: number, w: number, h: number): string {
   if (h <= 0) return "";
@@ -50,30 +54,39 @@ function niceMax(n: number): number {
   return 10 * pow;
 }
 
-type Tip = { x: number; day: CallDay } | null;
-
 function DayBars({
   title,
   days,
   value,
   fmtY,
   fmtTip,
+  hover,
+  onHover,
 }: {
   title: string;
   days: CallDay[];
   value: (d: CallDay) => number;
   fmtY: (v: number) => string;
   fmtTip: (d: CallDay) => string;
+  /** Index of the day under the cursor, in EITHER chart — both light up the
+   *  same day, so the pair reads as one fortnight instead of two. */
+  hover: number | null;
+  onHover: (i: number | null) => void;
 }) {
-  const [tip, setTip] = useState<Tip>(null);
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
   const step = innerW / Math.max(1, days.length);
   const barW = Math.min(26, step * 0.62);
   const yMax = niceMax(Math.max(...days.map(value), 0));
 
+  const tipDay = hover !== null ? days[hover] : null;
+  const tipX = hover !== null ? PAD.left + hover * step + step / 2 : 0;
+
   return (
-    <div style={{ flex: 1, minWidth: 280, position: "relative" }}>
+    <div
+      style={{ flex: 1, minWidth: 420, position: "relative" }}
+      onMouseLeave={() => onHover(null)}
+    >
       <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 6 }}>{title}</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
         {[0, 0.5, 1].map((f) => {
@@ -92,32 +105,44 @@ function DayBars({
           const v = value(d);
           const h = yMax > 0 ? (v / yMax) * innerH : 0;
           const x = PAD.left + i * step + (step - barW) / 2;
+          const lit = hover === i;
           return (
             <g key={d.date}>
-              {/* Full-height hit area: hovering a quiet day must work even
-                  though its bar is a sliver or nothing at all. */}
+              {/* The lit column runs the full height and behind the bar, so a
+                  day with no calls still shows which day you are on. */}
+              {lit && (
+                <rect
+                  x={PAD.left + i * step}
+                  y={PAD.top}
+                  width={step}
+                  height={innerH}
+                  fill={BAND}
+                />
+              )}
+              <path
+                d={topRoundedBar(x, PAD.top + innerH - h, barW, h)}
+                fill={lit ? VOICE_LIT : VOICE}
+              />
+              <text
+                x={PAD.left + i * step + step / 2}
+                y={H - 16}
+                fontSize={10.5}
+                fontWeight={lit ? 700 : 400}
+                fill={lit ? INK : MUTED}
+                textAnchor="middle"
+              >
+                {d.label}
+              </text>
+              {/* Hit area last, so it sits above the marks: hovering a quiet
+                  day must work even though its bar is a sliver or nothing. */}
               <rect
                 x={PAD.left + i * step}
                 y={PAD.top}
                 width={step}
-                height={innerH}
+                height={innerH + PAD.bottom - 6}
                 fill="transparent"
-                onMouseEnter={() => setTip({ x: PAD.left + i * step + step / 2, day: d })}
-                onMouseLeave={() => setTip(null)}
+                onMouseEnter={() => onHover(i)}
               />
-              <path d={topRoundedBar(x, PAD.top + innerH - h, barW, h)} fill={VOICE} />
-              {/* Every other label, so a fortnight fits without overlapping. */}
-              {i % 2 === 0 && (
-                <text
-                  x={PAD.left + i * step + step / 2}
-                  y={H - 7}
-                  fontSize={10.5}
-                  fill={MUTED}
-                  textAnchor="middle"
-                >
-                  {d.label}
-                </text>
-              )}
             </g>
           );
         })}
@@ -132,13 +157,13 @@ function DayBars({
         />
       </svg>
 
-      {tip && (
+      {tipDay && (
         <div
           style={{
             position: "absolute",
-            left: `${(tip.x / W) * 100}%`,
+            left: `${(tipX / W) * 100}%`,
             top: 20,
-            transform: tip.x > W * 0.62 ? "translateX(-105%)" : "translateX(8px)",
+            transform: tipX > W * 0.62 ? "translateX(-105%)" : "translateX(8px)",
             background: "#0B2118",
             color: "#D8E4DC",
             borderRadius: 8,
@@ -150,15 +175,27 @@ function DayBars({
             zIndex: 5,
           }}
         >
-          {fmtTip(tip.day)}
+          {fmtTip(tipDay)}
         </div>
       )}
     </div>
   );
 }
 
+/** «torsdag 1. oktober» — the tooltip says the weekday out loud, because a
+ *  shop thinks in «last Thursday», not in «1.10». */
+function fullDate(d: CallDay): string {
+  return new Intl.DateTimeFormat("no-NO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Oslo",
+  }).format(new Date(`${d.date}T12:00:00Z`));
+}
+
 export default function CallActivityChart({ clientId }: { clientId?: string }) {
   const [days, setDays] = useState<CallDay[] | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
   const [hidden, setHidden] = useState(false);
 
   const qs = clientId ? `?client=${clientId}` : "";
@@ -217,15 +254,19 @@ export default function CallActivityChart({ clientId }: { clientId?: string }) {
           value={(d) => d.calls}
           fmtY={(v) => String(Math.round(v))}
           fmtTip={(d) =>
-            `${d.label}: ${d.calls} ${d.calls === 1 ? "samtale" : "samtaler"}`
+            `${fullDate(d)}: ${d.calls} ${d.calls === 1 ? "samtale" : "samtaler"}`
           }
+          hover={hover}
+          onHover={setHover}
         />
         <DayBars
           title="Taleminutter per dag"
           days={days}
           value={(d) => d.minutes}
           fmtY={(v) => String(Math.round(v))}
-          fmtTip={(d) => `${d.label}: ${d.minutes.toFixed(1).replace(".", ",")} min`}
+          fmtTip={(d) => `${fullDate(d)}: ${d.minutes.toFixed(1).replace(".", ",")} min`}
+          hover={hover}
+          onHover={setHover}
         />
       </div>
     </div>
